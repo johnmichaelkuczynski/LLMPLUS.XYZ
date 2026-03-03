@@ -1089,6 +1089,7 @@
   els.btnMoveSession.addEventListener('click', showMoveSessionModal);
   els.btnWritePaper.addEventListener('click', showWritePaperModal);
   els.btnLibrary.addEventListener('click', openGlobalLibrary);
+  document.getElementById('btn-library-sidebar').addEventListener('click', openGlobalLibrary);
   document.getElementById('close-library').addEventListener('click', function() {
     els.libraryModal.classList.remove('active');
   });

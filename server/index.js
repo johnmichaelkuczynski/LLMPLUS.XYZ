@@ -690,7 +690,8 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
     if (ext === '.txt') {
       rawContent = file.buffer.toString('utf-8');
     } else if (ext === '.pdf') {
-      var pdfParse = (await import('pdf-parse')).default;
+      var pdfMod = await import('pdf-parse');
+      var pdfParse = pdfMod.PDFParse || pdfMod.default || pdfMod;
       var pdfData = await pdfParse(file.buffer);
       rawContent = pdfData.text;
     } else if (ext === '.docx' || ext === '.doc') {
