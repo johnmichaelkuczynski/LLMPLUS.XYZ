@@ -691,8 +691,10 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
       rawContent = file.buffer.toString('utf-8');
     } else if (ext === '.pdf') {
       var pdfMod = await import('pdf-parse');
-      var pdfParse = pdfMod.PDFParse || pdfMod.default || pdfMod;
-      var pdfData = await pdfParse(file.buffer);
+      var uint8 = new Uint8Array(file.buffer);
+      var parser = new pdfMod.PDFParse(uint8);
+      await parser.load();
+      var pdfData = await parser.getText();
       rawContent = pdfData.text;
     } else if (ext === '.docx' || ext === '.doc') {
       var mammoth = await import('mammoth');
