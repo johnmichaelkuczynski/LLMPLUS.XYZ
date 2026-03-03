@@ -247,7 +247,8 @@
     modal.querySelector('[data-testid="close-move-modal"]').addEventListener('click', function() {
       modal.remove();
     });
-    modal.addEventListener('click', function(e) {
+    modal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    modal.addEventListener('mousedown', function(e) {
       if (e.target === modal) modal.remove();
     });
 
@@ -890,7 +891,10 @@
     modal.querySelectorAll('[data-close]').forEach(function(b) {
       b.addEventListener('click', function() { modal.remove(); });
     });
-    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    modal.querySelector('.modal').addEventListener('mousedown', function(e) {
+      e.stopPropagation();
+    });
+    modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
 
     modal.querySelector('[data-testid="btn-start-paper"]').addEventListener('click', async function() {
       var title = modal.querySelector('[data-field="title"]').value.trim();
@@ -947,7 +951,8 @@
     modal.innerHTML = inner;
 
     modal.querySelector('[data-close]').addEventListener('click', function() { modal.remove(); });
-    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    modal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
 
     var newInput = modal.querySelector('[data-testid="move-new-project-input"]');
     modal.querySelector('[data-testid="move-create-project"]').addEventListener('click', async function() {
