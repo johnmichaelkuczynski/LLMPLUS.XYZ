@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Plus</title>
+  <meta name="description" content="LLM Plus - Minimalist AI chat with document management and persistent memory">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=2">
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1 data-testid="app-title">LLM <span class="accent">Plus</span></h1>
+      </div>
+      <div class="sidebar-scroll">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Projects</div>
+          <div id="project-list"></div>
+          <button class="sidebar-btn" id="btn-new-project" data-testid="btn-new-project">+ New Project</button>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Chats</div>
+          <div id="session-list"></div>
+          <button class="sidebar-btn" id="btn-new-session" data-testid="btn-new-session">+ New Chat</button>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <div id="cc-status" class="cc-status hidden">
+          <div class="cc-label"><strong>Coherence Engine</strong> <span id="cc-status-text">Idle</span></div>
+          <div class="cc-bar"><div class="cc-fill" id="cc-fill"></div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <span class="topbar-title" id="topbar-title" data-testid="topbar-title">LLM Plus</span>
+        <span class="topbar-project" id="topbar-project" data-testid="topbar-project"></span>
+        <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
+      </header>
+
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcome" data-testid="welcome-screen">
+          <h2>Welcome to LLM Plus</h2>
+          <p>Chat with Claude. Upload documents, build persistent memory, and generate large coherent documents with the three-pass coherence engine.</p>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-box" id="input-box">
+          <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>
+          <textarea id="chat-input" class="chat-textarea" placeholder="Message Claude..." rows="1" data-testid="chat-input"></textarea>
+          <button class="icon-btn" id="btn-upload" title="Upload Document" data-testid="btn-upload" type="button">&#128206;</button>
+          <input type="file" id="file-input" class="file-input" accept=".pdf,.docx,.doc,.txt" data-testid="file-input">
+          <button class="paper-btn" id="btn-write-paper" title="Write a Paper" data-testid="btn-write-paper" type="button">&#128221; Paper</button>
+          <button class="send-btn" id="btn-send" title="Send" data-testid="btn-send" type="button">&#9654;</button>
+        </div>
+      </div>
+    </main>
+
+    <aside class="doc-panel" id="doc-panel">
+      <div class="doc-panel-header">
+        <span class="doc-panel-title">Documents</span>
+      </div>
+      <div class="doc-panel-list" id="doc-panel-list" data-testid="doc-panel-list"></div>
+    </aside>
+  </div>
+
+  <div class="drop-overlay" id="drop-overlay">
+    <div class="drop-label">Drop document here to upload</div>
+  </div>
+
+  <div class="modal-bg" id="library-modal">
+    <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column">
+      <div class="modal-head">
+        <span class="modal-title">&#128218; General Library</span>
+        <button class="modal-x" id="close-library" data-testid="close-library">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="flex:1">+ Upload to Library</button>
+          <button class="sidebar-btn" id="btn-send-selected" data-testid="btn-send-selected" style="flex:1;background:#7c3aed;color:#fff;opacity:0.5" disabled>Send Selected to Claude</button>
+        </div>
+        <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt" multiple style="display:none">
+        <div id="library-selected-count" style="font-size:12px;color:#6b7280;margin-bottom:8px;display:none" data-testid="library-selected-count"></div>
+        <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="project-modal">
+    <div class="modal" style="width:380px">
+      <div class="modal-head">
+        <span class="modal-title">New Project</span>
+        <button class="modal-x" id="close-project-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="text-input" id="project-name-input" placeholder="Project name" data-testid="input-project-name">
+      </div>
+      <div class="modal-foot">
+        <button class="btn-cancel" id="cancel-project">Cancel</button>
+        <button class="btn-ok" id="confirm-project" data-testid="btn-confirm-project">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=2"></script>
+</body>
+</html>
