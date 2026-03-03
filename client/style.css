@@ -1133,6 +1133,15 @@ html, body {
   flex-shrink: 0;
 }
 
+.library-drop-hover {
+  outline: 3px dashed #fff !important;
+  outline-offset: -3px;
+  background: #6d28d9 !important;
+  transform: scale(1.05);
+  transition: transform 0.15s, background 0.15s;
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.5);
+}
+
 .tractatus-popup {
   position: fixed;
   bottom: 80px;

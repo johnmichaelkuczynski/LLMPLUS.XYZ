@@ -439,11 +439,11 @@
                   if (cursor) cursor.remove();
                   tpTitle.innerHTML = '&#9989; Memory Updated (' + p.nodes + ' nodes)';
                   tpClose.classList.remove('hidden');
-                  setTimeout(function() { popup.remove(); }, 5000);
+                  setTimeout(function() { popup.remove(); }, 8000);
                 } else if (p.type === 'error') {
                   var cursor = tpContent.querySelector('.cursor-blink');
                   if (cursor) cursor.remove();
-                  tpTitle.innerHTML = '&#10060; Update Failed';
+                  tpTitle.innerHTML = '&#10060; Update Failed: ' + (p.message || 'Unknown error');
                   tpClose.classList.remove('hidden');
                 }
               } catch (e) {}
@@ -1279,6 +1279,54 @@
   });
 
   var dragTimer = null;
+  var libraryBtn = document.getElementById('btn-library-sidebar');
+  var droppedOnLibrary = false;
+
+  libraryBtn.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    libraryBtn.classList.add('library-drop-hover');
+  });
+  libraryBtn.addEventListener('dragleave', function(e) {
+    libraryBtn.classList.remove('library-drop-hover');
+  });
+  libraryBtn.addEventListener('drop', async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    droppedOnLibrary = true;
+    libraryBtn.classList.remove('library-drop-hover');
+    els.dropOverlay.classList.remove('active');
+    clearTimeout(dragTimer);
+
+    var files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    var allowed = ['.pdf', '.docx', '.doc', '.txt'];
+    var uploaded = 0;
+    for (var fi = 0; fi < files.length; fi++) {
+      var file = files[fi];
+      var ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (allowed.indexOf(ext) === -1) {
+        notify(file.name + ': unsupported type (PDF, DOCX, TXT only)', 'error');
+        continue;
+      }
+      try {
+        notify('Uploading ' + file.name + ' to library...', 'info');
+        var fd = new FormData();
+        fd.append('file', file);
+        var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error(await resp.text());
+        uploaded++;
+      } catch (err) {
+        notify('Failed: ' + file.name, 'error');
+      }
+    }
+    if (uploaded > 0) {
+      notify('Added ' + uploaded + ' document' + (uploaded > 1 ? 's' : '') + ' to General Library', 'success');
+      openGlobalLibrary();
+    }
+    setTimeout(function() { droppedOnLibrary = false; }, 100);
+  });
+
   document.addEventListener('dragover', function(e) {
     e.preventDefault();
     els.dropOverlay.classList.add('active');
@@ -1291,6 +1339,7 @@
     e.preventDefault();
     clearTimeout(dragTimer);
     els.dropOverlay.classList.remove('active');
+    if (droppedOnLibrary) return;
     if (e.dataTransfer.files.length > 0) {
       uploadFile(e.dataTransfer.files[0]);
     }
@@ -1302,10 +1351,12 @@
     }
   });
 
-  els.libraryModal.addEventListener('click', function(e) {
+  els.libraryModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  els.libraryModal.addEventListener('mousedown', function(e) {
     if (e.target === els.libraryModal) els.libraryModal.classList.remove('active');
   });
-  els.projectModal.addEventListener('click', function(e) {
+  els.projectModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  els.projectModal.addEventListener('mousedown', function(e) {
     if (e.target === els.projectModal) els.projectModal.classList.remove('active');
   });
 

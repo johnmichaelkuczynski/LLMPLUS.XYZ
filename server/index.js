@@ -322,7 +322,20 @@ app.post('/api/tractatus/update', async function(req, res) {
     var prompt = 'Based on this conversation exchange, generate a Tractatus tree update in strict JSON format.\n\n';
     prompt += 'User said: "' + userExcerpt + '"\n';
     prompt += 'Assistant said: "' + assistantExcerpt + '"\n\n';
-    prompt += 'Existing tree:\n' + JSON.stringify(existingTree) + '\n\n';
+    var treeStr = JSON.stringify(existingTree);
+    if (treeStr.length > 8000) {
+      var treeKeys = Object.keys(existingTree);
+      var recentKeys = treeKeys.slice(-30);
+      var recentTree = {};
+      for (var rk = 0; rk < recentKeys.length; rk++) {
+        recentTree[recentKeys[rk]] = existingTree[recentKeys[rk]];
+      }
+      treeStr = JSON.stringify(recentTree);
+      prompt += 'Existing tree (last 30 of ' + treeKeys.length + ' nodes shown):\n' + treeStr + '\n\n';
+      prompt += 'Total existing node count: ' + treeKeys.length + '. Add new numbered nodes continuing from the highest existing key.\n\n';
+    } else {
+      prompt += 'Existing tree:\n' + treeStr + '\n\n';
+    }
     prompt += 'Rules:\n';
     prompt += '- Keys are strings like "1.0", "1.1", "1.1.1", "2.0" etc.\n';
     prompt += '- Values are strings containing the summary text\n';
@@ -360,20 +373,36 @@ app.post('/api/tractatus/update', async function(req, res) {
             if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
               fullText += parsed.delta.text;
               send({ type: 'text', text: parsed.delta.text });
+            } else if (parsed.type === 'error') {
+              console.error('Anthropic stream error in tractatus:', JSON.stringify(parsed));
             }
           } catch (e) {}
         }
       }
     }
 
+    var cleanedText = fullText.trim();
+    if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    }
+
     var newTree;
     try {
-      newTree = JSON.parse(fullText);
+      newTree = JSON.parse(cleanedText);
     } catch (e) {
-      var jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      var jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        newTree = JSON.parse(jsonMatch[0]);
+        try {
+          newTree = JSON.parse(jsonMatch[0]);
+        } catch (e2) {
+          console.error('Tractatus JSON parse failed (extracted):', e2.message, 'Text:', jsonMatch[0].substring(0, 200));
+          send({ type: 'error', message: 'Failed to parse tree update' });
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
       } else {
+        console.error('Tractatus no JSON found in:', cleanedText.substring(0, 200));
         send({ type: 'error', message: 'Failed to parse tree update' });
         res.write('data: [DONE]\n\n');
         res.end();
@@ -388,8 +417,8 @@ app.post('/api/tractatus/update', async function(req, res) {
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
-    console.error('Tractatus stream error:', err.message);
-    send({ type: 'error', message: err.message });
+    console.error('Tractatus stream error:', err.message, err.stack);
+    try { send({ type: 'error', message: err.message }); } catch(e2) {}
     res.write('data: [DONE]\n\n');
     res.end();
   }
