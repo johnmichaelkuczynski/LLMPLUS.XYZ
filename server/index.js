@@ -399,25 +399,19 @@ app.post('/api/coherence', async function(req, res) {
     var docResult = await pool.query('SELECT name, raw_content FROM project_documents WHERE project_id = $1', [projectId]);
     var projectDocs = docResult.rows;
 
-    var contextSummary = '';
-    if (transcript.length > 0) {
-      var recentMessages = transcript.slice(-10);
-      contextSummary += 'Recent conversation context:\n';
-      for (var t = 0; t < recentMessages.length; t++) {
-        var msg = recentMessages[t];
-        var excerpt = msg.content.length > 2000 ? msg.content.substring(0, 2000) + '...' : msg.content;
-        contextSummary += msg.role + ': ' + excerpt + '\n\n';
+    var sourceContent = '';
+    if (projectDocs.length > 0) {
+      for (var d = 0; d < projectDocs.length; d++) {
+        var docContent = projectDocs[d].raw_content || '';
+        sourceContent += '--- Document: ' + projectDocs[d].name + ' (' + docContent.split(/\s+/).length + ' words) ---\n';
+        sourceContent += docContent.length > 10000 ? docContent.substring(0, 10000) + '...[truncated]' : docContent;
+        sourceContent += '\n\n';
       }
     }
 
-    var sourceContent = '';
-    if (projectDocs.length > 0) {
-      sourceContent += 'Source documents available:\n\n';
-      for (var d = 0; d < projectDocs.length; d++) {
-        var docContent = projectDocs[d].raw_content || '';
-        var docExcerpt = docContent.length > 15000 ? docContent.substring(0, 15000) + '...[truncated, ' + docContent.split(/\s+/).length + ' words total]' : docContent;
-        sourceContent += '--- Document: ' + projectDocs[d].name + ' ---\n' + docExcerpt + '\n\n';
-      }
+    var treeContext = '';
+    if (Object.keys(tree).length > 0) {
+      treeContext = 'Project knowledge (Tractatus tree):\n' + JSON.stringify(tree).substring(0, 5000) + '\n\n';
     }
 
     var userRequest = 'Generate a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ');
@@ -430,6 +424,45 @@ app.post('/api/coherence', async function(req, res) {
     );
     var jobId = jobResult.rows[0].id;
 
+    if (targetWords <= 5000) {
+      send({ type: 'status', pass: 1, message: 'Generating ' + targetWords + '-word document...' });
+      send({ type: 'progress', current: 1, total: 1 });
+
+      var singlePrompt = 'Write a ' + doctype.replace(/_/g, ' ');
+      if (title) singlePrompt += ' titled "' + title + '"';
+      singlePrompt += '.\n\n';
+      if (instructions) singlePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
+      singlePrompt += 'TARGET LENGTH: exactly ' + targetWords + ' words. Do NOT exceed this. Do NOT write less.\n\n';
+      if (treeContext) singlePrompt += treeContext;
+      if (sourceContent) singlePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
+      singlePrompt += 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text.';
+
+      var singleResult = await callClaude(
+        [{ role: 'user', content: singlePrompt }],
+        'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. Write exactly the requested number of words. Output ONLY the document — no meta-commentary.',
+        false,
+        8192
+      );
+
+      var singleWords = singleResult.split(/\s+/).length;
+
+      await pool.query(
+        "UPDATE document_jobs SET status = 'complete', global_skeleton = $1 WHERE id = $2",
+        [JSON.stringify([{ title: title, content: singleResult }]), jobId]
+      );
+
+      await pool.query(
+        'INSERT INTO document_chunks (job_id, chunk_index, chunk_text, chunk_output, chunk_delta) VALUES ($1, $2, $3, $4, $5)',
+        [jobId, 0, title, singleResult, JSON.stringify({ title: title, words: singleWords })]
+      );
+
+      send({ type: 'chunk', text: singleResult });
+      send({ type: 'complete', jobId: jobId, totalWords: singleWords });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
+    }
+
     send({ type: 'status', pass: 1, message: 'Pass 1: Creating detailed outline...' });
 
     var wordsPerSection = 1500;
@@ -437,14 +470,13 @@ app.post('/api/coherence', async function(req, res) {
 
     var outlinePrompt = 'Create a detailed section-by-section outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + '.\n\n';
     if (title) outlinePrompt += 'Title: ' + title + '\n';
-    if (instructions) outlinePrompt += 'Instructions: ' + instructions + '\n\n';
+    if (instructions) outlinePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
     outlinePrompt += 'Target: approximately ' + numSections + ' sections, each roughly ' + wordsPerSection + ' words.\n\n';
-    if (contextSummary) outlinePrompt += contextSummary + '\n\n';
-    if (sourceContent) outlinePrompt += 'Use these source documents as material:\n' + sourceContent.substring(0, 20000) + '\n\n';
-    if (Object.keys(tree).length > 0) outlinePrompt += 'Tractatus tree context:\n' + JSON.stringify(tree) + '\n\n';
+    if (treeContext) outlinePrompt += treeContext;
+    if (sourceContent) outlinePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
     outlinePrompt += 'Return ONLY a JSON array of section objects:\n';
     outlinePrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
-    outlinePrompt += 'Include all major sections (abstract/intro, body sections, conclusion, bibliography if relevant). Return ONLY the JSON array.';
+    outlinePrompt += 'Include all major sections. Return ONLY the JSON array.';
 
     var outlineRaw = await callClaude(
       [{ role: 'user', content: outlinePrompt }],
