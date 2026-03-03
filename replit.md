@@ -22,9 +22,9 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 
 ## Key Features
 - **Projects & Sessions**: CRUD with auto-created "Main" project on first load
-- **SSE Streaming Chat**: Real-time word-by-word streaming from Claude
-- **Tractatus Tree Memory**: Per-project persistent JSONB tree, injected into every system prompt, updated after every exchange
-- **Three-Pass Coherence Engine**: Skeleton extraction → constrained chunk processing (15s pauses, fresh DB queries) → global stitch & repair
+- **SSE Streaming Chat**: Real-time word-by-word streaming from Claude with blinking cursor
+- **Tractatus Tree Memory**: Per-project persistent JSONB tree, injected into every system prompt, updated after every exchange in a background popup (green, draggable, minimizable) that streams the JSON update so it doesn't block chat
+- **Three-Pass Coherence Engine**: Outline → streaming section writing → global stitch & repair. Streams tokens live into paper popup. Short docs (≤5000 words) use single-call mode. User instructions are prioritized; chat transcript is NOT injected into paper prompts.
 - **Document Upload**: PDF, DOCX, DOC, TXT via click or drag-and-drop
 - **Document Library**: Book icon modal to browse and insert document text into chat input
 - **Download**: Export coherence engine output as TXT, DOCX, PDF

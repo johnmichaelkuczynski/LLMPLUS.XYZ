@@ -335,6 +335,8 @@
                 scrollBottom();
               } else if (parsed.type === 'error') {
                 notify('Error: ' + parsed.error, 'error');
+              } else if (parsed.type === 'tractatus_trigger') {
+                startTractatusUpdate(parsed.projectId, parsed.userMessage, parsed.assistantResponse);
               }
             } catch (e) {}
           }
@@ -347,6 +349,119 @@
       });
     }
     pump();
+  }
+
+  function startTractatusUpdate(projectId, userMessage, assistantResponse) {
+    var popup = document.createElement('div');
+    popup.className = 'tractatus-popup';
+    popup.setAttribute('data-testid', 'tractatus-popup');
+    popup.innerHTML = '<div class="tp-header">' +
+      '<div class="tp-title">&#128736; Updating Project Memory</div>' +
+      '<div class="tp-controls">' +
+      '<button class="tp-minimize" data-testid="tp-minimize" title="Minimize">&#8211;</button>' +
+      '<button class="tp-close hidden" data-testid="tp-close" title="Close">&times;</button>' +
+      '</div></div>' +
+      '<div class="tp-body"><div class="tp-content"><span class="cursor-blink"></span></div></div>';
+
+    document.body.appendChild(popup);
+
+    var tpContent = popup.querySelector('.tp-content');
+    var tpTitle = popup.querySelector('.tp-title');
+    var tpClose = popup.querySelector('.tp-close');
+    var tpMinimize = popup.querySelector('.tp-minimize');
+    var tpBody = popup.querySelector('.tp-body');
+    var minimized = false;
+    var rawText = '';
+
+    tpMinimize.addEventListener('click', function() {
+      minimized = !minimized;
+      tpBody.classList.toggle('hidden', minimized);
+      tpMinimize.innerHTML = minimized ? '&#9744;' : '&#8211;';
+    });
+    tpClose.addEventListener('click', function() { popup.remove(); });
+
+    var header = popup.querySelector('.tp-header');
+    var dragging = false, startX, startY, origX, origY;
+    header.addEventListener('mousedown', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      var rect = popup.getBoundingClientRect();
+      origX = rect.left; origY = rect.top;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      popup.style.left = (origX + e.clientX - startX) + 'px';
+      popup.style.top = (origY + e.clientY - startY) + 'px';
+      popup.style.right = 'auto';
+      popup.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', function() { dragging = false; });
+
+    fetch('/api/tractatus/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: projectId, userMessage: userMessage, assistantResponse: assistantResponse })
+    }).then(function(res) {
+      if (!res.ok || !res.body) {
+        tpTitle.innerHTML = '&#10060; Update Failed (' + res.status + ')';
+        tpClose.classList.remove('hidden');
+        var cursor = tpContent.querySelector('.cursor-blink');
+        if (cursor) cursor.remove();
+        return;
+      }
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
+
+      function pump() {
+        reader.read().then(function(result) {
+          if (result.done) return;
+          buf += decoder.decode(result.value, { stream: true });
+          var lines = buf.split('\n');
+          buf = lines.pop();
+          for (var i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith('data: ')) {
+              var d = lines[i].slice(6).trim();
+              if (d === '[DONE]') continue;
+              try {
+                var p = JSON.parse(d);
+                if (p.type === 'text') {
+                  rawText += p.text;
+                  var cursor = tpContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
+                  tpContent.textContent = rawText;
+                  tpContent.innerHTML += '<span class="cursor-blink"></span>';
+                  tpContent.scrollTop = tpContent.scrollHeight;
+                } else if (p.type === 'complete') {
+                  var cursor = tpContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
+                  tpTitle.innerHTML = '&#9989; Memory Updated (' + p.nodes + ' nodes)';
+                  tpClose.classList.remove('hidden');
+                  setTimeout(function() { popup.remove(); }, 5000);
+                } else if (p.type === 'error') {
+                  var cursor = tpContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
+                  tpTitle.innerHTML = '&#10060; Update Failed';
+                  tpClose.classList.remove('hidden');
+                }
+              } catch (e) {}
+            }
+          }
+          pump();
+        }).catch(function() {
+          tpTitle.innerHTML = '&#10060; Connection Lost';
+          tpClose.classList.remove('hidden');
+        });
+      }
+      pump();
+    }).catch(function() {
+      tpTitle.innerHTML = '&#10060; Update Failed';
+      tpClose.classList.remove('hidden');
+      var cursor = tpContent.querySelector('.cursor-blink');
+      if (cursor) cursor.remove();
+    });
   }
 
   async function ensureSession() {
@@ -489,6 +604,21 @@
     makeDraggable();
 
     var fullText = '';
+    var ppRenderTimer = null;
+
+    function ppRenderContent() {
+      var cursor = ppContent.querySelector('.cursor-blink');
+      if (cursor) cursor.remove();
+      ppContent.innerHTML = fmt(fullText) + '<span class="cursor-blink"></span>';
+      ppContent.scrollTop = ppContent.scrollHeight;
+      ppRenderTimer = null;
+    }
+
+    function ppScheduleRender() {
+      if (!ppRenderTimer) {
+        ppRenderTimer = setTimeout(ppRenderContent, 80);
+      }
+    }
 
     fetch('/api/coherence', {
       method: 'POST',
@@ -524,11 +654,23 @@
                   var pct = Math.round((parsed.current / parsed.total) * 100);
                   ppFill.style.width = pct + '%';
                   ppStatusText.textContent = 'Writing section ' + parsed.current + ' of ' + parsed.total + '...';
+                } else if (parsed.type === 'token') {
+                  fullText += parsed.text;
+                  ppScheduleRender();
+                } else if (parsed.type === 'section_start') {
+                  if (fullText) fullText += '\n\n';
+                  fullText += '## ' + parsed.title + '\n\n';
+                  ppRenderContent();
                 } else if (parsed.type === 'chunk') {
                   fullText += (fullText ? '\n\n' : '') + parsed.text;
+                  var cursor = ppContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
                   ppContent.innerHTML = fmt(fullText);
                   ppContent.scrollTop = ppContent.scrollHeight;
                 } else if (parsed.type === 'complete') {
+                  var cursor = ppContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
+                  ppContent.innerHTML = fmt(fullText);
                   ppStatusText.textContent = 'Complete — ' + (parsed.totalWords || '?') + ' words generated';
                   ppFill.style.width = '100%';
                   ppWordCount.textContent = (parsed.totalWords || '?') + ' words';

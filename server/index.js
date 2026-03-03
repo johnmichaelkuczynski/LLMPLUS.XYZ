@@ -288,10 +288,7 @@ app.post('/api/chat', async function(req, res) {
     await pool.query('UPDATE sessions SET transcript = $1 WHERE id = $2',
       [JSON.stringify(existingTranscript), sessionId]);
 
-    updateTractatus(projectId, fullText, message).catch(function(err) {
-      console.error('Tractatus update error:', err.message);
-    });
-
+    res.write('data: ' + JSON.stringify({ type: 'tractatus_trigger', projectId: projectId, userMessage: message, assistantResponse: fullText.substring(0, 8000) }) + '\n\n');
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
@@ -301,8 +298,21 @@ app.post('/api/chat', async function(req, res) {
   }
 });
 
-async function updateTractatus(projectId, assistantResponse, userMessage) {
+app.post('/api/tractatus/update', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
   try {
+    var projectId = req.body.projectId;
+    var userMessage = req.body.userMessage || '';
+    var assistantResponse = req.body.assistantResponse || '';
+
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var existingTree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
 
@@ -320,29 +330,100 @@ async function updateTractatus(projectId, assistantResponse, userMessage) {
     prompt += '- Only return the JSON object, no commentary, no markdown fences.\n';
     prompt += '- Merge with existing tree: add new nodes, update existing ones, flag conflicts.';
 
-    var result = await callClaude(
+    send({ type: 'status', message: 'Updating project memory...' });
+
+    var anthropicRes = await callClaude(
       [{ role: 'user', content: prompt }],
       'You output only valid JSON objects. No markdown, no commentary, no fences.',
-      false
+      true,
+      4096
     );
+
+    var reader = anthropicRes.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var fullText = '';
+
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        if (line.startsWith('data: ')) {
+          var data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+              fullText += parsed.delta.text;
+              send({ type: 'text', text: parsed.delta.text });
+            }
+          } catch (e) {}
+        }
+      }
+    }
 
     var newTree;
     try {
-      newTree = JSON.parse(result);
+      newTree = JSON.parse(fullText);
     } catch (e) {
-      var jsonMatch = result.match(/\{[\s\S]*\}/);
+      var jsonMatch = fullText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         newTree = JSON.parse(jsonMatch[0]);
       } else {
+        send({ type: 'error', message: 'Failed to parse tree update' });
+        res.write('data: [DONE]\n\n');
+        res.end();
         return;
       }
     }
 
     var merged = Object.assign({}, existingTree, newTree);
+    var nodeCount = Object.keys(merged).length;
     await pool.query('UPDATE projects SET tractatus_tree = $1 WHERE id = $2', [JSON.stringify(merged), projectId]);
+    send({ type: 'complete', nodes: nodeCount });
+    res.write('data: [DONE]\n\n');
+    res.end();
   } catch (err) {
-    console.error('Tractatus update failed:', err.message);
+    console.error('Tractatus stream error:', err.message);
+    send({ type: 'error', message: err.message });
+    res.write('data: [DONE]\n\n');
+    res.end();
   }
+});
+
+async function streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens) {
+  var anthropicRes = await callClaude(messages, systemPrompt, true, maxTokens || 8192);
+  var reader = anthropicRes.body.getReader();
+  var decoder = new TextDecoder();
+  var buffer = '';
+  var fullText = '';
+
+  while (true) {
+    var chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    var lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (var j = 0; j < lines.length; j++) {
+      var line = lines[j];
+      if (line.startsWith('data: ')) {
+        var data = line.slice(6).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          var parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+            fullText += parsed.delta.text;
+            sendFn({ type: 'token', text: parsed.delta.text });
+          }
+        } catch (e) {}
+      }
+    }
+  }
+  return fullText;
 }
 
 function splitIntoChunks(text, targetWords) {
@@ -437,10 +518,10 @@ app.post('/api/coherence', async function(req, res) {
       if (sourceContent) singlePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
       singlePrompt += 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text.';
 
-      var singleResult = await callClaude(
+      var singleResult = await streamClaudeToSSE(
         [{ role: 'user', content: singlePrompt }],
         'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. Write exactly the requested number of words. Output ONLY the document — no meta-commentary.',
-        false,
+        send,
         8192
       );
 
@@ -456,7 +537,6 @@ app.post('/api/coherence', async function(req, res) {
         [jobId, 0, title, singleResult, JSON.stringify({ title: title, words: singleWords })]
       );
 
-      send({ type: 'chunk', text: singleResult });
       send({ type: 'complete', jobId: jobId, totalWords: singleWords });
       res.write('data: [DONE]\n\n');
       res.end();
@@ -560,10 +640,11 @@ app.post('/api/coherence', async function(req, res) {
       sysPrompt += 'You use every available token to produce rich, substantive, scholarly content. ';
       sysPrompt += 'Output ONLY the section text — no JSON, no markdown headers, no meta-commentary.';
 
-      var sectionText = await callClaude(
+      send({ type: 'section_start', index: i, title: section.title });
+      var sectionText = await streamClaudeToSSE(
         [{ role: 'user', content: sectionPrompt }],
         sysPrompt,
-        false,
+        send,
         8192
       );
 
@@ -583,10 +664,11 @@ app.post('/api/coherence', async function(req, res) {
         if (sourceContent) expandPrompt += '\nSource material to draw from:\n' + sourceContent.substring(0, 10000) + '\n';
         expandPrompt += '\nOutput ONLY the expanded section text. No meta-commentary.';
 
-        var expandedText = await callClaude(
+        send({ type: 'section_start', index: i, title: section.title + ' (expanding)' });
+        var expandedText = await streamClaudeToSSE(
           [{ role: 'user', content: expandPrompt }],
           sysPrompt,
-          false,
+          send,
           8192
         );
 
@@ -604,7 +686,7 @@ app.post('/api/coherence', async function(req, res) {
         [jobId, i, section.title, sectionText, JSON.stringify({ title: section.title, words: sectionText.split(/\s+/).length })]
       );
 
-      send({ type: 'chunk', index: i, text: (i > 0 ? '\n\n' : '') + sectionText });
+      send({ type: 'section_end', index: i, words: sectionWordCount });
 
       await pool.query(
         "UPDATE document_jobs SET status = $1 WHERE id = $2",
