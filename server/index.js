@@ -591,8 +591,8 @@ app.post('/api/coherence', async function(req, res) {
       var singleWords = singleResult.split(/\s+/).length;
 
       await pool.query(
-        "UPDATE document_jobs SET status = 'complete', global_skeleton = $1 WHERE id = $2",
-        [JSON.stringify([{ title: title, content: singleResult }]), jobId]
+        "UPDATE document_jobs SET status = 'complete', final_output = $1, global_skeleton = $2 WHERE id = $3",
+        [singleResult, JSON.stringify([{ title: title, content: singleResult }]), jobId]
       );
 
       await pool.query(
@@ -864,6 +864,23 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="' + filename.replace(/"/g, '\\"') + '"');
     res.send(doc.raw_content || '');
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/documents/save-generated', async function(req, res) {
+  try {
+    var jobId = req.body.jobId;
+    var name = req.body.name || 'Generated Document';
+    var job = await pool.query('SELECT final_output FROM document_jobs WHERE id = $1', [jobId]);
+    if (!job.rows[0]) return res.status(404).json({ error: 'Job not found' });
+    var content = job.rows[0].final_output || '';
+    var result = await pool.query(
+      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
+      [name, content]
+    );
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

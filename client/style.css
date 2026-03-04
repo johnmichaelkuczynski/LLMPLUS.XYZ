@@ -930,6 +930,21 @@ html, body {
   background: #f3f4f6;
 }
 
+.dl-btn-save {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
+.dl-btn-save:hover {
+  background: #6d28d9;
+}
+
+.dl-btn-save:disabled {
+  background: #a78bfa;
+  cursor: default;
+}
+
 .hidden {
   display: none !important;
 }

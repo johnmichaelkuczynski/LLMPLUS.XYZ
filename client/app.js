@@ -773,6 +773,28 @@
                     ppDownloads.appendChild(btn);
                   }
 
+                  var saveBtn = document.createElement('button');
+                  saveBtn.className = 'dl-btn dl-btn-save';
+                  saveBtn.setAttribute('data-testid', 'btn-save-to-library');
+                  saveBtn.innerHTML = '&#128218; Save to Library';
+                  saveBtn.onclick = (function(jid, docTitle) {
+                    return async function() {
+                      try {
+                        await api('/api/documents/save-generated', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ jobId: jid, name: docTitle })
+                        });
+                        saveBtn.innerHTML = '&#9989; Saved';
+                        saveBtn.disabled = true;
+                        notify('Saved to General Library', 'success');
+                      } catch (err) {
+                        notify('Save failed: ' + err.message, 'error');
+                      }
+                    };
+                  })(parsed.jobId, paperSpec.title || paperSpec.doctype);
+                  ppDownloads.appendChild(saveBtn);
+
                   notify('Paper generation complete!', 'success');
                 } else if (parsed.type === 'error') {
                   ppStatusText.textContent = 'Error: ' + parsed.error;
