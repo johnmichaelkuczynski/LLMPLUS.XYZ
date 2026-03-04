@@ -90,9 +90,59 @@
       d.className = 'sidebar-item' + (state.currentProject && state.currentProject.id === p.id ? ' active' : '');
       d.setAttribute('data-testid', 'project-' + p.id);
       d.innerHTML = '<span class="si-icon">&#128193;</span><span class="si-text">' + esc(p.name) + '</span>';
-      d.onclick = (function(proj) { return function() { selectProject(proj); }; })(p);
+      (function(proj, el) {
+        el.addEventListener('click', function() { selectProject(proj); });
+        el.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          startInlineRename(el, proj.name, function(newName) { renameProject(proj, newName); });
+        });
+      })(p, d);
       els.projectList.appendChild(d);
     }
+  }
+
+  function renameProject(proj, newName) {
+    if (!newName || newName === proj.name) return;
+    proj.name = newName;
+    if (state.currentProject && state.currentProject.id === proj.id) {
+      els.topbarProject.textContent = newName;
+    }
+    renderProjects();
+    api('/api/projects/' + proj.id + '/name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName })
+    }).catch(function() { notify('Failed to rename project', 'error'); });
+  }
+
+  function startInlineRename(el, currentName, onSave) {
+    var textSpan = el.querySelector('.si-text');
+    if (!textSpan) return;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-rename';
+    input.value = currentName;
+    input.setAttribute('data-testid', 'inline-rename-input');
+    textSpan.replaceWith(input);
+    input.focus();
+    input.select();
+
+    var saved = false;
+    function save() {
+      if (saved) return;
+      saved = true;
+      var val = input.value.trim();
+      var span = document.createElement('span');
+      span.className = 'si-text';
+      span.textContent = val || currentName;
+      input.replaceWith(span);
+      if (val && val !== currentName) onSave(val);
+    }
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      if (e.key === 'Escape') { input.value = currentName; save(); }
+    });
   }
 
   async function selectProject(p) {
@@ -118,9 +168,26 @@
       d.className = 'sidebar-item' + (state.currentSession && state.currentSession.id === s.id ? ' active' : '');
       d.setAttribute('data-testid', 'session-' + s.id);
       d.innerHTML = '<span class="si-icon">&#128172;</span><span class="si-text">' + esc(s.title || 'New Chat') + '</span>';
-      d.onclick = (function(sess) { return function() { selectSession(sess); }; })(s);
+      (function(sess, el) {
+        el.addEventListener('click', function() { selectSession(sess); });
+        el.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          startInlineRename(el, sess.title || 'New Chat', function(newName) { renameSession(sess, newName); });
+        });
+      })(s, d);
       els.sessionList.appendChild(d);
     }
+  }
+
+  function renameSession(sess, newName) {
+    if (!newName || newName === sess.title) return;
+    sess.title = newName;
+    renderSessions();
+    api('/api/sessions/' + sess.id + '/title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newName })
+    }).catch(function() { notify('Failed to rename chat', 'error'); });
   }
 
   function selectSession(s) {
@@ -499,15 +566,13 @@
     scrollBottom();
 
     var isFirstMessage = !state.currentSession.transcript || state.currentSession.transcript.length === 0;
-    if (isFirstMessage && state.currentSession.title === 'New Chat') {
-      var autoTitle = text.length > 50 ? text.substring(0, 47) + '...' : text;
-      state.currentSession.title = autoTitle;
+    var needsAutoTitle = isFirstMessage && state.currentSession.title === 'New Chat';
+    var sendingSession = state.currentSession;
+    var optimisticTitle = '';
+    if (needsAutoTitle) {
+      optimisticTitle = text.length > 50 ? text.substring(0, 47) + '...' : text;
+      sendingSession.title = optimisticTitle;
       renderSessions();
-      api('/api/sessions/' + state.currentSession.id + '/title', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: autoTitle })
-      }).catch(function() {});
     }
 
     if (!state.currentSession.transcript) state.currentSession.transcript = [];
@@ -529,11 +594,25 @@
       });
 
       streamSSE(res, textEl, function(fullText) {
-        if (state.currentSession && fullText) {
-          state.currentSession.transcript.push({ role: 'assistant', content: fullText });
+        if (sendingSession && fullText) {
+          sendingSession.transcript = sendingSession.transcript || [];
+          sendingSession.transcript.push({ role: 'assistant', content: fullText });
         }
         state.streaming = false;
         els.btnSend.disabled = false;
+
+        if (needsAutoTitle && sendingSession) {
+          api('/api/sessions/' + sendingSession.id + '/auto-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userMessage: text, assistantResponse: fullText })
+          }).then(function(data) {
+            if (data && data.title && sendingSession.title === optimisticTitle) {
+              sendingSession.title = data.title;
+              renderSessions();
+            }
+          }).catch(function() {});
+        }
       });
     } catch (err) {
       notify('Message failed: ' + err.message, 'error');

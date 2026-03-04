@@ -21,7 +21,7 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 ```
 
 ## Key Features
-- **Projects & Sessions**: CRUD with auto-created "Main" project on first load
+- **Projects & Sessions**: CRUD with auto-created "Main" project on first load. Double-click to rename projects or chats inline. New chats get a Claude-generated smart title after the first exchange.
 - **SSE Streaming Chat**: Real-time word-by-word streaming from Claude with blinking cursor
 - **Tractatus Tree Memory**: Per-project persistent JSONB tree, injected into every system prompt, updated after every exchange in a background popup (green, draggable, minimizable) that streams the JSON update so it doesn't block chat
 - **Three-Pass Coherence Engine**: Outline → streaming section writing → global stitch & repair. Streams tokens live into paper popup. Short docs (≤5000 words) use single-call mode. User instructions are prioritized; chat transcript is NOT injected into paper prompts.

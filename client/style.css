@@ -97,6 +97,19 @@ html, body {
   text-overflow: ellipsis;
 }
 
+.inline-rename {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 2px 6px;
+  border: 1px solid #7c3aed;
+  border-radius: 4px;
+  outline: none;
+  background: #fff;
+  color: #111;
+}
+
 .sidebar-btn {
   display: flex;
   align-items: center;

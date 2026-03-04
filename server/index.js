@@ -190,6 +190,40 @@ app.post('/api/sessions/:id/title', async function(req, res) {
   }
 });
 
+app.post('/api/projects/:id/name', async function(req, res) {
+  try {
+    var name = req.body.name;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+    await pool.query('UPDATE projects SET name = $1 WHERE id = $2', [name.trim(), req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sessions/:id/auto-title', async function(req, res) {
+  try {
+    var userMessage = req.body.userMessage || '';
+    var assistantResponse = req.body.assistantResponse || '';
+    var userExcerpt = userMessage.length > 500 ? userMessage.substring(0, 500) : userMessage;
+    var assistantExcerpt = assistantResponse.length > 500 ? assistantResponse.substring(0, 500) : assistantResponse;
+
+    var result = await callClaude(
+      [{ role: 'user', content: 'Generate a short, descriptive chat title (3-7 words, no quotes) based on this exchange:\n\nUser: ' + userExcerpt + '\n\nAssistant: ' + assistantExcerpt + '\n\nRespond with ONLY the title, nothing else.' }],
+      'You generate concise chat titles. Output only the title text, no quotes, no punctuation at the end.',
+      false,
+      50
+    );
+
+    var title = result.trim().replace(/^["']|["']$/g, '').substring(0, 60);
+    await pool.query('UPDATE sessions SET title = $1 WHERE id = $2', [title, req.params.id]);
+    res.json({ title: title });
+  } catch (err) {
+    console.error('Auto-title error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/sessions/:id/transcript', async function(req, res) {
   try {
     var messages = req.body.messages;
