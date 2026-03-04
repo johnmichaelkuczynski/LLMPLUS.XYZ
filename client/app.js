@@ -1044,17 +1044,22 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ docId: ids[i], scope: 'global' })
         });
-        if (result && result.raw_content) {
+        if (result && result.raw_content && result.raw_content.trim().length > 0) {
           var wc = result.raw_content.split(/\s+/).length;
           docNames.push('"' + result.name + '" (' + wc + ' words)');
           allContent += '\n\n=== DOCUMENT: ' + result.name + ' (' + wc + ' words) ===\n\n' + result.raw_content;
+        } else if (result) {
+          notify('"' + result.name + '" has no content — skipped', 'error');
         }
       } catch (err) {
         notify('Failed to load doc: ' + err.message, 'error');
       }
     }
 
-    if (docNames.length === 0) return;
+    if (docNames.length === 0) {
+      notify('No documents with content to send', 'error');
+      return;
+    }
 
     addMessage('user', 'Loading ' + docNames.length + ' document' + (docNames.length > 1 ? 's' : '') + ' from library:\n' + docNames.join('\n'));
     scrollBottom();
@@ -1325,7 +1330,12 @@
     globalFileInput.click();
   });
   document.getElementById('btn-send-selected').addEventListener('click', function() {
-    sendSelectedDocs();
+    sendSelectedDocs().catch(function(err) {
+      console.error('sendSelectedDocs error:', err);
+      notify('Failed to send documents: ' + err.message, 'error');
+      state.streaming = false;
+      els.btnSend.disabled = false;
+    });
   });
   globalFileInput.addEventListener('change', async function() {
     if (globalFileInput.files.length === 0) return;
