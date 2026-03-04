@@ -31,8 +31,166 @@
     docPanelList: document.getElementById('doc-panel-list'),
     ccStatus: document.getElementById('cc-status'),
     ccStatusText: document.getElementById('cc-status-text'),
-    ccFill: document.getElementById('cc-fill')
+    ccFill: document.getElementById('cc-fill'),
+    artifactPanel: document.getElementById('artifact-panel'),
+    artifactTitle: document.getElementById('artifact-title'),
+    artifactBody: document.getElementById('artifact-body'),
+    artifactClose: document.getElementById('artifact-close'),
+    artifactDownloadTxt: document.getElementById('artifact-download-txt'),
+    artifactDownloadDocx: document.getElementById('artifact-download-docx'),
+    artifactDownloadPdf: document.getElementById('artifact-download-pdf'),
+    artifactSave: document.getElementById('artifact-save')
   };
+
+  var currentArtifact = null;
+
+  function isDocumentArtifact(text) {
+    if (!text || text.length < 400) return false;
+    var lines = text.split('\n');
+    var headingCount = 0;
+    var paragraphCount = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (/^#{1,3}\s/.test(line) || /^[IVXLC]+\.\s/.test(line) || /^[A-Z][A-Z\s,]{10,}$/.test(line)) headingCount++;
+      if (line.length > 80) paragraphCount++;
+    }
+    var words = text.split(/\s+/).length;
+    if (words >= 300 && headingCount >= 2 && paragraphCount >= 3) return true;
+    if (words >= 500 && paragraphCount >= 5) return true;
+    return false;
+  }
+
+  function extractArtifactTitle(text) {
+    var lines = text.split('\n');
+    for (var i = 0; i < Math.min(10, lines.length); i++) {
+      var line = lines[i].trim();
+      if (/^#\s+(.+)/.test(line)) return line.replace(/^#\s+/, '');
+      if (/^[A-Z][A-Z\s,'\-]{8,}$/.test(line) && line.length < 100) return line;
+    }
+    var first = text.substring(0, 60).split('\n')[0].trim();
+    return first.length > 5 ? first : 'Document';
+  }
+
+  function formatArtifactHtml(text) {
+    var h = esc(text);
+    h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    h = h.replace(/```([\s\S]*?)```/g, '<pre>$1</pre>');
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+    h = h.replace(/^---+$/gm, '<hr>');
+    h = h.replace(/^- (.+)$/gm, '<li>$1</li>');
+    h = h.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+    h = h.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+
+    var result = '';
+    var inParagraph = false;
+    var htmlLines = h.split('\n');
+    for (var i = 0; i < htmlLines.length; i++) {
+      var line = htmlLines[i];
+      var isBlock = /^<(h[1-3]|hr|pre|ul|ol|li|blockquote)/.test(line.trim());
+      if (isBlock) {
+        if (inParagraph) { result += '</p>'; inParagraph = false; }
+        result += line + '\n';
+      } else if (line.trim() === '') {
+        if (inParagraph) { result += '</p>'; inParagraph = false; }
+        result += '\n';
+      } else {
+        if (!inParagraph) { result += '<p>'; inParagraph = true; }
+        else { result += '<br>'; }
+        result += line;
+      }
+    }
+    if (inParagraph) result += '</p>';
+    return result;
+  }
+
+  function showArtifact(text, title) {
+    currentArtifact = { text: text, title: title || extractArtifactTitle(text) };
+    els.artifactTitle.textContent = currentArtifact.title;
+    els.artifactBody.innerHTML = formatArtifactHtml(text);
+    els.artifactPanel.classList.remove('hidden');
+    els.artifactSave.disabled = false;
+    els.artifactSave.innerHTML = '&#128218; Save';
+  }
+
+  function closeArtifact() {
+    els.artifactPanel.classList.add('hidden');
+    currentArtifact = null;
+  }
+
+  els.artifactClose.addEventListener('click', closeArtifact);
+
+  els.artifactDownloadTxt.addEventListener('click', function() {
+    if (!currentArtifact) return;
+    var blob = new Blob([currentArtifact.text], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (currentArtifact.title || 'document').replace(/[^a-zA-Z0-9\s\-_]/g, '').substring(0, 50) + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  els.artifactDownloadDocx.addEventListener('click', async function() {
+    if (!currentArtifact) return;
+    try {
+      var resp = await fetch('/api/artifact/docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentArtifact.text, title: currentArtifact.title })
+      });
+      if (!resp.ok) throw new Error('Download failed');
+      var blob = await resp.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (currentArtifact.title || 'document').replace(/[^a-zA-Z0-9\s\-_]/g, '').substring(0, 50) + '.docx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      notify('DOCX download failed: ' + err.message, 'error');
+    }
+  });
+
+  els.artifactDownloadPdf.addEventListener('click', async function() {
+    if (!currentArtifact) return;
+    try {
+      var resp = await fetch('/api/artifact/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentArtifact.text, title: currentArtifact.title })
+      });
+      if (!resp.ok) throw new Error('Download failed');
+      var blob = await resp.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (currentArtifact.title || 'document').replace(/[^a-zA-Z0-9\s\-_]/g, '').substring(0, 50) + '.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      notify('PDF download failed: ' + err.message, 'error');
+    }
+  });
+
+  els.artifactSave.addEventListener('click', async function() {
+    if (!currentArtifact) return;
+    try {
+      await api('/api/documents/save-artifact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentArtifact.text, name: currentArtifact.title })
+      });
+      els.artifactSave.innerHTML = '&#9989; Saved';
+      els.artifactSave.disabled = true;
+      notify('Saved to General Library', 'success');
+    } catch (err) {
+      notify('Save failed: ' + err.message, 'error');
+    }
+  });
 
   function notify(msg, type) {
     var el = document.createElement('div');
@@ -281,6 +439,7 @@
     var words = content.split(/\s+/).length;
     var lines = content.split('\n').length;
     var isLarge = role === 'user' && words > 200;
+    var isArtifact = role === 'assistant' && isDocumentArtifact(content);
 
     var bodyHtml;
     if (isLarge) {
@@ -303,6 +462,17 @@
         var card = div.querySelector('.collapsed-card');
         card.outerHTML = '<div class="msg-text">' + fmt(content) + '</div>';
       });
+    }
+
+    if (isArtifact) {
+      var artTitle = extractArtifactTitle(content);
+      var viewBtn = document.createElement('button');
+      viewBtn.className = 'artifact-link';
+      viewBtn.setAttribute('data-testid', 'btn-view-artifact');
+      viewBtn.textContent = '\uD83D\uDCC4 View as Document';
+      viewBtn.addEventListener('click', function() { showArtifact(content, artTitle); });
+      var textContainer = div.querySelector('.msg-text') || div.querySelector('.msg-body');
+      textContainer.appendChild(viewBtn);
     }
 
     els.messages.appendChild(div);
@@ -438,6 +608,16 @@
           var c = textEl.querySelector('.cursor-blink');
           if (c) c.remove();
           textEl.innerHTML = fmt(fullText);
+          if (isDocumentArtifact(fullText)) {
+            var artTitle = extractArtifactTitle(fullText);
+            showArtifact(fullText, artTitle);
+            var viewBtn = document.createElement('button');
+            viewBtn.className = 'artifact-link';
+            viewBtn.setAttribute('data-testid', 'btn-view-artifact');
+            viewBtn.textContent = '\uD83D\uDCC4 View as Document';
+            viewBtn.addEventListener('click', function() { showArtifact(fullText, artTitle); });
+            textEl.appendChild(viewBtn);
+          }
           if (onDone) onDone(fullText);
           return;
         }

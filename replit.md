@@ -25,10 +25,12 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **SSE Streaming Chat**: Real-time word-by-word streaming from Claude with blinking cursor
 - **Tractatus Tree Memory**: Per-project persistent JSONB tree, injected into every system prompt, updated after every exchange in a background popup (green, draggable, minimizable) that streams the JSON update so it doesn't block chat
 - **Three-Pass Coherence Engine**: Outline → streaming section writing → global stitch & repair. Streams tokens live into paper popup. Short docs (≤5000 words) use single-call mode. User instructions are prioritized; chat transcript is NOT injected into paper prompts.
-- **Document Upload**: PDF, DOCX, DOC, TXT via click or drag-and-drop
-- **Document Library**: Book icon modal to browse and insert document text into chat input
-- **Download**: Export coherence engine output as TXT, DOCX, PDF
+- **Document Upload**: PDF, DOCX, DOC, TXT, and image files (PNG, JPG, GIF, BMP, TIFF, WebP) via click or drag-and-drop. Images are processed with Google Cloud Vision OCR.
+- **Document Library**: General Library modal to browse, select, download, and send documents to Claude. Upload from PC button. Drag-and-drop onto library button uploads directly to global library.
+- **Artifact Panel**: When Claude generates a document (detected by length + structure), a formatted preview panel slides in from the right with proper document formatting (serif font, headings, justified text). Download as TXT/DOCX/PDF or save to library. "View as Document" button appears in chat to reopen the panel. Works for both streamed responses and transcript replay.
+- **Download**: Export coherence engine output and artifacts as TXT, DOCX, PDF
 - **Collapsed Messages**: Large user messages (200+ words) show collapsed card with expand button
+- **Context Management**: Chat messages truncated to 12K chars each, total context capped at 150K chars, cross-session context capped at 15K chars to prevent exceeding API token limits.
 
 ## Database Tables
 users, projects, sessions, project_documents, global_documents, document_jobs, document_chunks
@@ -36,6 +38,7 @@ users, projects, sessions, project_documents, global_documents, document_jobs, d
 ## Environment Variables
 - ANTHROPIC_API_KEY: Claude API key
 - DATABASE_URL: Neon PostgreSQL connection string
+- GOOGLE_CLOUD_VISION_API_KEY: Google Cloud Vision API key for image OCR
 - PORT: Server port (default 5000)
 
 ## Critical Rules

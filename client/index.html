@@ -74,6 +74,20 @@
     </aside>
   </div>
 
+  <div class="artifact-panel hidden" id="artifact-panel" data-testid="artifact-panel">
+    <div class="artifact-header">
+      <span class="artifact-title" id="artifact-title" data-testid="artifact-title">Document Preview</span>
+      <div class="artifact-controls">
+        <button class="artifact-btn" id="artifact-download-txt" data-testid="artifact-download-txt" title="Download TXT">&#128196; TXT</button>
+        <button class="artifact-btn" id="artifact-download-docx" data-testid="artifact-download-docx" title="Download DOCX">&#128195; DOCX</button>
+        <button class="artifact-btn" id="artifact-download-pdf" data-testid="artifact-download-pdf" title="Download PDF">&#128211; PDF</button>
+        <button class="artifact-btn artifact-save-btn" id="artifact-save" data-testid="artifact-save" title="Save to Library">&#128218; Save</button>
+        <button class="artifact-close" id="artifact-close" data-testid="artifact-close">&times;</button>
+      </div>
+    </div>
+    <div class="artifact-body" id="artifact-body" data-testid="artifact-body"></div>
+  </div>
+
   <div class="drop-overlay" id="drop-overlay">
     <div class="drop-label">Drop document here to upload</div>
   </div>

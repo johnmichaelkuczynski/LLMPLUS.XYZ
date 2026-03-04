@@ -905,6 +905,114 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
   }
 });
 
+app.post('/api/documents/save-artifact', async function(req, res) {
+  try {
+    var text = req.body.text || '';
+    var name = req.body.name || 'Document';
+    var result = await pool.query(
+      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
+      [name, text]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artifact/docx', async function(req, res) {
+  try {
+    var text = req.body.text || '';
+    var title = req.body.title || 'Document';
+    var docxModule = await import('docx');
+    var Document = docxModule.Document;
+    var Packer = docxModule.Packer;
+    var Paragraph = docxModule.Paragraph;
+    var TextRun = docxModule.TextRun;
+    var HeadingLevel = docxModule.HeadingLevel;
+
+    var children = [];
+    var lines = text.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (/^# (.+)/.test(line)) {
+        children.push(new Paragraph({ text: line.replace(/^# /, ''), heading: HeadingLevel.HEADING_1 }));
+      } else if (/^## (.+)/.test(line)) {
+        children.push(new Paragraph({ text: line.replace(/^## /, ''), heading: HeadingLevel.HEADING_2 }));
+      } else if (/^### (.+)/.test(line)) {
+        children.push(new Paragraph({ text: line.replace(/^### /, ''), heading: HeadingLevel.HEADING_3 }));
+      } else if (line.trim() === '') {
+        children.push(new Paragraph({ text: '' }));
+      } else {
+        var runs = [];
+        var parts = line.split(/(\*\*[^*]+\*\*)/);
+        for (var p = 0; p < parts.length; p++) {
+          if (/^\*\*(.+)\*\*$/.test(parts[p])) {
+            runs.push(new TextRun({ text: parts[p].replace(/\*\*/g, ''), bold: true }));
+          } else if (parts[p]) {
+            runs.push(new TextRun({ text: parts[p] }));
+          }
+        }
+        children.push(new Paragraph({ children: runs }));
+      }
+    }
+
+    var doc = new Document({ sections: [{ children: children }] });
+    var buffer = await Packer.toBuffer(doc);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + title.replace(/"/g, '') + '.docx"');
+    res.send(buffer);
+  } catch (err) {
+    console.error('DOCX error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artifact/pdf', async function(req, res) {
+  try {
+    var text = req.body.text || '';
+    var title = req.body.title || 'Document';
+    var PDFDocument = (await import('pdfkit')).default;
+    var doc = new PDFDocument({ margin: 72, size: 'LETTER' });
+    var buffers = [];
+    doc.on('data', function(chunk) { buffers.push(chunk); });
+    doc.on('end', function() {
+      var pdfBuf = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + title.replace(/"/g, '') + '.pdf"');
+      res.send(pdfBuf);
+    });
+
+    var lines = text.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (/^# (.+)/.test(line)) {
+        doc.fontSize(18).font('Helvetica-Bold').text(line.replace(/^# /, ''), { align: 'center' });
+        doc.moveDown(0.5);
+      } else if (/^## (.+)/.test(line)) {
+        doc.fontSize(14).font('Helvetica-Bold').text(line.replace(/^## /, '').toUpperCase());
+        doc.moveDown(0.3);
+      } else if (/^### (.+)/.test(line)) {
+        doc.fontSize(12).font('Helvetica-Bold').text(line.replace(/^### /, ''));
+        doc.moveDown(0.2);
+      } else if (/^---+$/.test(line.trim())) {
+        doc.moveDown(0.3);
+        doc.moveTo(72, doc.y).lineTo(540, doc.y).stroke();
+        doc.moveDown(0.3);
+      } else if (line.trim() === '') {
+        doc.moveDown(0.4);
+      } else {
+        var cleaned = line.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+        doc.fontSize(11).font('Times-Roman').text(cleaned, { align: 'justify', width: 468 });
+      }
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('PDF error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/documents/save-generated', async function(req, res) {
   try {
     var jobId = req.body.jobId;
