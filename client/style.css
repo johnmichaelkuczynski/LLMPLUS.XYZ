@@ -1146,6 +1146,25 @@ html, body {
   flex-shrink: 0;
 }
 
+.lib-download-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6b7280;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.lib-download-btn:hover {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
 .library-drop-hover {
   outline: 3px dashed #fff !important;
   outline-offset: -3px;

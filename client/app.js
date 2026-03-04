@@ -998,7 +998,8 @@
     var wc = doc.word_count ? doc.word_count.toLocaleString() + ' words' : '';
     li.innerHTML = '<label class="lib-checkbox-wrap"><input type="checkbox" class="lib-checkbox" data-testid="lib-check-' + doc.id + '"></label>' +
       '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name">' + esc(doc.name) + '</span></div>' +
-      '<span class="doc-meta-right">' + esc(wc) + '</span>';
+      '<span class="doc-meta-right">' + esc(wc) + '</span>' +
+      '<button class="lib-download-btn" data-testid="lib-download-' + doc.id + '" title="Download">&#11015;</button>';
 
     var checkbox = li.querySelector('.lib-checkbox');
     checkbox.addEventListener('change', function() {
@@ -1007,8 +1008,13 @@
       updateLibrarySelectionUI();
     });
 
+    li.querySelector('.lib-download-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      window.open('/api/documents/global/' + doc.id + '/download', '_blank');
+    });
+
     li.addEventListener('click', function(e) {
-      if (e.target.tagName === 'INPUT') return;
+      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn')) return;
       checkbox.checked = !checkbox.checked;
       librarySelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);

@@ -855,6 +855,20 @@ app.get('/api/documents/global', async function(req, res) {
   }
 });
 
+app.get('/api/documents/global/:id/download', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    var doc = result.rows[0];
+    var filename = doc.name.replace(/\.[^.]+$/, '') + '.txt';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + filename.replace(/"/g, '\\"') + '"');
+    res.send(doc.raw_content || '');
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/documents/upload', upload.single('file'), async function(req, res) {
   try {
     var file = req.file;
