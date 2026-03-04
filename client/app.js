@@ -917,12 +917,14 @@
       notify('Select a project first', 'error');
       return;
     }
-    var allowed = ['.pdf', '.docx', '.doc', '.txt'];
+    var allowed = ['.pdf', '.docx', '.doc', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
     var ext = '.' + file.name.split('.').pop().toLowerCase();
     if (allowed.indexOf(ext) === -1) {
-      notify('Unsupported file type. Use PDF, DOCX, DOC, or TXT.', 'error');
+      notify('Unsupported file type. Use PDF, DOCX, DOC, TXT, or image files.', 'error');
       return;
     }
+    var isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1;
+    if (isImage) notify('Running OCR on image...', 'info');
 
     await ensureSession();
     if (!state.currentSession) return;
@@ -1369,7 +1371,7 @@
     if (globalFileInput.files.length === 0) return;
     var files = Array.from(globalFileInput.files);
     globalFileInput.value = '';
-    var allowed = ['.pdf', '.docx', '.doc', '.txt'];
+    var allowed = ['.pdf', '.docx', '.doc', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
     var uploaded = 0;
     for (var fi = 0; fi < files.length; fi++) {
       var file = files[fi];
@@ -1379,7 +1381,8 @@
         continue;
       }
       try {
-        notify('Uploading ' + file.name + '...', 'info');
+        var isImg = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1;
+        notify((isImg ? 'Running OCR on ' : 'Uploading ') + file.name + '...', 'info');
         var fd = new FormData();
         fd.append('file', file);
         var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
@@ -1417,17 +1420,18 @@
 
     var files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
-    var allowed = ['.pdf', '.docx', '.doc', '.txt'];
+    var allowed = ['.pdf', '.docx', '.doc', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
     var uploaded = 0;
     for (var fi = 0; fi < files.length; fi++) {
       var file = files[fi];
       var ext = '.' + file.name.split('.').pop().toLowerCase();
       if (allowed.indexOf(ext) === -1) {
-        notify(file.name + ': unsupported type (PDF, DOCX, TXT only)', 'error');
+        notify(file.name + ': unsupported type', 'error');
         continue;
       }
       try {
-        notify('Uploading ' + file.name + ' to library...', 'info');
+        var isImg = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1;
+        notify((isImg ? 'Running OCR on ' : 'Uploading ') + file.name + ' to library...', 'info');
         var fd = new FormData();
         fd.append('file', file);
         var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });

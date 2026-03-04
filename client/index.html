@@ -59,7 +59,7 @@
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>
           <textarea id="chat-input" class="chat-textarea" placeholder="Message Claude..." rows="1" data-testid="chat-input"></textarea>
           <button class="icon-btn" id="btn-upload" title="Upload Document" data-testid="btn-upload" type="button">&#128206;</button>
-          <input type="file" id="file-input" class="file-input" accept=".pdf,.docx,.doc,.txt" data-testid="file-input">
+          <input type="file" id="file-input" class="file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" data-testid="file-input">
           <button class="paper-btn" id="btn-write-paper" title="Write a Paper" data-testid="btn-write-paper" type="button">&#128221; Paper</button>
           <button class="send-btn" id="btn-send" title="Send" data-testid="btn-send" type="button">&#9654;</button>
         </div>
@@ -89,7 +89,7 @@
           <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="flex:1">+ Upload to Library</button>
           <button class="sidebar-btn" id="btn-send-selected" data-testid="btn-send-selected" style="flex:1;background:#7c3aed;color:#fff;opacity:0.5" disabled>Send Selected to Claude</button>
         </div>
-        <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt" multiple style="display:none">
+        <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <div id="library-selected-count" style="font-size:12px;color:#6b7280;margin-bottom:8px;display:none" data-testid="library-selected-count"></div>
         <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
       </div>

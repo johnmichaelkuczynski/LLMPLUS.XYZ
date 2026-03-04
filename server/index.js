@@ -908,8 +908,44 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
       var mammoth = await import('mammoth');
       var mammothResult = await mammoth.extractRawText({ buffer: file.buffer });
       rawContent = mammothResult.value;
+    } else if (['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1) {
+      var visionKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
+      if (!visionKey) return res.status(500).json({ error: 'Google Cloud Vision API key not configured' });
+      var base64Image = file.buffer.toString('base64');
+      var visionResp = await fetch('https://vision.googleapis.com/v1/images:annotate?key=' + visionKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64Image },
+            features: [
+              { type: 'TEXT_DETECTION', maxResults: 1 },
+              { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }
+            ]
+          }]
+        })
+      });
+      if (!visionResp.ok) {
+        var errBody = await visionResp.text();
+        console.error('Vision API error:', errBody);
+        var errDetail = 'OCR failed';
+        try {
+          var errJson = JSON.parse(errBody);
+          if (errJson.error && errJson.error.message) errDetail = errJson.error.message;
+        } catch(e) {}
+        return res.status(500).json({ error: errDetail });
+      }
+      var visionData = await visionResp.json();
+      var annotations = visionData.responses && visionData.responses[0];
+      if (annotations && annotations.fullTextAnnotation) {
+        rawContent = annotations.fullTextAnnotation.text;
+      } else if (annotations && annotations.textAnnotations && annotations.textAnnotations.length > 0) {
+        rawContent = annotations.textAnnotations[0].description;
+      } else {
+        rawContent = '[No text detected in image]';
+      }
     } else {
-      return res.status(400).json({ error: 'Unsupported file type. Use PDF, DOCX, DOC, or TXT.' });
+      return res.status(400).json({ error: 'Unsupported file type. Use PDF, DOCX, DOC, TXT, or image files (PNG, JPG, GIF, BMP, TIFF, WebP).' });
     }
 
     if (projectId) {
