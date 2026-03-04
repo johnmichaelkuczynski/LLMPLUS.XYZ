@@ -279,6 +279,7 @@ app.post('/api/chat', async function(req, res) {
       [projectId, sessionId]
     );
     var crossSessionContext = '';
+    var crossContextBudget = 15000;
     for (var os = 0; os < otherSessions.rows.length; os++) {
       var otherT = otherSessions.rows[os].transcript || [];
       if (otherT.length > 0) {
@@ -291,6 +292,10 @@ app.post('/api/chat', async function(req, res) {
           summary += role + ': ' + snippet + '\n';
         }
         crossSessionContext += '\n--- Previous chat: "' + otherTitle + '" ---\n' + summary + '\n';
+        if (crossSessionContext.length > crossContextBudget) {
+          crossSessionContext = crossSessionContext.substring(0, crossContextBudget) + '\n[...truncated...]';
+          break;
+        }
       }
     }
 
@@ -301,10 +306,23 @@ app.post('/api/chat', async function(req, res) {
 
     var msgs = [];
     var recent = transcript.slice(-20);
-    for (var i = 0; i < recent.length; i++) {
-      msgs.push({ role: recent[i].role, content: recent[i].content });
+    var maxMsgChars = 12000;
+    var totalChars = 0;
+    var charBudget = 150000;
+    for (var i = recent.length - 1; i >= 0; i--) {
+      var content = recent[i].content || '';
+      if (content.length > maxMsgChars) {
+        content = content.substring(0, maxMsgChars) + '\n\n[...content truncated for context length...]';
+      }
+      totalChars += content.length;
+      if (totalChars > charBudget) break;
+      msgs.unshift({ role: recent[i].role, content: content });
     }
-    msgs.push({ role: 'user', content: message });
+    var userContent = message;
+    if (userContent.length > 80000) {
+      userContent = userContent.substring(0, 80000) + '\n\n[...content truncated for context length...]';
+    }
+    msgs.push({ role: 'user', content: userContent });
 
     var anthropicRes = await callClaude(msgs, systemPrompt, true);
     var reader = anthropicRes.body.getReader();
