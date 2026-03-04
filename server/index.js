@@ -146,6 +146,24 @@ app.post('/api/projects', async function(req, res) {
   }
 });
 
+app.delete('/api/projects/:id', async function(req, res) {
+  try {
+    await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/sessions/:id', async function(req, res) {
+  try {
+    await pool.query('DELETE FROM sessions WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/projects/:id/tractatus', async function(req, res) {
   try {
     var result = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [req.params.id]);

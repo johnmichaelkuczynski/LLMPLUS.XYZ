@@ -89,16 +89,44 @@
       var d = document.createElement('div');
       d.className = 'sidebar-item' + (state.currentProject && state.currentProject.id === p.id ? ' active' : '');
       d.setAttribute('data-testid', 'project-' + p.id);
-      d.innerHTML = '<span class="si-icon">&#128193;</span><span class="si-text">' + esc(p.name) + '</span>';
+      d.innerHTML = '<span class="si-icon">&#128193;</span><span class="si-text">' + esc(p.name) + '</span>' +
+        '<span class="si-actions">' +
+        '<button class="si-btn si-btn-rename" data-testid="btn-rename-project-' + p.id + '" title="Rename">&#9998;</button>' +
+        '<button class="si-btn si-btn-delete" data-testid="btn-delete-project-' + p.id + '" title="Delete">&#128465;</button>' +
+        '</span>';
       (function(proj, el) {
-        el.addEventListener('click', function() { selectProject(proj); });
-        el.addEventListener('dblclick', function(e) {
+        el.addEventListener('click', function(e) {
+          if (e.target.closest('.si-btn')) return;
+          selectProject(proj);
+        });
+        el.querySelector('.si-btn-rename').addEventListener('click', function(e) {
           e.stopPropagation();
           startInlineRename(el, proj.name, function(newName) { renameProject(proj, newName); });
+        });
+        el.querySelector('.si-btn-delete').addEventListener('click', function(e) {
+          e.stopPropagation();
+          deleteProject(proj);
         });
       })(p, d);
       els.projectList.appendChild(d);
     }
+  }
+
+  function deleteProject(proj) {
+    if (!confirm('Delete project "' + proj.name + '"? This will delete all chats and documents in this project.')) return;
+    api('/api/projects/' + proj.id, { method: 'DELETE' }).then(function() {
+      state.projects = state.projects.filter(function(p) { return p.id !== proj.id; });
+      if (state.currentProject && state.currentProject.id === proj.id) {
+        state.currentProject = null;
+        state.currentSession = null;
+        state.sessions = [];
+        renderSessions();
+        showWelcome();
+        els.topbarProject.textContent = '';
+      }
+      renderProjects();
+      notify('Project deleted', 'success');
+    }).catch(function() { notify('Failed to delete project', 'error'); });
   }
 
   function renameProject(proj, newName) {
@@ -167,16 +195,44 @@
       var d = document.createElement('div');
       d.className = 'sidebar-item' + (state.currentSession && state.currentSession.id === s.id ? ' active' : '');
       d.setAttribute('data-testid', 'session-' + s.id);
-      d.innerHTML = '<span class="si-icon">&#128172;</span><span class="si-text">' + esc(s.title || 'New Chat') + '</span>';
+      d.innerHTML = '<span class="si-icon">&#128172;</span><span class="si-text">' + esc(s.title || 'New Chat') + '</span>' +
+        '<span class="si-actions">' +
+        '<button class="si-btn si-btn-rename" data-testid="btn-rename-session-' + s.id + '" title="Rename">&#9998;</button>' +
+        '<button class="si-btn si-btn-delete" data-testid="btn-delete-session-' + s.id + '" title="Delete">&#128465;</button>' +
+        '</span>';
       (function(sess, el) {
-        el.addEventListener('click', function() { selectSession(sess); });
-        el.addEventListener('dblclick', function(e) {
+        el.addEventListener('click', function(e) {
+          if (e.target.closest('.si-btn')) return;
+          selectSession(sess);
+        });
+        el.querySelector('.si-btn-rename').addEventListener('click', function(e) {
           e.stopPropagation();
           startInlineRename(el, sess.title || 'New Chat', function(newName) { renameSession(sess, newName); });
+        });
+        el.querySelector('.si-btn-delete').addEventListener('click', function(e) {
+          e.stopPropagation();
+          deleteSession(sess);
         });
       })(s, d);
       els.sessionList.appendChild(d);
     }
+  }
+
+  function deleteSession(sess) {
+    if (!confirm('Delete chat "' + (sess.title || 'New Chat') + '"?')) return;
+    api('/api/sessions/' + sess.id, { method: 'DELETE' }).then(function() {
+      state.sessions = state.sessions.filter(function(s) { return s.id !== sess.id; });
+      if (state.currentSession && state.currentSession.id === sess.id) {
+        if (state.sessions.length > 0) {
+          selectSession(state.sessions[0]);
+        } else {
+          state.currentSession = null;
+          showWelcome();
+        }
+      }
+      renderSessions();
+      notify('Chat deleted', 'success');
+    }).catch(function() { notify('Failed to delete chat', 'error'); });
   }
 
   function renameSession(sess, newName) {
