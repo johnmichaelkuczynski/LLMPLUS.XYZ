@@ -1620,7 +1620,7 @@
       notify('No chat session selected', 'error');
       return;
     }
-    window.open('/api/sessions/' + state.currentSession + '/download', '_blank');
+    window.open('/api/sessions/' + state.currentSession.id + '/download', '_blank');
   });
   els.btnMoveSession.addEventListener('click', showMoveSessionModal);
   els.btnWritePaper.addEventListener('click', showWritePaperModal);
