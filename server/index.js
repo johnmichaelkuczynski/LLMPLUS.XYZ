@@ -242,6 +242,39 @@ app.post('/api/sessions/:id/auto-title', async function(req, res) {
   }
 });
 
+app.get('/api/sessions/:id/download', async function(req, res) {
+  try {
+    var sResult = await pool.query('SELECT s.title, s.transcript, p.name as project_name FROM sessions s LEFT JOIN projects p ON s.project_id = p.id WHERE s.id = $1', [req.params.id]);
+    if (!sResult.rows[0]) return res.status(404).json({ error: 'Session not found' });
+    var session = sResult.rows[0];
+    var transcript = session.transcript || [];
+    var lines = [];
+    lines.push('Chat Session: ' + (session.title || 'Untitled'));
+    if (session.project_name) lines.push('Project: ' + session.project_name);
+    lines.push('Exported: ' + new Date().toISOString());
+    lines.push('');
+    lines.push('='.repeat(60));
+    lines.push('');
+    for (var i = 0; i < transcript.length; i++) {
+      var msg = transcript[i];
+      var role = msg.role === 'user' ? 'USER' : 'ASSISTANT';
+      lines.push(role + ':');
+      lines.push('');
+      lines.push(msg.content || '');
+      lines.push('');
+      lines.push('-'.repeat(60));
+      lines.push('');
+    }
+    var text = lines.join('\n');
+    var safeTitle = (session.title || 'chat').replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeTitle + '.txt"');
+    res.send(text);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/sessions/:id/transcript', async function(req, res) {
   try {
     var messages = req.body.messages;

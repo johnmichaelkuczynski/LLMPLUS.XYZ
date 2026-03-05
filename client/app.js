@@ -1615,6 +1615,13 @@
     }
   });
 
+  document.getElementById('btn-download-session').addEventListener('click', function() {
+    if (!state.currentSession) {
+      notify('No chat session selected', 'error');
+      return;
+    }
+    window.open('/api/sessions/' + state.currentSession + '/download', '_blank');
+  });
   els.btnMoveSession.addEventListener('click', showMoveSessionModal);
   els.btnWritePaper.addEventListener('click', showWritePaperModal);
   els.btnLibrary.addEventListener('click', openGlobalLibrary);
