@@ -120,11 +120,12 @@
     return result;
   }
 
-  function showArtifact(text, title) {
-    var cleaned = stripTractatusContent(text);
+  function showArtifact(text, title, opts) {
+    opts = opts || {};
+    var cleaned = opts.raw ? text : stripTractatusContent(text);
     currentArtifact = { text: cleaned, title: title || extractArtifactTitle(cleaned) };
     els.artifactTitle.textContent = currentArtifact.title;
-    els.artifactBody.innerHTML = formatArtifactHtml(cleaned);
+    els.artifactBody.innerHTML = opts.raw ? '<pre style="white-space:pre-wrap;word-break:break-word;font-family:\'SF Mono\',Consolas,monospace;font-size:12px;line-height:1.6">' + esc(cleaned) + '</pre>' : formatArtifactHtml(cleaned);
     els.artifactPanel.classList.remove('hidden');
     els.artifactSave.disabled = false;
     els.artifactSave.innerHTML = '&#128218; Save';
@@ -1601,6 +1602,21 @@
   els.btnWritePaper.addEventListener('click', showWritePaperModal);
   els.btnLibrary.addEventListener('click', openGlobalLibrary);
   document.getElementById('btn-library-sidebar').addEventListener('click', openGlobalLibrary);
+
+  document.getElementById('btn-view-tractatus').addEventListener('click', async function() {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    try {
+      var tree = await api('/api/projects/' + state.currentProject.id + '/tractatus');
+      var treeText = JSON.stringify(tree, null, 2);
+      var title = 'Tractatus Tree — ' + state.currentProject.name;
+      showArtifact(treeText, title, { raw: true });
+    } catch (err) {
+      notify('Failed to load Tractatus tree', 'error');
+    }
+  });
   document.getElementById('close-library').addEventListener('click', function() {
     els.libraryModal.classList.remove('active');
   });
