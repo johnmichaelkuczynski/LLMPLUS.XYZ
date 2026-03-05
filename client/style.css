@@ -1225,8 +1225,8 @@ html, body {
 
 .tractatus-popup {
   position: fixed;
-  bottom: 80px;
-  left: 40px;
+  top: 120px;
+  left: 20px;
   width: 380px;
   max-width: calc(100vw - 80px);
   max-height: 50vh;
