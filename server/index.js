@@ -898,7 +898,8 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
     var doc = result.rows[0];
     var filename = doc.name.replace(/\.[^.]+$/, '') + '.txt';
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + filename.replace(/"/g, '\\"') + '"');
+    var safeFilename = filename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeFilename + '"');
     res.send(doc.raw_content || '');
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -959,7 +960,8 @@ app.post('/api/artifact/docx', async function(req, res) {
     var doc = new Document({ sections: [{ children: children }] });
     var buffer = await Packer.toBuffer(doc);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + title.replace(/"/g, '') + '.docx"');
+    var safeTitle = title.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeTitle + '.docx"');
     res.send(buffer);
   } catch (err) {
     console.error('DOCX error:', err);
@@ -976,10 +978,16 @@ app.post('/api/artifact/pdf', async function(req, res) {
     var buffers = [];
     doc.on('data', function(chunk) { buffers.push(chunk); });
     doc.on('end', function() {
-      var pdfBuf = Buffer.concat(buffers);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="' + title.replace(/"/g, '') + '.pdf"');
-      res.send(pdfBuf);
+      try {
+        var pdfBuf = Buffer.concat(buffers);
+        res.setHeader('Content-Type', 'application/pdf');
+        var safePdfTitle = title.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + safePdfTitle + '.pdf"');
+        res.send(pdfBuf);
+      } catch (err) {
+        console.error('PDF send error:', err);
+        if (!res.headersSent) res.status(500).json({ error: err.message });
+      }
     });
 
     var lines = text.split('\n');
