@@ -44,9 +44,21 @@
 
   var currentArtifact = null;
 
+  function stripTractatusContent(text) {
+    text = text.replace(/\*?\*?Updated Tractatus Tree:?\*?\*?[\s\S]*?```[\s\S]*?```/gi, '');
+    text = text.replace(/\*?\*?Updated Tractatus Tree:?\*?\*?[\s\S]*?\n\{[\s\S]*?\n\}/gi, '');
+    text = text.replace(/\*?\*?Tractatus (?:Tree )?(?:Update|Memory):?\*?\*?[\s\S]*?```[\s\S]*?```/gi, '');
+    text = text.replace(/```json\s*\n\s*\{[\s\S]*?"ASSERTS"[\s\S]*?\}\s*\n\s*```/gi, '');
+    text = text.replace(/```\s*\n\s*\{[\s\S]*?"DOCUMENT"[\s\S]*?\}\s*\n\s*```/gi, '');
+    text = text.replace(/^\s*\n+/, '');
+    return text.trim();
+  }
+
   function isDocumentArtifact(text) {
     if (!text || text.length < 400) return false;
-    var lines = text.split('\n');
+    var cleaned = stripTractatusContent(text);
+    if (cleaned.length < 400) return false;
+    var lines = cleaned.split('\n');
     var headingCount = 0;
     var paragraphCount = 0;
     for (var i = 0; i < lines.length; i++) {
@@ -54,20 +66,21 @@
       if (/^#{1,3}\s/.test(line) || /^[IVXLC]+\.\s/.test(line) || /^[A-Z][A-Z\s,]{10,}$/.test(line)) headingCount++;
       if (line.length > 80) paragraphCount++;
     }
-    var words = text.split(/\s+/).length;
+    var words = cleaned.split(/\s+/).length;
     if (words >= 300 && headingCount >= 2 && paragraphCount >= 3) return true;
     if (words >= 500 && paragraphCount >= 5) return true;
     return false;
   }
 
   function extractArtifactTitle(text) {
-    var lines = text.split('\n');
+    var cleaned = stripTractatusContent(text);
+    var lines = cleaned.split('\n');
     for (var i = 0; i < Math.min(10, lines.length); i++) {
       var line = lines[i].trim();
       if (/^#\s+(.+)/.test(line)) return line.replace(/^#\s+/, '');
       if (/^[A-Z][A-Z\s,'\-]{8,}$/.test(line) && line.length < 100) return line;
     }
-    var first = text.substring(0, 60).split('\n')[0].trim();
+    var first = cleaned.substring(0, 60).split('\n')[0].trim();
     return first.length > 5 ? first : 'Document';
   }
 
@@ -108,9 +121,10 @@
   }
 
   function showArtifact(text, title) {
-    currentArtifact = { text: text, title: title || extractArtifactTitle(text) };
+    var cleaned = stripTractatusContent(text);
+    currentArtifact = { text: cleaned, title: title || extractArtifactTitle(cleaned) };
     els.artifactTitle.textContent = currentArtifact.title;
-    els.artifactBody.innerHTML = formatArtifactHtml(text);
+    els.artifactBody.innerHTML = formatArtifactHtml(cleaned);
     els.artifactPanel.classList.remove('hidden');
     els.artifactSave.disabled = false;
     els.artifactSave.innerHTML = '&#128218; Save';
