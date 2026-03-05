@@ -1274,7 +1274,8 @@
     li.innerHTML = '<label class="lib-checkbox-wrap"><input type="checkbox" class="lib-checkbox" data-testid="lib-check-' + doc.id + '"></label>' +
       '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name">' + esc(doc.name) + '</span></div>' +
       '<span class="doc-meta-right">' + esc(wc) + '</span>' +
-      '<button class="lib-download-btn" data-testid="lib-download-' + doc.id + '" title="Download">&#11015;</button>';
+      '<button class="lib-download-btn" data-testid="lib-download-' + doc.id + '" title="Download">&#11015;</button>' +
+      '<button class="lib-delete-btn" data-testid="lib-delete-' + doc.id + '" title="Delete">&#128465;</button>';
 
     var checkbox = li.querySelector('.lib-checkbox');
     checkbox.addEventListener('change', function() {
@@ -1288,8 +1289,24 @@
       window.open('/api/documents/global/' + doc.id + '/download', '_blank');
     });
 
+    li.querySelector('.lib-delete-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirm('Delete "' + doc.name + '" from the library?')) return;
+      api('/api/documents/global/' + doc.id, { method: 'DELETE' })
+        .then(function() {
+          li.remove();
+          delete librarySelection[doc.id];
+          updateLibrarySelectionUI();
+          notify('Document deleted');
+          if (els.globalDocs.children.length === 0) {
+            els.globalDocs.innerHTML = '<li class="empty-state">No documents in the general library yet.<br>Use the upload button above to add documents.</li>';
+          }
+        })
+        .catch(function() { notify('Failed to delete document', 'error'); });
+    });
+
     li.addEventListener('click', function(e) {
-      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn')) return;
+      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
       checkbox.checked = !checkbox.checked;
       librarySelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);

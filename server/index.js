@@ -906,6 +906,16 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
   }
 });
 
+app.delete('/api/documents/global/:id', async function(req, res) {
+  try {
+    var result = await pool.query('DELETE FROM global_documents WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/documents/save-artifact', async function(req, res) {
   try {
     var text = req.body.text || '';

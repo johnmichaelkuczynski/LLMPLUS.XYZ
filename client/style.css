@@ -1214,6 +1214,26 @@ html, body {
   border-color: #7c3aed;
 }
 
+.lib-delete-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6b7280;
+  transition: all 0.15s;
+  line-height: 1;
+  margin-left: 4px;
+}
+
+.lib-delete-btn:hover {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+
 .library-drop-hover {
   outline: 3px dashed #fff !important;
   outline-offset: -3px;
