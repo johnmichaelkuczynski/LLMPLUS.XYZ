@@ -1090,15 +1090,25 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
     var ext = path.extname(file.originalname).toLowerCase();
     var rawContent = '';
 
+    console.log('Upload: file=' + file.originalname + ' ext=' + ext + ' size=' + file.buffer.length);
+
     if (ext === '.txt') {
       rawContent = file.buffer.toString('utf-8');
     } else if (ext === '.pdf') {
-      var pdfMod = await import('pdf-parse');
-      var uint8 = new Uint8Array(file.buffer);
-      var parser = new pdfMod.PDFParse(uint8);
-      await parser.load();
-      var pdfData = await parser.getText();
-      rawContent = pdfData.text;
+      try {
+        var pdfMod = await import('pdf-parse');
+        var uint8 = new Uint8Array(file.buffer);
+        var parser = new pdfMod.PDFParse(uint8, { verbosity: 0 });
+        await parser.load();
+        var pdfData = await parser.getText();
+        rawContent = pdfData.text || '';
+        if (!rawContent.trim()) {
+          rawContent = '[PDF contained no extractable text. It may be a scanned document — try uploading as an image for OCR.]';
+        }
+      } catch (pdfErr) {
+        console.error('PDF parse error:', pdfErr.message);
+        rawContent = '[Failed to extract text from PDF: ' + pdfErr.message + ']';
+      }
     } else if (ext === '.docx' || ext === '.doc') {
       var mammoth = await import('mammoth');
       var mammothResult = await mammoth.extractRawText({ buffer: file.buffer });
@@ -1148,12 +1158,14 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
         'INSERT INTO project_documents (project_id, name, raw_content) VALUES ($1, $2, $3) RETURNING id, name, created_at',
         [projectId, file.originalname, rawContent]
       );
+      console.log('Upload success: project doc, content length=' + rawContent.length);
       res.json({ id: result.rows[0].id, name: result.rows[0].name, created_at: result.rows[0].created_at, raw_content: rawContent, scope: 'project' });
     } else {
       var gResult = await pool.query(
         'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
         [file.originalname, rawContent]
       );
+      console.log('Upload success: global doc, content length=' + rawContent.length);
       res.json({ id: gResult.rows[0].id, name: gResult.rows[0].name, created_at: gResult.rows[0].created_at, raw_content: rawContent, scope: 'global' });
     }
   } catch (err) {
