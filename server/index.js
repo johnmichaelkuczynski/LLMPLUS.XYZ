@@ -401,6 +401,129 @@ app.post('/api/chat', async function(req, res) {
   }
 });
 
+app.post('/api/tractator/generate', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
+  try {
+    var content = req.body.content || '';
+    var docName = req.body.docName || 'Document';
+    var depth = parseInt(req.body.depth) || 0;
+
+    var wordCount = content.split(/\s+/).length;
+    send({ type: 'status', message: 'Analyzing "' + docName + '" (' + wordCount.toLocaleString() + ' words) at depth ' + depth + '...' });
+
+    var depthLabels = ['broad strokes (whole numbers: 1, 2, 3)', 'one decimal (1.0, 1.1, 1.2, 2.0, 2.1)', 'two decimals (1.0, 1.1, 1.11, 1.12, 2.0)', 'three decimals (1.0, 1.1, 1.11, 1.111, 1.112)'];
+    var depthExamples = [
+      '{"1": "ASSERTS: First major thesis", "2": "ASSERTS: Second major thesis", "3": "ASSERTS: Third major thesis"}',
+      '{"1.0": "ASSERTS: First major thesis", "1.1": "ASSERTS: Sub-point of first thesis", "1.2": "ASSERTS: Another sub-point", "2.0": "ASSERTS: Second major thesis", "2.1": "ASSERTS: Sub-point"}',
+      '{"1.0": "ASSERTS: First major thesis", "1.1": "ASSERTS: Sub-point", "1.11": "ASSERTS: Detail of 1.1", "1.12": "ASSERTS: Another detail of 1.1", "2.0": "ASSERTS: Second thesis", "2.1": "ASSERTS: Sub-point", "2.11": "DOCUMENT: Supporting evidence"}',
+      '{"1.0": "ASSERTS: First major thesis", "1.1": "ASSERTS: Sub-point", "1.11": "ASSERTS: Detail", "1.111": "ASSERTS: Fine-grained point", "1.112": "DOCUMENT: Specific evidence", "2.0": "ASSERTS: Second thesis"}'
+    ];
+
+    var maxChars = 60000;
+    var segments = [];
+    if (content.length > maxChars) {
+      var paragraphs = content.split(/\n\s*\n/);
+      var seg = '';
+      for (var i = 0; i < paragraphs.length; i++) {
+        if (seg.length + paragraphs[i].length > maxChars && seg.length > 0) {
+          segments.push(seg.trim());
+          seg = '';
+        }
+        seg += paragraphs[i] + '\n\n';
+      }
+      if (seg.trim()) segments.push(seg.trim());
+    } else {
+      segments.push(content);
+    }
+
+    var partialTrees = [];
+
+    for (var s = 0; s < segments.length; s++) {
+      if (segments.length > 1) {
+        send({ type: 'status', message: 'Processing segment ' + (s + 1) + ' of ' + segments.length + '...' });
+        send({ type: 'progress', current: s + 1, total: segments.length });
+      }
+
+      var prompt = 'Create a Tractatus-style propositional tree for the following text.\n\n';
+      prompt += 'DEPTH LEVEL: ' + depthLabels[depth] + '\n\n';
+      prompt += 'RULES:\n';
+      prompt += '- Each node is a key-value pair where the key is the numbering and the value starts with a TYPE prefix\n';
+      prompt += '- Types: ASSERTS (claims/theses), DOCUMENT (facts/evidence), REJECTS (counter-arguments), OPEN (unresolved questions)\n';
+      prompt += '- The tree should capture the logical structure and argumentative flow of the document\n';
+      prompt += '- Be comprehensive — cover ALL major points in the text\n\n';
+      prompt += 'EXAMPLE at this depth level:\n' + depthExamples[depth] + '\n\n';
+      if (segments.length > 1) prompt += '(This is segment ' + (s + 1) + ' of ' + segments.length + ' — focus on the content in THIS segment)\n\n';
+      prompt += 'TEXT TO ANALYZE:\n' + segments[s] + '\n\n';
+      prompt += 'Return ONLY a valid JSON object with the Tractatus tree. No markdown fences, no commentary.';
+
+      var treeRaw = await callClaude(
+        [{ role: 'user', content: prompt }],
+        'You output only valid JSON objects. No markdown fences, no commentary. Create comprehensive Tractatus-style propositional trees.',
+        false
+      );
+
+      try {
+        var parsed = JSON.parse(treeRaw);
+        partialTrees.push(parsed);
+      } catch (e) {
+        var jsonMatch = treeRaw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { partialTrees.push(JSON.parse(jsonMatch[0])); } catch (e2) { console.error('Tractator parse error:', e2.message); }
+        }
+      }
+
+      if (s < segments.length - 1) await sleep(3000);
+    }
+
+    var finalTree;
+    if (partialTrees.length === 0) {
+      throw new Error('Failed to generate Tractatus tree');
+    } else if (partialTrees.length === 1) {
+      finalTree = partialTrees[0];
+    } else {
+      send({ type: 'status', message: 'Merging ' + partialTrees.length + ' partial trees into unified tree...' });
+
+      var mergePrompt = 'Merge these ' + partialTrees.length + ' partial Tractatus trees into ONE unified, coherent tree.\n\n';
+      mergePrompt += 'DEPTH LEVEL: ' + depthLabels[depth] + '\n';
+      mergePrompt += 'Renumber all nodes sequentially. Eliminate exact duplicates. Maintain logical flow.\n\n';
+      for (var mt = 0; mt < partialTrees.length; mt++) {
+        mergePrompt += '--- Segment ' + (mt + 1) + ' tree ---\n' + JSON.stringify(partialTrees[mt]) + '\n\n';
+      }
+      mergePrompt += 'Return ONLY the merged JSON object.';
+
+      var mergeRaw = await callClaude(
+        [{ role: 'user', content: mergePrompt }],
+        'You output only valid JSON objects. No markdown fences, no commentary.',
+        false
+      );
+
+      try {
+        finalTree = JSON.parse(mergeRaw);
+      } catch (e3) {
+        var m3 = mergeRaw.match(/\{[\s\S]*\}/);
+        finalTree = m3 ? JSON.parse(m3[0]) : partialTrees[0];
+      }
+    }
+
+    var nodeCount = Object.keys(finalTree).length;
+    send({ type: 'complete', tree: finalTree, nodeCount: nodeCount, docName: docName, depth: depth });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('Tractator error:', err);
+    send({ type: 'error', error: err.message });
+    res.end();
+  }
+});
+
 app.post('/api/tractatus/update', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1040,6 +1163,16 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
     var safeFilename = filename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
     res.setHeader('Content-Disposition', 'attachment; filename="' + safeFilename + '"');
     res.send(doc.raw_content || '');
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/documents/global/:id/content', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ name: result.rows[0].name, raw_content: result.rows[0].raw_content || '' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1292,6 +1292,57 @@ html, body {
   border-color: #dc2626;
 }
 
+.tractator-depth-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tractator-depth-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 8px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.tractator-depth-btn:hover {
+  border-color: #0d9488;
+  background: #f0fdfa;
+}
+
+.tractator-depth-btn.active {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: #fff;
+}
+
+.tractator-lib-item {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.tractator-lib-item:hover {
+  background: #f3f4f6;
+}
+
+.tractator-lib-item.selected {
+  background: #ecfdf5;
+  outline: 2px solid #0d9488;
+}
+
 .library-drop-hover {
   outline: 3px dashed #fff !important;
   outline-offset: -3px;

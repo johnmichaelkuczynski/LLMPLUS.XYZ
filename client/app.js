@@ -1756,6 +1756,201 @@
     els.libraryModal.classList.remove('active');
   });
 
+  // --- Tractator ---
+  var tractatorModal = document.getElementById('tractator-modal');
+  var tractatorDepth = 0;
+  var tractatorSource = null;
+
+  document.getElementById('btn-tractator').addEventListener('click', function() {
+    tractatorModal.classList.add('active');
+    tractatorSource = null;
+    document.getElementById('tractator-source-info').style.display = 'none';
+    document.getElementById('tractator-library-pick').style.display = 'none';
+    document.getElementById('tractator-status').style.display = 'none';
+    document.getElementById('tractator-generate').disabled = true;
+    document.getElementById('tractator-fill').style.width = '0%';
+  });
+  document.getElementById('close-tractator').addEventListener('click', function() {
+    tractatorModal.classList.remove('active');
+  });
+  document.getElementById('tractator-cancel').addEventListener('click', function() {
+    tractatorModal.classList.remove('active');
+  });
+  tractatorModal.addEventListener('mousedown', function(e) {
+    if (e.target === tractatorModal) tractatorModal.classList.remove('active');
+  });
+  tractatorModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+  var depthBtns = document.querySelectorAll('.tractator-depth-btn');
+  for (var di = 0; di < depthBtns.length; di++) {
+    depthBtns[di].addEventListener('click', function() {
+      for (var j = 0; j < depthBtns.length; j++) depthBtns[j].classList.remove('active');
+      this.classList.add('active');
+      tractatorDepth = parseInt(this.getAttribute('data-depth'));
+    });
+  }
+
+  document.getElementById('tractator-upload-btn').addEventListener('click', function() {
+    document.getElementById('tractator-file-input').click();
+  });
+
+  document.getElementById('tractator-file-input').addEventListener('change', async function() {
+    var file = this.files[0];
+    if (!file) return;
+    this.value = '';
+    var allowed = ['.pdf', '.docx', '.doc', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
+    var ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (allowed.indexOf(ext) === -1) {
+      notify('Unsupported file type', 'error');
+      return;
+    }
+
+    var srcInfo = document.getElementById('tractator-source-info');
+    srcInfo.textContent = 'Uploading ' + file.name + '...';
+    srcInfo.style.display = 'block';
+    document.getElementById('tractator-library-pick').style.display = 'none';
+
+    var fd = new FormData();
+    fd.append('file', file);
+    try {
+      var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error(await resp.text());
+      var docData = await resp.json();
+      var wc = docData.raw_content ? docData.raw_content.split(/\s+/).length : 0;
+      tractatorSource = { name: docData.name, content: docData.raw_content || '' };
+      srcInfo.innerHTML = '&#128196; <strong>' + esc(docData.name) + '</strong> (' + wc.toLocaleString() + ' words)';
+      document.getElementById('tractator-generate').disabled = false;
+    } catch (err) {
+      srcInfo.textContent = 'Upload failed: ' + err.message;
+      notify('Upload failed', 'error');
+    }
+  });
+
+  document.getElementById('tractator-library-btn').addEventListener('click', async function() {
+    var libPick = document.getElementById('tractator-library-pick');
+    var libList = document.getElementById('tractator-lib-list');
+    libPick.style.display = 'block';
+    libList.innerHTML = '<li style="color:#6b7280;font-size:12px">Loading...</li>';
+
+    try {
+      var docs = await api('/api/documents/global');
+      libList.innerHTML = '';
+      if (docs.length === 0) {
+        libList.innerHTML = '<li style="color:#6b7280;font-size:12px">No documents in library</li>';
+        return;
+      }
+      for (var k = 0; k < docs.length; k++) {
+        (function(doc) {
+          var li = document.createElement('li');
+          li.className = 'tractator-lib-item';
+          li.setAttribute('data-testid', 'tractator-pick-' + doc.id);
+          var wc = doc.word_count ? doc.word_count.toLocaleString() + ' words' : '';
+          li.innerHTML = '<span>&#128196;</span><span style="flex:1">' + esc(doc.name) + '</span><span style="font-size:11px;color:#6b7280">' + wc + '</span>';
+          li.addEventListener('click', async function() {
+            var items = libList.querySelectorAll('.tractator-lib-item');
+            for (var m = 0; m < items.length; m++) items[m].classList.remove('selected');
+            li.classList.add('selected');
+
+            var srcInfo = document.getElementById('tractator-source-info');
+            srcInfo.textContent = 'Loading document content...';
+            srcInfo.style.display = 'block';
+
+            try {
+              var fullDoc = await api('/api/documents/global/' + doc.id + '/content');
+              tractatorSource = { name: doc.name, content: fullDoc.raw_content || '' };
+              var fwc = tractatorSource.content.split(/\s+/).length;
+              srcInfo.innerHTML = '&#128196; <strong>' + esc(doc.name) + '</strong> (' + fwc.toLocaleString() + ' words)';
+              document.getElementById('tractator-generate').disabled = false;
+            } catch (err) {
+              srcInfo.textContent = 'Failed to load document';
+              notify('Failed to load document', 'error');
+            }
+          });
+          libList.appendChild(li);
+        })(docs[k]);
+      }
+    } catch (err) {
+      libList.innerHTML = '<li style="color:#dc2626;font-size:12px">Failed to load library</li>';
+    }
+  });
+
+  document.getElementById('tractator-generate').addEventListener('click', async function() {
+    if (!tractatorSource) return;
+    var genBtn = document.getElementById('tractator-generate');
+    genBtn.disabled = true;
+    genBtn.textContent = 'Generating...';
+    var statusDiv = document.getElementById('tractator-status');
+    var statusText = document.getElementById('tractator-status-text');
+    var fillBar = document.getElementById('tractator-fill');
+    statusDiv.style.display = 'block';
+    statusText.textContent = 'Starting...';
+    fillBar.style.width = '10%';
+
+    try {
+      var resp = await fetch('/api/tractator/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: tractatorSource.content,
+          docName: tractatorSource.name,
+          depth: tractatorDepth
+        })
+      });
+
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var resultTree = null;
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (!line.startsWith('data: ')) continue;
+          var payload = line.substring(6);
+          if (payload === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(payload);
+            if (parsed.type === 'status') {
+              statusText.textContent = parsed.message;
+            } else if (parsed.type === 'progress') {
+              fillBar.style.width = Math.round((parsed.current / parsed.total) * 90) + '%';
+            } else if (parsed.type === 'complete') {
+              resultTree = parsed;
+              fillBar.style.width = '100%';
+              statusText.textContent = 'Complete! ' + parsed.nodeCount + ' nodes generated.';
+            } else if (parsed.type === 'error') {
+              throw new Error(parsed.error);
+            }
+          } catch (pe) {
+            if (pe.message && !pe.message.includes('JSON')) throw pe;
+          }
+        }
+      }
+
+      if (resultTree && resultTree.tree) {
+        tractatorModal.classList.remove('active');
+        var treeText = JSON.stringify(resultTree.tree, null, 2);
+        var depthNames = ['Broad', '1-Decimal', '2-Decimal', '3-Decimal'];
+        var artTitle = 'Tractatus (' + depthNames[tractatorDepth] + ') — ' + tractatorSource.name;
+        showArtifact(treeText, artTitle, { raw: true });
+        notify('Tractatus tree generated: ' + resultTree.nodeCount + ' nodes');
+      } else {
+        throw new Error('No tree generated');
+      }
+    } catch (err) {
+      statusText.textContent = 'Error: ' + err.message;
+      notify('Tractator failed: ' + err.message, 'error');
+    } finally {
+      genBtn.disabled = false;
+      genBtn.textContent = 'Generate Tractatus Tree';
+    }
+  });
+
   var globalFileInput = document.getElementById('file-input-global');
   document.getElementById('btn-upload-global').addEventListener('click', function() {
     globalFileInput.click();

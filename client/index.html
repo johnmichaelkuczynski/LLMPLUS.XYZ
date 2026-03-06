@@ -33,6 +33,7 @@
         </div>
         <div class="sidebar-section">
           <button class="sidebar-btn" id="btn-view-tractatus" data-testid="btn-view-tractatus" style="background:#059669;color:#fff">&#127795; View Tractatus Tree</button>
+          <button class="sidebar-btn" id="btn-tractator" data-testid="btn-tractator" style="background:#0d9488;color:#fff;margin-top:6px">&#128302; Tractator</button>
         </div>
       </div>
       <div class="sidebar-footer">
@@ -113,6 +114,48 @@
         <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <div id="library-selected-count" style="font-size:12px;color:#6b7280;margin-bottom:8px;display:none" data-testid="library-selected-count"></div>
         <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="tractator-modal">
+    <div class="modal" style="width:520px;max-height:80vh;display:flex;flex-direction:column">
+      <div class="modal-head">
+        <span class="modal-title">&#128302; Tractator — Create Tractatus Tree</span>
+        <button class="modal-x" id="close-tractator" data-testid="close-tractator">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto">
+        <div style="margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Depth Level</label>
+          <div id="tractator-depth" class="tractator-depth-selector" data-testid="tractator-depth">
+            <button class="tractator-depth-btn active" data-depth="0" data-testid="depth-0" title="Whole numbers only: 1, 2, 3...">Broad (1, 2, 3)</button>
+            <button class="tractator-depth-btn" data-depth="1" data-testid="depth-1" title="One decimal: 1.0, 1.1, 1.2...">1 Decimal (1.1, 1.2)</button>
+            <button class="tractator-depth-btn" data-depth="2" data-testid="depth-2" title="Two decimals: 1.11, 1.12...">2 Decimals (1.11)</button>
+            <button class="tractator-depth-btn" data-depth="3" data-testid="depth-3" title="Three decimals: 1.111, 1.112...">3 Decimals (1.111)</button>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Source</label>
+          <div style="display:flex;gap:8px">
+            <button class="sidebar-btn" id="tractator-upload-btn" data-testid="tractator-upload-btn" style="flex:1">&#128194; Upload Document</button>
+            <button class="sidebar-btn" id="tractator-library-btn" data-testid="tractator-library-btn" style="flex:1;background:#7c3aed;color:#fff">&#128218; Pick from Library</button>
+          </div>
+          <input type="file" id="tractator-file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" style="display:none">
+        </div>
+        <div id="tractator-source-info" style="font-size:12px;color:#6b7280;margin-bottom:14px;display:none" data-testid="tractator-source-info"></div>
+        <div id="tractator-library-pick" style="display:none;margin-bottom:14px">
+          <ul class="doc-list" id="tractator-lib-list" data-testid="tractator-lib-list" style="max-height:200px;overflow-y:auto"></ul>
+        </div>
+        <div id="tractator-status" style="display:none;margin-bottom:14px" data-testid="tractator-status">
+          <div class="cc-status" style="display:block">
+            <div class="cc-label"><strong>Tractator</strong> <span id="tractator-status-text">Working...</span></div>
+            <div class="cc-bar"><div class="cc-fill" id="tractator-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-cancel" id="tractator-cancel" data-testid="tractator-cancel">Cancel</button>
+        <button class="btn-ok" id="tractator-generate" data-testid="tractator-generate" disabled>Generate Tractatus Tree</button>
       </div>
     </div>
   </div>
