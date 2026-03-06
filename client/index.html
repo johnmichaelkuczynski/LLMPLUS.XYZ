@@ -59,11 +59,14 @@
       </div>
 
       <div class="input-area">
+        <div id="attached-files" class="attached-files" data-testid="attached-files"></div>
         <div class="input-box" id="input-box">
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>
+          <button class="icon-btn analyze-btn" id="btn-auto-analyze" title="Upload &amp; Auto-Analyze" data-testid="btn-auto-analyze" type="button">&#128300;</button>
           <textarea id="chat-input" class="chat-textarea" placeholder="Message Claude..." rows="1" data-testid="chat-input"></textarea>
           <button class="icon-btn" id="btn-upload" title="Upload Document" data-testid="btn-upload" type="button">&#128206;</button>
-          <input type="file" id="file-input" class="file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" data-testid="file-input">
+          <input type="file" id="file-input" class="file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple data-testid="file-input">
+          <input type="file" id="file-input-analyze" class="file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" data-testid="file-input-analyze">
           <button class="paper-btn" id="btn-write-paper" title="Write a Paper" data-testid="btn-write-paper" type="button">&#128221; Paper</button>
           <button class="send-btn" id="btn-send" title="Send" data-testid="btn-send" type="button">&#9654;</button>
         </div>

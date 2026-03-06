@@ -479,6 +479,64 @@ html, body {
   border-top: 1px solid #f3f4f6;
 }
 
+.attached-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 16px;
+  padding: 0;
+}
+
+.attached-files:empty {
+  display: none;
+}
+
+.attached-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #1e40af;
+  max-width: 250px;
+}
+
+.attached-chip.uploading {
+  opacity: 0.6;
+}
+
+.attached-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attached-chip-remove {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.attached-chip-remove:hover {
+  color: #dc2626;
+}
+
+.analyze-btn {
+  font-size: 16px;
+  color: #059669;
+}
+
+.analyze-btn:hover {
+  color: #047857;
+}
+
 .input-box {
   max-width: 100%;
   margin: 0 16px;

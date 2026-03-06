@@ -5,7 +5,8 @@
     currentProject: null,
     currentSession: null,
     streaming: false,
-    projectDocs: []
+    projectDocs: [],
+    pendingAttachments: []
   };
 
   var els = {
@@ -803,7 +804,8 @@
   async function sendMessage() {
     if (state.streaming) return;
     var text = els.chatInput.value.trim();
-    if (!text) return;
+    var hasAttachments = state.pendingAttachments.length > 0 && state.pendingAttachments.some(function(a) { return !a.uploading; });
+    if (!text && !hasAttachments) return;
     if (!state.currentProject) {
       notify('Select a project first', 'error');
       return;
@@ -813,7 +815,34 @@
 
     els.chatInput.value = '';
     autoResize();
-    addMessage('user', text);
+
+    var readyAttachments = [];
+    var remaining = [];
+    for (var ai = 0; ai < state.pendingAttachments.length; ai++) {
+      if (!state.pendingAttachments[ai].uploading) {
+        readyAttachments.push(state.pendingAttachments[ai]);
+      } else {
+        remaining.push(state.pendingAttachments[ai]);
+      }
+    }
+    state.pendingAttachments = remaining;
+    renderAttachmentChips();
+
+    var fullMessage = '';
+    if (readyAttachments.length > 0) {
+      var docParts = [];
+      for (var di = 0; di < readyAttachments.length; di++) {
+        var att = readyAttachments[di];
+        docParts.push('[Attached document: "' + att.docName + '" (' + att.wordCount + ' words)]\n\n' + att.content);
+      }
+      fullMessage = docParts.join('\n\n---\n\n');
+      if (text) fullMessage += '\n\n---\n\nUser message: ' + text;
+    } else {
+      fullMessage = text;
+    }
+
+    var displayText = text || (readyAttachments.length > 0 ? readyAttachments.map(function(a) { return '📄 ' + a.docName; }).join(', ') + (text ? '\n\n' + text : '') : '');
+    addMessage('user', displayText);
     scrollBottom();
 
     var isFirstMessage = !state.currentSession.transcript || state.currentSession.transcript.length === 0;
@@ -821,13 +850,14 @@
     var sendingSession = state.currentSession;
     var optimisticTitle = '';
     if (needsAutoTitle) {
-      optimisticTitle = text.length > 50 ? text.substring(0, 47) + '...' : text;
+      var titleSource = text || (readyAttachments.length > 0 ? readyAttachments[0].docName : 'New Chat');
+      optimisticTitle = titleSource.length > 50 ? titleSource.substring(0, 47) + '...' : titleSource;
       sendingSession.title = optimisticTitle;
       renderSessions();
     }
 
     if (!state.currentSession.transcript) state.currentSession.transcript = [];
-    state.currentSession.transcript.push({ role: 'user', content: text });
+    state.currentSession.transcript.push({ role: 'user', content: displayText });
 
     state.streaming = true;
     els.btnSend.disabled = true;
@@ -840,7 +870,7 @@
         body: JSON.stringify({
           sessionId: state.currentSession.id,
           projectId: state.currentProject.id,
-          message: text
+          message: fullMessage
         })
       });
 
@@ -1163,7 +1193,77 @@
     }
   }
 
+  function renderAttachmentChips() {
+    var container = document.getElementById('attached-files');
+    container.innerHTML = '';
+    for (var i = 0; i < state.pendingAttachments.length; i++) {
+      (function(idx) {
+        var att = state.pendingAttachments[idx];
+        var chip = document.createElement('div');
+        chip.className = 'attached-chip' + (att.uploading ? ' uploading' : '');
+        chip.setAttribute('data-testid', 'attached-chip-' + idx);
+        chip.innerHTML = '<span class="attached-chip-icon">&#128196;</span>' +
+          '<span class="attached-chip-name">' + esc(att.name) + '</span>' +
+          (att.uploading ? '<span style="font-size:11px">uploading...</span>' : '<span style="font-size:11px;color:#6b7280">' + (att.wordCount || 0).toLocaleString() + ' words</span>') +
+          '<button class="attached-chip-remove" data-testid="remove-attachment-' + idx + '" title="Remove">&times;</button>';
+        chip.querySelector('.attached-chip-remove').addEventListener('click', function() {
+          state.pendingAttachments.splice(idx, 1);
+          renderAttachmentChips();
+        });
+        container.appendChild(chip);
+      })(i);
+    }
+  }
+
   async function uploadFile(file) {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    var allowed = ['.pdf', '.docx', '.doc', '.txt', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
+    var ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (allowed.indexOf(ext) === -1) {
+      notify('Unsupported file type. Use PDF, DOCX, DOC, TXT, or image files.', 'error');
+      return;
+    }
+    var isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1;
+    if (isImage) notify('Running OCR on image...', 'info');
+
+    var placeholderIdx = state.pendingAttachments.length;
+    state.pendingAttachments.push({ name: file.name, uploading: true, wordCount: 0, content: '', docId: null });
+    renderAttachmentChips();
+
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('projectId', state.currentProject.id);
+
+    try {
+      notify('Uploading ' + file.name + '...', 'info');
+      var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+      if (!resp.ok) throw new Error(await resp.text());
+      var docData = await resp.json();
+
+      var wordCount = docData.raw_content ? docData.raw_content.split(/\s+/).length : 0;
+
+      var att = state.pendingAttachments[placeholderIdx];
+      if (att && att.name === file.name) {
+        att.uploading = false;
+        att.wordCount = wordCount;
+        att.content = docData.raw_content || '';
+        att.docId = docData.id;
+        att.docName = docData.name;
+      }
+      renderAttachmentChips();
+      loadProjectDocs();
+      notify(file.name + ' attached', 'info');
+    } catch (err) {
+      state.pendingAttachments.splice(placeholderIdx, 1);
+      renderAttachmentChips();
+      notify('Upload failed: ' + err.message, 'error');
+    }
+  }
+
+  async function uploadAndAutoAnalyze(file) {
     if (!state.currentProject) {
       notify('Select a project first', 'error');
       return;
@@ -1609,9 +1709,20 @@
     els.fileInput.click();
   });
   els.fileInput.addEventListener('change', function() {
-    if (els.fileInput.files.length > 0) {
-      uploadFile(els.fileInput.files[0]);
-      els.fileInput.value = '';
+    for (var i = 0; i < els.fileInput.files.length; i++) {
+      uploadFile(els.fileInput.files[i]);
+    }
+    els.fileInput.value = '';
+  });
+
+  document.getElementById('btn-auto-analyze').addEventListener('click', function() {
+    document.getElementById('file-input-analyze').click();
+  });
+  document.getElementById('file-input-analyze').addEventListener('change', function() {
+    var input = document.getElementById('file-input-analyze');
+    if (input.files.length > 0) {
+      uploadAndAutoAnalyze(input.files[0]);
+      input.value = '';
     }
   });
 
@@ -1752,7 +1863,9 @@
     els.dropOverlay.classList.remove('active');
     if (droppedOnLibrary) return;
     if (e.dataTransfer.files.length > 0) {
-      uploadFile(e.dataTransfer.files[0]);
+      for (var fi = 0; fi < e.dataTransfer.files.length; fi++) {
+        uploadFile(e.dataTransfer.files[fi]);
+      }
     }
   });
   document.addEventListener('dragleave', function(e) {
