@@ -617,7 +617,7 @@ app.post('/api/coherence', async function(req, res) {
       for (var d = 0; d < projectDocs.length; d++) {
         var docContent = projectDocs[d].raw_content || '';
         sourceContent += '--- Document: ' + projectDocs[d].name + ' (' + docContent.split(/\s+/).length + ' words) ---\n';
-        sourceContent += docContent.length > 10000 ? docContent.substring(0, 10000) + '...[truncated]' : docContent;
+        sourceContent += docContent;
         sourceContent += '\n\n';
       }
     }
@@ -675,45 +675,151 @@ app.post('/api/coherence', async function(req, res) {
       return;
     }
 
-    send({ type: 'status', pass: 1, message: 'Pass 1: Creating detailed outline...' });
-
-    var wordsPerSection = 1500;
-    var numSections = Math.max(3, Math.ceil(targetWords / wordsPerSection));
-
-    var outlinePrompt = 'Create a detailed section-by-section outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + '.\n\n';
-    if (title) outlinePrompt += 'Title: ' + title + '\n';
-    if (instructions) outlinePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
-    outlinePrompt += 'Target: approximately ' + numSections + ' sections, each roughly ' + wordsPerSection + ' words.\n\n';
-    if (treeContext) outlinePrompt += treeContext;
-    if (sourceContent) outlinePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
-    outlinePrompt += 'Return ONLY a JSON array of section objects:\n';
-    outlinePrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
-    outlinePrompt += 'Include all major sections. Return ONLY the JSON array.';
-
-    var outlineRaw = await callClaude(
-      [{ role: 'user', content: outlinePrompt }],
-      'You output only valid JSON arrays. No markdown fences, no commentary.',
-      false
-    );
-
+    var totalSourceWords = sourceContent.split(/\s+/).length;
     var outline;
-    try {
-      outline = JSON.parse(outlineRaw);
-    } catch (e) {
-      var arrMatch = outlineRaw.match(/\[[\s\S]*\]/);
-      outline = arrMatch ? JSON.parse(arrMatch[0]) : [];
+
+    if (totalSourceWords > 80000) {
+      send({ type: 'status', pass: 0, message: 'Pass 0: Input is ' + totalSourceWords.toLocaleString() + ' words. Splitting into segments for skeleton extraction...' });
+
+      var paragraphs = sourceContent.split(/\n\s*\n/);
+      var segments = [];
+      var currentSegment = '';
+      var currentWords = 0;
+      var segmentLimit = 20000;
+
+      for (var si = 0; si < paragraphs.length; si++) {
+        var paraWords = paragraphs[si].split(/\s+/).length;
+        if (currentWords + paraWords > segmentLimit && currentWords > 0) {
+          segments.push(currentSegment.trim());
+          currentSegment = '';
+          currentWords = 0;
+        }
+        currentSegment += paragraphs[si] + '\n\n';
+        currentWords += paraWords;
+      }
+      if (currentSegment.trim()) segments.push(currentSegment.trim());
+
+      send({ type: 'status', pass: 0, message: 'Split into ' + segments.length + ' segments. Extracting skeletons...' });
+
+      var wordsPerSection = 1500;
+      var numSections = Math.max(3, Math.ceil(targetWords / wordsPerSection));
+      var partialSkeletons = [];
+
+      for (var sg = 0; sg < segments.length; sg++) {
+        send({ type: 'status', pass: 0, message: 'Extracting skeleton from segment ' + (sg + 1) + ' of ' + segments.length + '...' });
+        send({ type: 'progress', current: sg + 1, total: segments.length });
+
+        var segContent = segments[sg].length > 60000 ? segments[sg].substring(0, 60000) : segments[sg];
+        var segPrompt = 'You are analyzing segment ' + (sg + 1) + ' of ' + segments.length + ' from a large document.\n\n';
+        segPrompt += 'Create a partial outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + ' based on the content in this segment.\n\n';
+        if (title) segPrompt += 'Overall document title: ' + title + '\n';
+        if (instructions) segPrompt += 'Instructions: ' + instructions + '\n\n';
+        segPrompt += 'Segment content:\n' + segContent + '\n\n';
+        segPrompt += 'Return ONLY a JSON array of section objects covering the themes in this segment:\n';
+        segPrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
+        segPrompt += 'Return ONLY the JSON array.';
+
+        try {
+          var segOutline = await callClaude(
+            [{ role: 'user', content: segPrompt }],
+            'You output only valid JSON arrays. No markdown fences, no commentary.',
+            false
+          );
+          var parsed;
+          try { parsed = JSON.parse(segOutline); } catch(e2) {
+            var m2 = segOutline.match(/\[[\s\S]*\]/);
+            parsed = m2 ? JSON.parse(m2[0]) : [];
+          }
+          if (parsed.length > 0) partialSkeletons.push(parsed);
+        } catch (segErr) {
+          console.error('Segment ' + (sg + 1) + ' skeleton error:', segErr.message);
+        }
+
+        if (sg < segments.length - 1) await sleep(3000);
+      }
+
+      send({ type: 'status', pass: 0, message: 'Merging ' + partialSkeletons.length + ' partial skeletons into unified outline...' });
+
+      var mergePrompt = 'You have ' + partialSkeletons.length + ' partial outlines from different segments of a large document.\n';
+      mergePrompt += 'Merge them into ONE unified, coherent outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + '.\n\n';
+      if (title) mergePrompt += 'Title: ' + title + '\n';
+      if (instructions) mergePrompt += 'Instructions: ' + instructions + '\n\n';
+      mergePrompt += 'Target: approximately ' + numSections + ' sections, each roughly ' + wordsPerSection + ' words.\n\n';
+      if (treeContext) mergePrompt += treeContext;
+      mergePrompt += 'Partial outlines:\n';
+      for (var ms = 0; ms < partialSkeletons.length; ms++) {
+        mergePrompt += '\n--- Segment ' + (ms + 1) + ' outline ---\n' + JSON.stringify(partialSkeletons[ms]) + '\n';
+      }
+      mergePrompt += '\nMerge these into one unified outline. Eliminate duplicates, ensure logical flow, consolidate related topics.\n';
+      mergePrompt += 'Return ONLY a JSON array:\n';
+      mergePrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
+      mergePrompt += 'Return ONLY the JSON array.';
+
+      var mergeRaw = await callClaude(
+        [{ role: 'user', content: mergePrompt }],
+        'You output only valid JSON arrays. No markdown fences, no commentary.',
+        false
+      );
+
+      try {
+        outline = JSON.parse(mergeRaw);
+      } catch (e3) {
+        var m3 = mergeRaw.match(/\[[\s\S]*\]/);
+        outline = m3 ? JSON.parse(m3[0]) : [];
+      }
+
+      if (outline.length === 0) {
+        throw new Error('Failed to merge outlines from segments');
+      }
+
+      await pool.query(
+        "UPDATE document_jobs SET global_skeleton = $1, status = 'writing' WHERE id = $2",
+        [JSON.stringify(outline), jobId]
+      );
+
+      send({ type: 'status', pass: 0, message: 'Pass 0 complete: merged into ' + outline.length + ' sections.' });
+
+    } else {
+
+      send({ type: 'status', pass: 1, message: 'Pass 1: Creating detailed outline...' });
+
+      var wordsPerSection = 1500;
+      var numSections = Math.max(3, Math.ceil(targetWords / wordsPerSection));
+
+      var outlinePrompt = 'Create a detailed section-by-section outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + '.\n\n';
+      if (title) outlinePrompt += 'Title: ' + title + '\n';
+      if (instructions) outlinePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
+      outlinePrompt += 'Target: approximately ' + numSections + ' sections, each roughly ' + wordsPerSection + ' words.\n\n';
+      if (treeContext) outlinePrompt += treeContext;
+      if (sourceContent) outlinePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
+      outlinePrompt += 'Return ONLY a JSON array of section objects:\n';
+      outlinePrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
+      outlinePrompt += 'Include all major sections. Return ONLY the JSON array.';
+
+      var outlineRaw = await callClaude(
+        [{ role: 'user', content: outlinePrompt }],
+        'You output only valid JSON arrays. No markdown fences, no commentary.',
+        false
+      );
+
+      try {
+        outline = JSON.parse(outlineRaw);
+      } catch (e) {
+        var arrMatch = outlineRaw.match(/\[[\s\S]*\]/);
+        outline = arrMatch ? JSON.parse(arrMatch[0]) : [];
+      }
+
+      if (outline.length === 0) {
+        throw new Error('Failed to generate outline');
+      }
+
+      await pool.query(
+        "UPDATE document_jobs SET global_skeleton = $1, status = 'writing' WHERE id = $2",
+        [JSON.stringify(outline), jobId]
+      );
+
+      send({ type: 'status', pass: 1, message: 'Outline complete: ' + outline.length + ' sections planned.' });
     }
-
-    if (outline.length === 0) {
-      throw new Error('Failed to generate outline');
-    }
-
-    await pool.query(
-      "UPDATE document_jobs SET global_skeleton = $1, status = 'writing' WHERE id = $2",
-      [JSON.stringify(outline), jobId]
-    );
-
-    send({ type: 'status', pass: 1, message: 'Outline complete: ' + outline.length + ' sections planned.' });
     send({ type: 'status', pass: 2, message: 'Pass 2: Writing sections...' });
 
     var allSections = [];
