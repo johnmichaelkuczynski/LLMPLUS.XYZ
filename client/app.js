@@ -1076,6 +1076,130 @@
                   })(parsed.jobId, paperSpec.title || paperSpec.doctype);
                   ppDownloads.appendChild(saveBtn);
 
+                  var reviseBtn = document.createElement('button');
+                  reviseBtn.className = 'dl-btn dl-btn-revise';
+                  reviseBtn.setAttribute('data-testid', 'btn-revise-paper');
+                  reviseBtn.innerHTML = '&#9999;&#65039; Revise';
+                  reviseBtn.onclick = function() {
+                    var reviseArea = popup.querySelector('.pp-revise-area');
+                    if (reviseArea) { reviseArea.classList.toggle('hidden'); reviseArea.querySelector('textarea').focus(); return; }
+                    var area = document.createElement('div');
+                    area.className = 'pp-revise-area';
+                    area.innerHTML = '<textarea class="text-input pp-revise-input" data-testid="revise-instructions" placeholder="Describe what to change... (e.g. \'Make the introduction more concise\', \'Add a section on X\', \'Change the tone to be more formal\')" style="width:100%;min-height:60px;resize:vertical;font-family:inherit;margin-bottom:6px;box-sizing:border-box"></textarea>' +
+                      '<div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn-cancel pp-revise-cancel" data-testid="revise-cancel" style="font-size:12px">Cancel</button><button class="dl-btn" data-testid="revise-submit" style="background:#7c3aed;font-size:12px">&#9999;&#65039; Apply Revision</button></div>';
+                    ppFooter.after(area);
+                    area.querySelector('.pp-revise-cancel').onclick = function() { area.remove(); };
+                    area.querySelector('[data-testid="revise-submit"]').onclick = function() {
+                      var revInstructions = area.querySelector('textarea').value.trim();
+                      if (!revInstructions) return;
+                      area.remove();
+                      ppFooter.classList.add('hidden');
+                      ppFooter.classList.remove('pp-done');
+                      ppClose.classList.add('hidden');
+                      ppDownloads.innerHTML = '';
+                      ppWordCount.textContent = '';
+                      ppStatusText.textContent = 'Revising document...';
+                      ppFill.style.width = '30%';
+
+                      var prevText = fullText;
+                      fullText = '';
+                      ppContent.innerHTML = '<span class="cursor-blink"></span>';
+
+                      fetch('/api/coherence/revise', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          sessionId: state.currentSession.id,
+                          projectId: state.currentProject.id,
+                          previousOutput: prevText,
+                          revisionInstructions: revInstructions,
+                          title: paperSpec.title,
+                          doctype: paperSpec.doctype
+                        })
+                      }).then(function(revRes) {
+                        var revReader = revRes.body.getReader();
+                        var revDecoder = new TextDecoder();
+                        var revBuf = '';
+                        function revPump() {
+                          revReader.read().then(function(rr) {
+                            if (rr.done) return;
+                            revBuf += revDecoder.decode(rr.value, { stream: true });
+                            var revLines = revBuf.split('\n');
+                            revBuf = revLines.pop();
+                            for (var ri = 0; ri < revLines.length; ri++) {
+                              if (revLines[ri].startsWith('data: ')) {
+                                var rd = revLines[ri].slice(6).trim();
+                                if (rd === '[DONE]') continue;
+                                try {
+                                  var rp = JSON.parse(rd);
+                                  if (rp.type === 'token') {
+                                    fullText += rp.text;
+                                    ppScheduleRender();
+                                  } else if (rp.type === 'status') {
+                                    ppStatusText.textContent = rp.message;
+                                  } else if (rp.type === 'complete') {
+                                    var c2 = ppContent.querySelector('.cursor-blink');
+                                    if (c2) c2.remove();
+                                    ppContent.innerHTML = fmt(fullText);
+                                    ppStatusText.textContent = 'Revision complete — ' + (rp.totalWords || '?') + ' words';
+                                    ppFill.style.width = '100%';
+                                    ppWordCount.textContent = (rp.totalWords || '?') + ' words';
+                                    ppClose.classList.remove('hidden');
+                                    ppFooter.classList.remove('hidden');
+                                    ppFooter.classList.add('pp-done');
+
+                                    var fmts2 = [
+                                      { key: 'txt', icon: '&#128196;', label: 'TXT' },
+                                      { key: 'docx', icon: '&#128195;', label: 'DOCX' },
+                                      { key: 'pdf', icon: '&#128211;', label: 'PDF' }
+                                    ];
+                                    for (var f2 = 0; f2 < fmts2.length; f2++) {
+                                      var btn2 = document.createElement('button');
+                                      btn2.className = 'dl-btn';
+                                      btn2.setAttribute('data-testid', 'btn-download-' + fmts2[f2].key);
+                                      btn2.innerHTML = fmts2[f2].icon + ' ' + fmts2[f2].label;
+                                      btn2.onclick = (function(jid2, fk2) { return function() { window.open('/api/download/' + jid2 + '/' + fk2); }; })(rp.jobId, fmts2[f2].key);
+                                      ppDownloads.appendChild(btn2);
+                                    }
+
+                                    var saveBtn2 = document.createElement('button');
+                                    saveBtn2.className = 'dl-btn dl-btn-save';
+                                    saveBtn2.setAttribute('data-testid', 'btn-save-to-library');
+                                    saveBtn2.innerHTML = '&#128218; Save to Library';
+                                    saveBtn2.onclick = (function(jid2, dt2) { return async function() {
+                                      try {
+                                        await api('/api/documents/save-generated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: jid2, name: dt2 }) });
+                                        saveBtn2.innerHTML = '&#9989; Saved'; saveBtn2.disabled = true; notify('Saved to General Library', 'success');
+                                      } catch (err) { notify('Save failed: ' + err.message, 'error'); }
+                                    }; })(rp.jobId, paperSpec.title || paperSpec.doctype);
+                                    ppDownloads.appendChild(saveBtn2);
+
+                                    var reviseBtn2 = document.createElement('button');
+                                    reviseBtn2.className = 'dl-btn dl-btn-revise';
+                                    reviseBtn2.setAttribute('data-testid', 'btn-revise-paper');
+                                    reviseBtn2.innerHTML = '&#9999;&#65039; Revise';
+                                    reviseBtn2.onclick = reviseBtn.onclick;
+                                    ppDownloads.appendChild(reviseBtn2);
+                                    reviseBtn = reviseBtn2;
+
+                                    notify('Revision complete!', 'success');
+                                  } else if (rp.type === 'error') {
+                                    ppStatusText.textContent = 'Error: ' + rp.error;
+                                    ppClose.classList.remove('hidden');
+                                  }
+                                } catch(e2) {}
+                              }
+                            }
+                            revPump();
+                          }).catch(function() { ppStatusText.textContent = 'Connection lost'; ppClose.classList.remove('hidden'); });
+                        }
+                        revPump();
+                      });
+                    };
+                    area.querySelector('textarea').focus();
+                  };
+                  ppDownloads.appendChild(reviseBtn);
+
                   notify('Paper generation complete!', 'success');
                 } else if (parsed.type === 'error') {
                   ppStatusText.textContent = 'Error: ' + parsed.error;

@@ -1098,6 +1098,69 @@ app.post('/api/coherence', async function(req, res) {
   }
 });
 
+app.post('/api/coherence/revise', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
+  try {
+    var sessionId = req.body.sessionId;
+    var projectId = req.body.projectId;
+    var previousOutput = req.body.previousOutput || '';
+    var revisionInstructions = req.body.revisionInstructions || '';
+    var title = req.body.title || '';
+    var doctype = req.body.doctype || 'paper';
+
+    send({ type: 'status', message: 'Revising document...' });
+
+    var treeContext = '';
+    var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
+    var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
+    if (Object.keys(tree).length > 0) {
+      treeContext = 'Project knowledge (Tractatus tree):\n' + JSON.stringify(tree).substring(0, 5000) + '\n\n';
+    }
+
+    var revPrompt = 'Here is a previously generated ' + doctype.replace(/_/g, ' ');
+    if (title) revPrompt += ' titled "' + title + '"';
+    revPrompt += ':\n\n=== CURRENT DOCUMENT ===\n' + previousOutput + '\n=== END CURRENT DOCUMENT ===\n\n';
+    revPrompt += '=== REVISION INSTRUCTIONS ===\n' + revisionInstructions + '\n=== END REVISION INSTRUCTIONS ===\n\n';
+    if (treeContext) revPrompt += treeContext;
+    revPrompt += 'CRITICAL RULES:\n';
+    revPrompt += '1. Apply ONLY the changes described in the revision instructions.\n';
+    revPrompt += '2. Keep everything else EXACTLY the same — same structure, same wording, same tone, same length.\n';
+    revPrompt += '3. Do NOT rewrite sections that the user did not ask to change.\n';
+    revPrompt += '4. Do NOT add meta-commentary. Output ONLY the revised document.\n';
+    revPrompt += '5. Preserve the overall length unless the revision instructions specifically ask to change it.';
+
+    var revResult = await streamClaudeToSSE(
+      [{ role: 'user', content: revPrompt }],
+      'You are revising a ' + doctype.replace(/_/g, ' ') + '. Apply only the requested changes and leave everything else intact. Output ONLY the revised document — no commentary, no explanations.',
+      send,
+      8192
+    );
+
+    var revWords = revResult.split(/\s+/).length;
+
+    var jobResult = await pool.query(
+      "INSERT INTO document_jobs (session_id, original_text, status, final_output, global_skeleton) VALUES ($1, $2, 'complete', $3, $4) RETURNING *",
+      [sessionId, 'Revision: ' + revisionInstructions.substring(0, 200), revResult, 'Revised version']
+    );
+
+    send({ type: 'complete', totalWords: revWords, jobId: jobResult.rows[0].id });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('Revision error:', err);
+    send({ type: 'error', error: err.message });
+    res.end();
+  }
+});
+
 app.get('/api/download/:jobId/:format', async function(req, res) {
   try {
     var jobId = req.params.jobId;

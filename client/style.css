@@ -1037,6 +1037,22 @@ html, body {
   cursor: default;
 }
 
+.dl-btn-revise {
+  background: #0891b2;
+  color: #fff;
+  border-color: #0891b2;
+}
+
+.dl-btn-revise:hover {
+  background: #0e7490;
+}
+
+.pp-revise-area {
+  padding: 10px 14px 10px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
 .hidden {
   display: none !important;
 }
