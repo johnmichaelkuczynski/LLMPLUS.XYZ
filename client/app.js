@@ -1503,11 +1503,15 @@
     inner += '<input type="text" class="text-input" data-field="title" value="' + esc(defaultTitle) + '" data-testid="paper-title" style="margin-bottom:12px">';
     inner += '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Instructions</label>';
     inner += '<textarea class="text-input" data-field="instructions" data-testid="paper-instructions" style="min-height:80px;resize:vertical;margin-bottom:12px;font-family:inherit">' + esc(defaultInstructions) + '</textarea>';
+    inner += '<div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Upload Source Document (optional)</label>';
+    inner += '<div style="display:flex;gap:8px;align-items:center"><button class="sidebar-btn" data-testid="paper-upload-btn" style="flex:0 0 auto" type="button">&#128194; Upload File</button>';
+    inner += '<span data-testid="paper-upload-info" style="font-size:12px;color:#6b7280;flex:1"></span></div>';
+    inner += '<input type="file" data-testid="paper-file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" style="display:none"></div>';
     inner += '<div style="display:flex;gap:12px;margin-bottom:12px">';
-    inner += '<div style="flex:1"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Words</label>';
-    inner += '<input type="number" class="text-input" data-field="wordcount" value="10000" min="1000" max="100000" data-testid="paper-wordcount"></div>';
+    inner += '<div style="flex:1"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Words <span style="font-weight:400;color:#9ca3af">(leave blank for auto)</span></label>';
+    inner += '<input type="number" class="text-input" data-field="wordcount" placeholder="Auto" min="500" max="100000" data-testid="paper-wordcount"></div>';
     inner += '<div style="flex:1"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Type</label>';
-    inner += '<select class="text-input" data-field="doctype" data-testid="paper-doctype"><option value="research_paper">Research Paper</option><option value="dissertation">Dissertation</option><option value="whitepaper">Whitepaper</option><option value="essay">Essay</option><option value="report">Report</option><option value="book_chapter">Book Chapter</option><option value="other">Other</option></select></div>';
+    inner += '<select class="text-input" data-field="doctype" data-testid="paper-doctype"><option value="research_paper">Research Paper</option><option value="legal_brief">Legal Brief</option><option value="rewrite">Rewrite / Polish</option><option value="dissertation">Dissertation</option><option value="whitepaper">Whitepaper</option><option value="essay">Essay</option><option value="report">Report</option><option value="letter">Letter</option><option value="book_chapter">Book Chapter</option><option value="other">Other</option></select></div>';
     inner += '</div>';
     inner += '</div><div class="modal-foot"><button class="btn-cancel" data-close>Cancel</button><button class="btn-ok" data-testid="btn-start-paper" style="background:#7c3aed">&#128221; Generate</button></div></div>';
     modal.innerHTML = inner;
@@ -1520,15 +1524,52 @@
     });
     modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
 
+    var paperUploadContent = null;
+    var paperUploadName = '';
+    var paperUploadBtn = modal.querySelector('[data-testid="paper-upload-btn"]');
+    var paperFileInput = modal.querySelector('[data-testid="paper-file-input"]');
+    var paperUploadInfo = modal.querySelector('[data-testid="paper-upload-info"]');
+
+    paperUploadBtn.addEventListener('click', function() {
+      paperFileInput.click();
+    });
+
+    paperFileInput.addEventListener('change', async function() {
+      var file = paperFileInput.files[0];
+      if (!file) return;
+      paperFileInput.value = '';
+      paperUploadInfo.textContent = 'Uploading ' + file.name + '...';
+
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('projectId', state.currentProject.id);
+      try {
+        var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error(await resp.text());
+        var docData = await resp.json();
+        paperUploadContent = docData.raw_content || '';
+        paperUploadName = docData.name;
+        var wc = paperUploadContent.split(/\s+/).length;
+        paperUploadInfo.innerHTML = '&#128196; <strong>' + esc(docData.name) + '</strong> (' + wc.toLocaleString() + ' words)';
+      } catch (err) {
+        paperUploadInfo.textContent = 'Upload failed: ' + err.message;
+      }
+    });
+
     modal.querySelector('[data-testid="btn-start-paper"]').addEventListener('click', async function() {
       var title = modal.querySelector('[data-field="title"]').value.trim();
       var instructions = modal.querySelector('[data-field="instructions"]').value.trim();
-      var wordcount = parseInt(modal.querySelector('[data-field="wordcount"]').value) || 10000;
+      var wcVal = modal.querySelector('[data-field="wordcount"]').value.trim();
+      var wordcount = wcVal ? parseInt(wcVal) : 0;
       var doctype = modal.querySelector('[data-field="doctype"]').value;
 
       if (!title && !instructions) {
-        notify('Enter at least a title', 'error');
+        notify('Enter at least a title or instructions', 'error');
         return;
+      }
+
+      if (paperUploadContent) {
+        instructions = (instructions ? instructions + '\n\n' : '') + '=== SOURCE DOCUMENT ("' + paperUploadName + '") ===\n' + paperUploadContent;
       }
 
       modal.remove();
@@ -1536,8 +1577,10 @@
       await ensureSession();
       if (!state.currentSession) return;
 
-      var desc = 'Generate a ' + wordcount + '-word ' + doctype.replace(/_/g, ' ') + ': "' + (title || 'Untitled') + '"';
-      if (instructions) desc += '\n\nInstructions: ' + instructions;
+      var desc = wordcount
+        ? 'Generate a ' + wordcount + '-word ' + doctype.replace(/_/g, ' ') + ': "' + (title || 'Untitled') + '"'
+        : 'Generate a ' + doctype.replace(/_/g, ' ') + ' (auto length): "' + (title || 'Untitled') + '"';
+      if (paperUploadName) desc += '\nSource: ' + paperUploadName;
       addMessage('user', desc);
       scrollBottom();
 

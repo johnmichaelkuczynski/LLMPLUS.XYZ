@@ -723,7 +723,9 @@ app.post('/api/coherence', async function(req, res) {
     var projectId = req.body.projectId;
     var title = req.body.title || '';
     var instructions = req.body.instructions || '';
-    var targetWords = parseInt(req.body.wordcount) || 10000;
+    var rawWc = parseInt(req.body.wordcount);
+    var autoLength = !rawWc || rawWc <= 0;
+    var targetWords = autoLength ? 0 : rawWc;
     var doctype = req.body.doctype || 'paper';
 
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
@@ -750,9 +752,11 @@ app.post('/api/coherence', async function(req, res) {
       treeContext = 'Project knowledge (Tractatus tree):\n' + JSON.stringify(tree).substring(0, 5000) + '\n\n';
     }
 
-    var userRequest = 'Generate a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ');
+    var userRequest = autoLength
+      ? 'Generate a ' + doctype.replace(/_/g, ' ') + ' (auto length)'
+      : 'Generate a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ');
     if (title) userRequest += ' titled "' + title + '"';
-    if (instructions) userRequest += '\n\nInstructions: ' + instructions;
+    if (instructions) userRequest += '\n\nInstructions: ' + instructions.substring(0, 500);
 
     var jobResult = await pool.query(
       "INSERT INTO document_jobs (session_id, original_text, status) VALUES ($1, $2, 'outline') RETURNING *",
@@ -760,22 +764,32 @@ app.post('/api/coherence', async function(req, res) {
     );
     var jobId = jobResult.rows[0].id;
 
-    if (targetWords <= 5000) {
-      send({ type: 'status', pass: 1, message: 'Generating ' + targetWords + '-word document...' });
+    if (autoLength || targetWords <= 5000) {
+      var lengthNote = autoLength ? 'appropriate length (use your judgment)' : targetWords + ' words';
+      send({ type: 'status', pass: 1, message: autoLength ? 'Generating document (auto length)...' : 'Generating ' + targetWords + '-word document...' });
       send({ type: 'progress', current: 1, total: 1 });
 
       var singlePrompt = 'Write a ' + doctype.replace(/_/g, ' ');
       if (title) singlePrompt += ' titled "' + title + '"';
       singlePrompt += '.\n\n';
       if (instructions) singlePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
-      singlePrompt += 'TARGET LENGTH: exactly ' + targetWords + ' words. Do NOT exceed this. Do NOT write less.\n\n';
+      if (autoLength) {
+        singlePrompt += 'LENGTH: Use your best judgment for how long this document should be. Write as much as is needed to be thorough and complete.\n\n';
+      } else {
+        singlePrompt += 'TARGET LENGTH: exactly ' + targetWords + ' words. Do NOT exceed this. Do NOT write less.\n\n';
+      }
       if (treeContext) singlePrompt += treeContext;
       if (sourceContent) singlePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
-      singlePrompt += 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text.';
+      singlePrompt += autoLength
+        ? 'CRITICAL: Follow the user\'s instructions EXACTLY. Write a complete, thorough document. Output ONLY the document text.'
+        : 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text.';
 
+      var singleSysPrompt = 'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. '
+        + (autoLength ? 'Write a thorough, complete document of appropriate length.' : 'Write exactly the requested number of words.')
+        + ' Output ONLY the document — no meta-commentary.';
       var singleResult = await streamClaudeToSSE(
         [{ role: 'user', content: singlePrompt }],
-        'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. Write exactly the requested number of words. Output ONLY the document — no meta-commentary.',
+        singleSysPrompt,
         send,
         8192
       );
