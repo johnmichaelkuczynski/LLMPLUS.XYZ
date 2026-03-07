@@ -2232,7 +2232,53 @@
     }
   });
 
-  els.libraryModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  var libModal = els.libraryModal.querySelector('.modal');
+  libModal.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    libModal.style.outline = '2px dashed #7c3aed';
+    libModal.style.outlineOffset = '-4px';
+  });
+  libModal.addEventListener('dragleave', function(e) {
+    libModal.style.outline = '';
+    libModal.style.outlineOffset = '';
+  });
+  libModal.addEventListener('drop', async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    libModal.style.outline = '';
+    libModal.style.outlineOffset = '';
+    clearTimeout(dragTimer);
+    els.dropOverlay.classList.remove('active');
+    var files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    var uploaded = 0;
+    for (var fi = 0; fi < files.length; fi++) {
+      var fd = new FormData();
+      fd.append('file', files[fi]);
+      try {
+        var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (resp.ok) uploaded++;
+      } catch (err) {}
+    }
+    if (uploaded > 0) {
+      notify('Added ' + uploaded + ' document' + (uploaded > 1 ? 's' : '') + ' to General Library', 'success');
+      openGlobalLibrary();
+    }
+  });
+
+  els.libraryModal.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  els.libraryModal.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(dragTimer);
+    els.dropOverlay.classList.remove('active');
+  });
+
+  libModal.addEventListener('mousedown', function(e) { e.stopPropagation(); });
   els.libraryModal.addEventListener('mousedown', function(e) {
     if (e.target === els.libraryModal) els.libraryModal.classList.remove('active');
   });
