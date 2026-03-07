@@ -1455,16 +1455,12 @@
   function updateLibrarySelectionUI() {
     var ids = Object.keys(librarySelection).filter(function(k) { return librarySelection[k]; });
     var countEl = document.getElementById('library-selected-count');
-    var sendBtn = document.getElementById('btn-send-selected');
+    var footer = document.getElementById('library-footer');
     if (ids.length > 0) {
-      countEl.style.display = '';
+      footer.style.display = 'flex';
       countEl.textContent = ids.length + ' document' + (ids.length > 1 ? 's' : '') + ' selected';
-      sendBtn.disabled = false;
-      sendBtn.style.opacity = '1';
     } else {
-      countEl.style.display = 'none';
-      sendBtn.disabled = true;
-      sendBtn.style.opacity = '0.5';
+      footer.style.display = 'none';
     }
   }
 
