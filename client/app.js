@@ -1511,7 +1511,6 @@
 
     li.querySelector('.lib-delete-btn').addEventListener('click', function(e) {
       e.stopPropagation();
-      if (!confirm('Delete "' + doc.name + '" from the library?')) return;
       api('/api/documents/global/' + doc.id, { method: 'DELETE' })
         .then(function() {
           li.remove();
