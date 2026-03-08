@@ -29,6 +29,7 @@
         </div>
         <div class="sidebar-section">
           <div class="sidebar-label">Library</div>
+          <button class="sidebar-btn" id="btn-project-library" data-testid="btn-project-library" style="background:#2563eb;color:#fff;margin-bottom:6px">&#128194; Project Library</button>
           <button class="sidebar-btn" id="btn-library-sidebar" data-testid="btn-library-sidebar" style="background:#7c3aed;color:#fff">&#128218; General Library</button>
         </div>
         <div class="sidebar-section">
@@ -107,8 +108,9 @@
         <button class="modal-x" id="close-library" data-testid="close-library">&times;</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
-        <div style="display:flex;gap:8px;margin-bottom:14px">
-          <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="flex:1">&#128194; Upload Files from PC</button>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="flex:0 0 auto">&#128194; Upload</button>
+          <input type="text" class="text-input lib-search" id="lib-search-global" data-testid="lib-search-global" placeholder="&#128269; Search library..." style="flex:1">
         </div>
         <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
@@ -116,6 +118,28 @@
       <div class="modal-foot lib-footer" id="library-footer" style="display:none">
         <div id="library-selected-count" style="font-size:12px;color:#6b7280;flex:1" data-testid="library-selected-count"></div>
         <button class="sidebar-btn" id="btn-send-selected" data-testid="btn-send-selected" style="background:#7c3aed;color:#fff;padding:8px 18px;font-size:13px;font-weight:600">&#128172; Send to Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="project-library-modal">
+    <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column">
+      <div class="modal-head">
+        <span class="modal-title" id="project-library-title">&#128194; Project Library</span>
+        <button class="modal-x" id="close-project-library" data-testid="close-project-library">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="sidebar-btn" id="btn-upload-project-lib" data-testid="btn-upload-project-lib" style="flex:0 0 auto">&#128194; Upload</button>
+          <input type="text" class="text-input lib-search" id="lib-search-project" data-testid="lib-search-project" placeholder="&#128269; Search project docs..." style="flex:1">
+        </div>
+        <input type="file" id="file-input-project-lib" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
+        <ul class="doc-list" id="project-lib-docs" data-testid="project-lib-docs-list"></ul>
+      </div>
+      <div class="modal-foot lib-footer" id="project-library-footer" style="display:none">
+        <div id="project-library-selected-count" style="font-size:12px;color:#6b7280;flex:1" data-testid="project-library-selected-count"></div>
+        <button class="sidebar-btn" id="btn-send-project-selected" data-testid="btn-send-project-selected" style="background:#2563eb;color:#fff;padding:8px 18px;font-size:13px;font-weight:600">&#128172; Send to Chat</button>
+        <button class="sidebar-btn" id="btn-copy-to-global" data-testid="btn-copy-to-global" style="background:#7c3aed;color:#fff;padding:8px 18px;font-size:13px;font-weight:600">&#128218; Copy to General</button>
       </div>
     </div>
   </div>

@@ -1047,6 +1047,18 @@ html, body {
   background: #0e7490;
 }
 
+.lib-search {
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+}
+.lib-search:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124,58,237,0.12);
+}
+
 .lib-footer {
   align-items: center;
   border-top: 2px solid #7c3aed;

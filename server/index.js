@@ -1265,6 +1265,46 @@ app.delete('/api/documents/global/:id', async function(req, res) {
   }
 });
 
+app.get('/api/projects/documents/:id/download', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    var doc = result.rows[0];
+    var filename = doc.name.replace(/\.[^.]+$/, '') + '.txt';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    var safeFilename = filename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeFilename + '"');
+    res.send(doc.raw_content || '');
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/projects/documents/:id', async function(req, res) {
+  try {
+    var result = await pool.query('DELETE FROM project_documents WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/documents/:id/copy-to-global', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    var doc = result.rows[0];
+    var gResult = await pool.query(
+      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
+      [doc.name, doc.raw_content]
+    );
+    res.json(gResult.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/documents/save-artifact', async function(req, res) {
   try {
     var text = req.body.text || '';

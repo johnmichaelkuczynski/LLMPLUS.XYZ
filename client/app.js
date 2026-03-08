@@ -1451,6 +1451,7 @@
   }
 
   var librarySelection = {};
+  var cachedGlobalDocs = [];
 
   function updateLibrarySelectionUI() {
     var ids = Object.keys(librarySelection).filter(function(k) { return librarySelection[k]; });
@@ -1464,25 +1465,126 @@
     }
   }
 
+  function filterLibraryDocs(docs, query, listEl, makeFn) {
+    listEl.innerHTML = '';
+    var q = (query || '').toLowerCase().trim();
+    var keywords = q ? q.split(/\s+/) : [];
+    var filtered = docs.filter(function(d) {
+      if (keywords.length === 0) return true;
+      var name = (d.name || '').toLowerCase();
+      return keywords.every(function(kw) { return name.indexOf(kw) !== -1; });
+    });
+    if (filtered.length === 0) {
+      listEl.innerHTML = q
+        ? '<li class="empty-state">No documents match "' + esc(q) + '"</li>'
+        : '<li class="empty-state">No documents yet.<br>Upload files to add them.</li>';
+    } else {
+      for (var i = 0; i < filtered.length; i++) {
+        makeFn(listEl, filtered[i]);
+      }
+    }
+  }
+
   async function openGlobalLibrary() {
     els.libraryModal.classList.add('active');
     els.globalDocs.innerHTML = '<li class="empty-state">Loading...</li>';
     librarySelection = {};
     updateLibrarySelectionUI();
+    var searchInput = document.getElementById('lib-search-global');
+    searchInput.value = '';
 
     try {
-      var gDocs = await api('/api/documents/global');
-      els.globalDocs.innerHTML = '';
-      if (gDocs.length === 0) {
-        els.globalDocs.innerHTML = '<li class="empty-state">No documents in the general library yet.<br>Use the upload button above to add documents.</li>';
-      } else {
-        for (var j = 0; j < gDocs.length; j++) {
-          makeGlobalDocItem(els.globalDocs, gDocs[j]);
-        }
-      }
+      cachedGlobalDocs = await api('/api/documents/global');
+      filterLibraryDocs(cachedGlobalDocs, '', els.globalDocs, makeGlobalDocItem);
     } catch (err) {
       notify('Failed to load library', 'error');
     }
+  }
+
+  var projectLibSelection = {};
+  var cachedProjectDocs = [];
+
+  function updateProjectLibSelectionUI() {
+    var ids = Object.keys(projectLibSelection).filter(function(k) { return projectLibSelection[k]; });
+    var countEl = document.getElementById('project-library-selected-count');
+    var footer = document.getElementById('project-library-footer');
+    if (ids.length > 0) {
+      footer.style.display = 'flex';
+      countEl.textContent = ids.length + ' document' + (ids.length > 1 ? 's' : '') + ' selected';
+    } else {
+      footer.style.display = 'none';
+    }
+  }
+
+  async function openProjectLibrary() {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    var modal = document.getElementById('project-library-modal');
+    modal.classList.add('active');
+    var listEl = document.getElementById('project-lib-docs');
+    listEl.innerHTML = '<li class="empty-state">Loading...</li>';
+    projectLibSelection = {};
+    updateProjectLibSelectionUI();
+    document.getElementById('project-library-title').innerHTML = '&#128194; ' + esc(state.currentProject.name) + ' — Library';
+    var searchInput = document.getElementById('lib-search-project');
+    searchInput.value = '';
+
+    try {
+      cachedProjectDocs = await api('/api/projects/' + state.currentProject.id + '/documents');
+      filterLibraryDocs(cachedProjectDocs, '', listEl, makeProjectDocItem);
+    } catch (err) {
+      notify('Failed to load project documents', 'error');
+    }
+  }
+
+  function makeProjectDocItem(list, doc) {
+    var li = document.createElement('li');
+    li.className = 'doc-item lib-selectable';
+    li.setAttribute('data-testid', 'project-doc-' + doc.id);
+    li.setAttribute('data-doc-id', doc.id);
+    var wc = doc.word_count ? doc.word_count.toLocaleString() + ' words' : '';
+    li.innerHTML = '<label class="lib-checkbox-wrap"><input type="checkbox" class="lib-checkbox" data-testid="plib-check-' + doc.id + '"></label>' +
+      '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name">' + esc(doc.name) + '</span></div>' +
+      '<span class="doc-meta-right">' + esc(wc) + '</span>' +
+      '<button class="lib-download-btn" data-testid="plib-download-' + doc.id + '" title="Download">&#11015;</button>' +
+      '<button class="lib-delete-btn" data-testid="plib-delete-' + doc.id + '" title="Delete">&#128465;</button>';
+
+    var checkbox = li.querySelector('.lib-checkbox');
+    checkbox.addEventListener('change', function() {
+      projectLibSelection[doc.id] = checkbox.checked;
+      li.classList.toggle('lib-selected', checkbox.checked);
+      updateProjectLibSelectionUI();
+    });
+
+    li.querySelector('.lib-download-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      window.open('/api/projects/documents/' + doc.id + '/download', '_blank');
+    });
+
+    li.querySelector('.lib-delete-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      api('/api/projects/documents/' + doc.id, { method: 'DELETE' })
+        .then(function() {
+          li.remove();
+          delete projectLibSelection[doc.id];
+          updateProjectLibSelectionUI();
+          notify('Document deleted');
+          loadProjectDocs();
+        })
+        .catch(function() { notify('Failed to delete document', 'error'); });
+    });
+
+    li.addEventListener('click', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
+      checkbox.checked = !checkbox.checked;
+      projectLibSelection[doc.id] = checkbox.checked;
+      li.classList.toggle('lib-selected', checkbox.checked);
+      updateProjectLibSelectionUI();
+    });
+
+    list.appendChild(li);
   }
 
   function makeGlobalDocItem(list, doc) {
@@ -1916,6 +2018,138 @@
   });
   document.getElementById('close-library').addEventListener('click', function() {
     els.libraryModal.classList.remove('active');
+  });
+
+  document.getElementById('lib-search-global').addEventListener('input', function() {
+    filterLibraryDocs(cachedGlobalDocs, this.value, els.globalDocs, makeGlobalDocItem);
+  });
+
+  document.getElementById('btn-project-library').addEventListener('click', openProjectLibrary);
+
+  document.getElementById('close-project-library').addEventListener('click', function() {
+    document.getElementById('project-library-modal').classList.remove('active');
+  });
+
+  document.getElementById('lib-search-project').addEventListener('input', function() {
+    filterLibraryDocs(cachedProjectDocs, this.value, document.getElementById('project-lib-docs'), makeProjectDocItem);
+  });
+
+  var projLibFileInput = document.getElementById('file-input-project-lib');
+  document.getElementById('btn-upload-project-lib').addEventListener('click', function() {
+    projLibFileInput.click();
+  });
+  projLibFileInput.addEventListener('change', async function() {
+    if (!state.currentProject) return;
+    var files = projLibFileInput.files;
+    var uploaded = 0;
+    for (var i = 0; i < files.length; i++) {
+      var fd = new FormData();
+      fd.append('file', files[i]);
+      fd.append('projectId', state.currentProject.id);
+      try {
+        var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (resp.ok) uploaded++;
+      } catch (err) {}
+    }
+    projLibFileInput.value = '';
+    if (uploaded > 0) {
+      notify('Added ' + uploaded + ' document' + (uploaded > 1 ? 's' : '') + ' to project library', 'success');
+      openProjectLibrary();
+      loadProjectDocs();
+    }
+  });
+
+  document.getElementById('btn-send-project-selected').addEventListener('click', async function() {
+    var ids = Object.keys(projectLibSelection).filter(function(k) { return projectLibSelection[k]; });
+    if (ids.length === 0) return;
+    if (state.streaming) { notify('Wait for current response to finish', 'error'); return; }
+    if (!state.currentProject) { notify('Select a project first', 'error'); return; }
+
+    document.getElementById('project-library-modal').classList.remove('active');
+    await ensureSession();
+    if (!state.currentSession) return;
+
+    var allContent = '';
+    var docNames = [];
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        var result = await api('/api/documents/insert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ docId: ids[i], scope: 'project' })
+        });
+        if (result && result.raw_content && result.raw_content.trim().length > 0) {
+          var wc = result.raw_content.split(/\s+/).length;
+          docNames.push('"' + result.name + '" (' + wc + ' words)');
+          allContent += '\n\n=== DOCUMENT: ' + result.name + ' (' + wc + ' words) ===\n\n' + result.raw_content;
+        }
+      } catch (err) { notify('Failed to load doc: ' + err.message, 'error'); }
+    }
+    if (docNames.length === 0) { notify('No documents with content to send', 'error'); return; }
+
+    addMessage('user', 'Loading ' + docNames.length + ' document' + (docNames.length > 1 ? 's' : '') + ' from project library:\n' + docNames.join('\n'));
+    scrollBottom();
+    state.streaming = true;
+    els.btnSend.disabled = true;
+    var claudeMsg = 'The user has loaded ' + docNames.length + ' documents from the project library:\n' + docNames.join('\n') + '\n\nHere are the full contents:' + allContent + '\n\nPlease acknowledge all documents loaded, provide a brief summary of each, and let the user know you are ready for questions or instructions about them.';
+    var textEl = startStreaming();
+    var chatResp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: state.currentSession.id, projectId: state.currentProject.id, message: claudeMsg })
+    });
+    streamSSE(chatResp, textEl, function() { state.streaming = false; els.btnSend.disabled = false; });
+  });
+
+  document.getElementById('btn-copy-to-global').addEventListener('click', async function() {
+    var ids = Object.keys(projectLibSelection).filter(function(k) { return projectLibSelection[k]; });
+    if (ids.length === 0) return;
+    var copied = 0;
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        await api('/api/projects/documents/' + ids[i] + '/copy-to-global', { method: 'POST' });
+        copied++;
+      } catch (err) {}
+    }
+    if (copied > 0) notify('Copied ' + copied + ' document' + (copied > 1 ? 's' : '') + ' to General Library', 'success');
+  });
+
+  var projLibModal = document.getElementById('project-library-modal');
+  var projLibInner = projLibModal.querySelector('.modal');
+  projLibInner.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  projLibModal.addEventListener('mousedown', function(e) {
+    if (e.target === projLibModal) projLibModal.classList.remove('active');
+  });
+
+  projLibInner.addEventListener('dragover', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    projLibInner.style.outline = '2px dashed #2563eb';
+    projLibInner.style.outlineOffset = '-4px';
+  });
+  projLibInner.addEventListener('dragleave', function() {
+    projLibInner.style.outline = ''; projLibInner.style.outlineOffset = '';
+  });
+  projLibInner.addEventListener('drop', async function(e) {
+    e.preventDefault(); e.stopPropagation();
+    projLibInner.style.outline = ''; projLibInner.style.outlineOffset = '';
+    if (!state.currentProject) return;
+    var files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    var uploaded = 0;
+    for (var fi = 0; fi < files.length; fi++) {
+      var fd = new FormData();
+      fd.append('file', files[fi]);
+      fd.append('projectId', state.currentProject.id);
+      try {
+        var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
+        if (resp.ok) uploaded++;
+      } catch (err) {}
+    }
+    if (uploaded > 0) {
+      notify('Added ' + uploaded + ' document' + (uploaded > 1 ? 's' : '') + ' to project library', 'success');
+      openProjectLibrary();
+      loadProjectDocs();
+    }
   });
 
   // --- Tractator ---
