@@ -1465,7 +1465,20 @@
     }
   }
 
-  function filterLibraryDocs(docs, query, listEl, makeFn) {
+  var libSortMode = { global: 'newest', project: 'newest' };
+
+  function sortDocs(docs, mode) {
+    var sorted = docs.slice();
+    if (mode === 'newest') sorted.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    else if (mode === 'oldest') sorted.sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+    else if (mode === 'az') sorted.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    else if (mode === 'za') sorted.sort(function(a, b) { return (b.name || '').localeCompare(a.name || ''); });
+    else if (mode === 'largest') sorted.sort(function(a, b) { return (b.word_count || 0) - (a.word_count || 0); });
+    else if (mode === 'smallest') sorted.sort(function(a, b) { return (a.word_count || 0) - (b.word_count || 0); });
+    return sorted;
+  }
+
+  function filterLibraryDocs(docs, query, listEl, makeFn, libType) {
     listEl.innerHTML = '';
     var q = (query || '').toLowerCase().trim();
     var keywords = q ? q.split(/\s+/) : [];
@@ -1474,6 +1487,7 @@
       var name = (d.name || '').toLowerCase();
       return keywords.every(function(kw) { return name.indexOf(kw) !== -1; });
     });
+    filtered = sortDocs(filtered, libSortMode[libType || 'global']);
     if (filtered.length === 0) {
       listEl.innerHTML = q
         ? '<li class="empty-state">No documents match "' + esc(q) + '"</li>'
@@ -1482,6 +1496,16 @@
       for (var i = 0; i < filtered.length; i++) {
         makeFn(listEl, filtered[i]);
       }
+    }
+  }
+
+  function refreshLibView(libType) {
+    if (libType === 'global') {
+      var q = document.getElementById('lib-search-global').value;
+      filterLibraryDocs(cachedGlobalDocs, q, els.globalDocs, makeGlobalDocItem, 'global');
+    } else {
+      var q2 = document.getElementById('lib-search-project').value;
+      filterLibraryDocs(cachedProjectDocs, q2, document.getElementById('project-lib-docs'), makeProjectDocItem, 'project');
     }
   }
 
@@ -1495,7 +1519,7 @@
 
     try {
       cachedGlobalDocs = await api('/api/documents/global');
-      filterLibraryDocs(cachedGlobalDocs, '', els.globalDocs, makeGlobalDocItem);
+      filterLibraryDocs(cachedGlobalDocs, '', els.globalDocs, makeGlobalDocItem, 'global');
     } catch (err) {
       notify('Failed to load library', 'error');
     }
@@ -1533,7 +1557,7 @@
 
     try {
       cachedProjectDocs = await api('/api/projects/' + state.currentProject.id + '/documents');
-      filterLibraryDocs(cachedProjectDocs, '', listEl, makeProjectDocItem);
+      filterLibraryDocs(cachedProjectDocs, '', listEl, makeProjectDocItem, 'project');
     } catch (err) {
       notify('Failed to load project documents', 'error');
     }
@@ -2021,17 +2045,29 @@
   });
 
   document.getElementById('lib-search-global').addEventListener('input', function() {
-    filterLibraryDocs(cachedGlobalDocs, this.value, els.globalDocs, makeGlobalDocItem);
+    refreshLibView('global');
+  });
+
+  document.getElementById('lib-search-project').addEventListener('input', function() {
+    refreshLibView('project');
+  });
+
+  document.querySelectorAll('.lib-sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var libType = btn.getAttribute('data-lib');
+      var sortMode = btn.getAttribute('data-sort');
+      libSortMode[libType] = sortMode;
+      var container = btn.closest('.lib-sort-bar');
+      container.querySelectorAll('.lib-sort-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      refreshLibView(libType);
+    });
   });
 
   document.getElementById('btn-project-library').addEventListener('click', openProjectLibrary);
 
   document.getElementById('close-project-library').addEventListener('click', function() {
     document.getElementById('project-library-modal').classList.remove('active');
-  });
-
-  document.getElementById('lib-search-project').addEventListener('input', function() {
-    filterLibraryDocs(cachedProjectDocs, this.value, document.getElementById('project-lib-docs'), makeProjectDocItem);
   });
 
   var projLibFileInput = document.getElementById('file-input-project-lib');

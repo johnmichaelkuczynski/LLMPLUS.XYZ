@@ -108,9 +108,17 @@
         <button class="modal-x" id="close-library" data-testid="close-library">&times;</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="flex:0 0 auto">&#128194; Upload</button>
-          <input type="text" class="text-input lib-search" id="lib-search-global" data-testid="lib-search-global" placeholder="&#128269; Search library..." style="flex:1">
+        <input type="text" class="lib-search-big" id="lib-search-global" data-testid="lib-search-global" placeholder="Search documents..." autofocus>
+        <div class="lib-sort-bar">
+          <span class="lib-sort-label">Sort:</span>
+          <button class="lib-sort-btn active" data-testid="lib-sort-global-newest" data-sort="newest" data-lib="global">Newest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-global-oldest" data-sort="oldest" data-lib="global">Oldest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-global-az" data-sort="az" data-lib="global">A-Z</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-global-za" data-sort="za" data-lib="global">Z-A</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-global-largest" data-sort="largest" data-lib="global">Largest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-global-smallest" data-sort="smallest" data-lib="global">Smallest</button>
+          <span style="flex:1"></span>
+          <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="font-size:12px;padding:3px 10px">&#128194; Upload</button>
         </div>
         <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
@@ -129,9 +137,17 @@
         <button class="modal-x" id="close-project-library" data-testid="close-project-library">&times;</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button class="sidebar-btn" id="btn-upload-project-lib" data-testid="btn-upload-project-lib" style="flex:0 0 auto">&#128194; Upload</button>
-          <input type="text" class="text-input lib-search" id="lib-search-project" data-testid="lib-search-project" placeholder="&#128269; Search project docs..." style="flex:1">
+        <input type="text" class="lib-search-big" id="lib-search-project" data-testid="lib-search-project" placeholder="Search project documents...">
+        <div class="lib-sort-bar">
+          <span class="lib-sort-label">Sort:</span>
+          <button class="lib-sort-btn active" data-testid="lib-sort-project-newest" data-sort="newest" data-lib="project">Newest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-project-oldest" data-sort="oldest" data-lib="project">Oldest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-project-az" data-sort="az" data-lib="project">A-Z</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-project-za" data-sort="za" data-lib="project">Z-A</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-project-largest" data-sort="largest" data-lib="project">Largest</button>
+          <button class="lib-sort-btn" data-testid="lib-sort-project-smallest" data-sort="smallest" data-lib="project">Smallest</button>
+          <span style="flex:1"></span>
+          <button class="sidebar-btn" id="btn-upload-project-lib" data-testid="btn-upload-project-lib" style="font-size:12px;padding:3px 10px">&#128194; Upload</button>
         </div>
         <input type="file" id="file-input-project-lib" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <ul class="doc-list" id="project-lib-docs" data-testid="project-lib-docs-list"></ul>

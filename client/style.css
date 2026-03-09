@@ -1047,16 +1047,54 @@ html, body {
   background: #0e7490;
 }
 
-.lib-search {
-  font-size: 13px;
-  padding: 7px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+.lib-search-big {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 15px;
+  padding: 10px 14px;
+  border: 2px solid #7c3aed;
+  border-radius: 8px;
   outline: none;
+  margin-bottom: 10px;
+  background: #faf5ff;
 }
-.lib-search:focus {
+.lib-search-big::placeholder {
+  color: #9ca3af;
+}
+.lib-search-big:focus {
+  border-color: #6d28d9;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.18);
+  background: #fff;
+}
+
+.lib-sort-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.lib-sort-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+  cursor: pointer;
+  color: #6b7280;
+}
+.lib-sort-btn:hover {
+  background: #f3f4f6;
+}
+.lib-sort-btn.active {
+  background: #7c3aed;
+  color: #fff;
   border-color: #7c3aed;
-  box-shadow: 0 0 0 2px rgba(124,58,237,0.12);
+}
+.lib-sort-label {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-right: 4px;
 }
 
 .lib-footer {
