@@ -2052,6 +2052,13 @@
     refreshLibView('project');
   });
 
+  document.querySelectorAll('.modal-resize-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var modal = btn.closest('.lib-modal-resizable');
+      modal.classList.toggle('lib-expanded');
+    });
+  });
+
   document.querySelectorAll('.lib-sort-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var libType = btn.getAttribute('data-lib');

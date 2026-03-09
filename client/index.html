@@ -102,13 +102,16 @@
   </div>
 
   <div class="modal-bg" id="library-modal">
-    <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column">
+    <div class="modal lib-modal-resizable" id="lib-modal-inner-global">
       <div class="modal-head">
         <span class="modal-title">&#128218; General Library</span>
-        <button class="modal-x" id="close-library" data-testid="close-library">&times;</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="modal-resize-btn" data-testid="lib-resize-global" title="Expand / Shrink">&#x26F6;</button>
+          <button class="modal-x" id="close-library" data-testid="close-library">&times;</button>
+        </div>
       </div>
-      <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
-        <input type="text" class="lib-search-big" id="lib-search-global" data-testid="lib-search-global" placeholder="Search documents..." autofocus>
+      <div class="lib-toolbar">
+        <input type="text" class="lib-search-big" id="lib-search-global" data-testid="lib-search-global" placeholder="Search documents...">
         <div class="lib-sort-bar">
           <span class="lib-sort-label">Sort:</span>
           <button class="lib-sort-btn active" data-testid="lib-sort-global-newest" data-sort="newest" data-lib="global">Newest</button>
@@ -120,6 +123,8 @@
           <span style="flex:1"></span>
           <button class="sidebar-btn" id="btn-upload-global" data-testid="btn-upload-global" style="font-size:12px;padding:3px 10px">&#128194; Upload</button>
         </div>
+      </div>
+      <div class="modal-body lib-doc-scroll">
         <input type="file" id="file-input-global" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <ul class="doc-list" id="global-docs" data-testid="global-docs-list"></ul>
       </div>
@@ -131,12 +136,15 @@
   </div>
 
   <div class="modal-bg" id="project-library-modal">
-    <div class="modal" style="width:580px;max-height:80vh;display:flex;flex-direction:column">
+    <div class="modal lib-modal-resizable" id="lib-modal-inner-project">
       <div class="modal-head">
         <span class="modal-title" id="project-library-title">&#128194; Project Library</span>
-        <button class="modal-x" id="close-project-library" data-testid="close-project-library">&times;</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="modal-resize-btn" data-testid="lib-resize-project" title="Expand / Shrink">&#x26F6;</button>
+          <button class="modal-x" id="close-project-library" data-testid="close-project-library">&times;</button>
+        </div>
       </div>
-      <div class="modal-body" style="flex:1;overflow-y:auto;padding-bottom:8px">
+      <div class="lib-toolbar">
         <input type="text" class="lib-search-big" id="lib-search-project" data-testid="lib-search-project" placeholder="Search project documents...">
         <div class="lib-sort-bar">
           <span class="lib-sort-label">Sort:</span>
@@ -149,6 +157,8 @@
           <span style="flex:1"></span>
           <button class="sidebar-btn" id="btn-upload-project-lib" data-testid="btn-upload-project-lib" style="font-size:12px;padding:3px 10px">&#128194; Upload</button>
         </div>
+      </div>
+      <div class="modal-body lib-doc-scroll">
         <input type="file" id="file-input-project-lib" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" multiple style="display:none">
         <ul class="doc-list" id="project-lib-docs" data-testid="project-lib-docs-list"></ul>
       </div>
