@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxA
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
-const MAX_TOKENS = 8192;
+const MAX_TOKENS = 16384;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (
@@ -117,6 +117,11 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
 
 function buildSystemPrompt(tree) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
+  prompt += '\n\nIMPORTANT WRITING RULES:';
+  prompt += '\n- When the user asks you to write, draft, or compose anything (motions, briefs, letters, essays, papers, code, etc.), write the FULL, COMPLETE document. Do NOT summarize. Do NOT abbreviate. Do NOT use placeholders like "[continue here]" or "[additional arguments]".';
+  prompt += '\n- Write as long as needed. If a legal motion needs 20 pages, write 20 pages. If a letter needs 3 paragraphs, write 3 paragraphs. Match the length to the task.';
+  prompt += '\n- Use proper formatting for the document type: legal documents should have proper caption, headings, numbered paragraphs, signature blocks, etc. Letters should have proper salutation and closing. Academic papers should have sections, citations, etc.';
+  prompt += '\n- Never cut yourself short. If you run out of space, the system will automatically continue your response.';
   prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
   if (tree && Object.keys(tree).length > 0) {
     prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
@@ -357,31 +362,53 @@ app.post('/api/chat', async function(req, res) {
     }
     msgs.push({ role: 'user', content: userContent });
 
-    var anthropicRes = await callClaude(msgs, systemPrompt, true);
-    var reader = anthropicRes.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
     var fullText = '';
+    var continuationMsgs = msgs.slice();
+    var maxContinuations = 20;
+    var continuationCount = 0;
 
-    while (true) {
-      var chunk = await reader.read();
-      if (chunk.done) break;
-      buffer += decoder.decode(chunk.value, { stream: true });
-      var lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (var j = 0; j < lines.length; j++) {
-        var line = lines[j];
-        if (line.startsWith('data: ')) {
-          var data = line.slice(6).trim();
-          if (!data || data === '[DONE]') continue;
-          try {
-            var parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
-              fullText += parsed.delta.text;
-              res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
-            }
-          } catch (e) {}
+    while (continuationCount < maxContinuations) {
+      var anthropicRes = await callClaude(continuationMsgs, systemPrompt, true);
+      var reader = anthropicRes.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var segmentText = '';
+      var stopReason = 'end_turn';
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var j = 0; j < lines.length; j++) {
+          var line = lines[j];
+          if (line.startsWith('data: ')) {
+            var data = line.slice(6).trim();
+            if (!data || data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+                segmentText += parsed.delta.text;
+                res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
+              } else if (parsed.type === 'message_delta' && parsed.delta && parsed.delta.stop_reason) {
+                stopReason = parsed.delta.stop_reason;
+              }
+            } catch (e) {}
+          }
         }
+      }
+
+      fullText += segmentText;
+      continuationCount++;
+
+      if (stopReason === 'max_tokens' && segmentText.length > 100) {
+        continuationMsgs = msgs.slice(0, -1);
+        continuationMsgs.push({ role: 'user', content: userContent });
+        continuationMsgs.push({ role: 'assistant', content: fullText });
+        continuationMsgs.push({ role: 'user', content: 'Continue writing exactly where you left off. Do not repeat anything. Do not add any preamble or commentary. Just continue the text seamlessly.' });
+      } else {
+        break;
       }
     }
 
@@ -651,7 +678,7 @@ app.post('/api/tractatus/update', async function(req, res) {
 });
 
 async function streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens) {
-  var anthropicRes = await callClaude(messages, systemPrompt, true, maxTokens || 8192);
+  var anthropicRes = await callClaude(messages, systemPrompt, true, maxTokens || 16384);
   var reader = anthropicRes.body.getReader();
   var decoder = new TextDecoder();
   var buffer = '';
@@ -791,7 +818,7 @@ app.post('/api/coherence', async function(req, res) {
         [{ role: 'user', content: singlePrompt }],
         singleSysPrompt,
         send,
-        8192
+        16384
       );
 
       var singleWords = singleResult.split(/\s+/).length;
@@ -1020,7 +1047,7 @@ app.post('/api/coherence', async function(req, res) {
         [{ role: 'user', content: sectionPrompt }],
         sysPrompt,
         send,
-        8192
+        16384
       );
 
       var sectionWordCount = sectionText.split(/\s+/).length;
@@ -1044,7 +1071,7 @@ app.post('/api/coherence', async function(req, res) {
           [{ role: 'user', content: expandPrompt }],
           sysPrompt,
           send,
-          8192
+          16384
         );
 
         if (expandedText.split(/\s+/).length > sectionWordCount) {
@@ -1141,7 +1168,7 @@ app.post('/api/coherence/revise', async function(req, res) {
       [{ role: 'user', content: revPrompt }],
       'You are revising a ' + doctype.replace(/_/g, ' ') + '. Apply only the requested changes and leave everything else intact. Output ONLY the revised document — no commentary, no explanations.',
       send,
-      8192
+      16384
     );
 
     var revWords = revResult.split(/\s+/).length;
