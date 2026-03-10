@@ -635,6 +635,183 @@ app.post('/api/chat', async function(req, res) {
   }
 });
 
+app.post('/api/report/scopes', async function(req, res) {
+  try {
+    var projectId = req.body.projectId;
+    var scopes = [{ value: 'project', label: 'Entire Project' }];
+
+    var sessions = await pool.query(
+      'SELECT id, title FROM sessions WHERE project_id = $1 ORDER BY created_at DESC',
+      [projectId]
+    );
+    for (var i = 0; i < sessions.rows.length; i++) {
+      var s = sessions.rows[i];
+      scopes.push({ value: 'chat:' + s.id, label: 'Chat: ' + (s.title || 'Untitled') });
+    }
+
+    var archives = await pool.query(
+      'SELECT id, tier, node_count, created_at FROM tractatus_archive WHERE project_id = $1 ORDER BY created_at DESC',
+      [projectId]
+    );
+    for (var a = 0; a < archives.rows.length; a++) {
+      var arch = archives.rows[a];
+      var archDate = new Date(arch.created_at).toLocaleDateString();
+      var label = 'Since ' + (a + 1) + ' tree' + (a + 1 > 1 ? 's' : '') + ' ago (' + archDate + ', ' + (arch.node_count || '?') + ' nodes)';
+      scopes.push({ value: 'since:' + arch.id, label: label });
+    }
+
+    res.json(scopes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/report/generate', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
+  try {
+    var projectId = req.body.projectId;
+    var scope = req.body.scope || 'project';
+    var instructions = req.body.instructions || '';
+
+    var projectResult = await pool.query('SELECT name, tractatus_tree FROM projects WHERE id = $1', [projectId]);
+    var projectName = projectResult.rows[0] ? projectResult.rows[0].name : 'Project';
+
+    send({ type: 'status', message: 'Gathering data for report...' });
+
+    var contextParts = [];
+    var currentTree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
+
+    if (scope === 'project') {
+      var tieredMemory = await loadTieredMemory(projectId);
+      for (var t = 0; t < tieredMemory.tiers.length; t++) {
+        var tier = tieredMemory.tiers[t];
+        var tierLabel = tier.tier === 1 ? 'Current Memory (Tier 1)' : 'Summary Memory (Tier ' + tier.tier + ')';
+        contextParts.push('=== ' + tierLabel + ' (' + tier.nodes + ' nodes) ===\n' + JSON.stringify(tier.tree, null, 1));
+      }
+
+      var allSessions = await pool.query(
+        'SELECT title, transcript FROM sessions WHERE project_id = $1 ORDER BY created_at ASC',
+        [projectId]
+      );
+      var sessionSummary = '';
+      for (var si = 0; si < allSessions.rows.length; si++) {
+        var sess = allSessions.rows[si];
+        var transcript = sess.transcript || [];
+        if (transcript.length === 0) continue;
+        sessionSummary += '\n--- Chat: "' + (sess.title || 'Untitled') + '" (' + transcript.length + ' messages) ---\n';
+        var recent = transcript.slice(-10);
+        for (var mi = 0; mi < recent.length; mi++) {
+          var role = recent[mi].role === 'user' ? 'User' : 'Assistant';
+          sessionSummary += role + ': ' + (recent[mi].content || '').substring(0, 500) + '\n';
+        }
+      }
+      if (sessionSummary) contextParts.push('=== Chat History ===\n' + sessionSummary.substring(0, 30000));
+
+      var docs = await pool.query('SELECT name, raw_content FROM project_documents WHERE project_id = $1', [projectId]);
+      if (docs.rows.length > 0) {
+        var docList = 'Project has ' + docs.rows.length + ' documents: ' + docs.rows.map(function(d) { return d.name; }).join(', ');
+        contextParts.push('=== Documents ===\n' + docList);
+      }
+
+    } else if (scope.startsWith('chat:')) {
+      var chatId = scope.substring(5);
+      var chatResult = await pool.query('SELECT title, transcript FROM sessions WHERE id = $1 AND project_id = $2', [chatId, projectId]);
+      if (chatResult.rows.length > 0) {
+        var chatTitle = chatResult.rows[0].title || 'Untitled';
+        var chatTranscript = chatResult.rows[0].transcript || [];
+        var chatContent = '';
+        for (var ci = 0; ci < chatTranscript.length; ci++) {
+          var cRole = chatTranscript[ci].role === 'user' ? 'User' : 'Assistant';
+          chatContent += cRole + ': ' + (chatTranscript[ci].content || '').substring(0, 2000) + '\n\n';
+        }
+        contextParts.push('=== Chat: "' + chatTitle + '" (' + chatTranscript.length + ' messages) ===\n' + chatContent.substring(0, 60000));
+      }
+
+      if (Object.keys(currentTree).length > 0) {
+        contextParts.push('=== Current Project Memory ===\n' + JSON.stringify(currentTree, null, 1).substring(0, 8000));
+      }
+
+    } else if (scope.startsWith('since:')) {
+      var archiveId = scope.substring(6);
+      var archResult = await pool.query('SELECT tree, node_count, created_at FROM tractatus_archive WHERE id = $1 AND project_id = $2', [archiveId, projectId]);
+      if (archResult.rows.length > 0) {
+        var archTree = archResult.rows[0].tree || {};
+        var archDate = new Date(archResult.rows[0].created_at);
+        contextParts.push('=== Archived Tree Snapshot (from ' + archDate.toLocaleDateString() + ', ' + (archResult.rows[0].node_count || '?') + ' nodes) ===\n' + JSON.stringify(archTree, null, 1));
+      }
+
+      if (Object.keys(currentTree).length > 0) {
+        contextParts.push('=== Current Active Memory (' + Object.keys(currentTree).length + ' nodes) ===\n' + JSON.stringify(currentTree, null, 1));
+      }
+
+      var tieredMem = await loadTieredMemory(projectId);
+      for (var tm = 0; tm < tieredMem.tiers.length; tm++) {
+        if (tieredMem.tiers[tm].tier > 1) {
+          contextParts.push('=== Tier ' + tieredMem.tiers[tm].tier + ' Summary (' + tieredMem.tiers[tm].nodes + ' nodes) ===\n' +
+            JSON.stringify(tieredMem.tiers[tm].tree, null, 1).substring(0, 5000));
+        }
+      }
+    }
+
+    var contextText = contextParts.join('\n\n');
+    if (contextText.length > 80000) contextText = contextText.substring(0, 80000) + '\n[...truncated...]';
+
+    send({ type: 'status', message: 'Generating report...' });
+    send({ type: 'progress', current: 1, total: 2 });
+
+    var scopeDesc = scope === 'project' ? 'the entire project "' + projectName + '"' :
+                    scope.startsWith('chat:') ? 'a specific chat in "' + projectName + '"' :
+                    'recent activity in "' + projectName + '" (since a previous memory checkpoint)';
+
+    var prompt = 'Write a comprehensive report covering ' + scopeDesc + '.\n\n';
+    prompt += 'Write in normal prose — complete sentences and paragraphs. NOT in numbered Tractatus-style nodes.\n';
+    prompt += 'This is a narrative report, not a tree or outline.\n\n';
+    if (instructions) prompt += '=== USER INSTRUCTIONS ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
+    prompt += 'Here is all the available context:\n\n' + contextText + '\n\n';
+    prompt += 'Write a thorough, well-organized report covering:\n';
+    prompt += '- Key findings and facts\n';
+    prompt += '- Important assertions and evidence\n';
+    prompt += '- Open questions and unresolved issues\n';
+    prompt += '- Notable conflicts or contradictions\n';
+    prompt += '- Timeline of significant developments (if applicable)\n';
+    prompt += '- Conclusions and actionable next steps\n\n';
+    prompt += 'ABSOLUTELY NO MARKDOWN. No #, ##, **, *, ---. Write in clean plain text only.\n';
+    prompt += 'For section headings, just write the heading text on its own line. No hash symbols.\n';
+    prompt += 'Write as long as needed to be thorough. Output ONLY the report.';
+
+    var sysPrompt = 'You are a skilled report writer producing a comprehensive narrative report. ';
+    sysPrompt += 'Write in flowing prose — complete sentences and paragraphs. ';
+    sysPrompt += 'Do NOT use Tractatus-style numbered nodes. Do NOT use markdown formatting. ';
+    sysPrompt += 'Organize with clear section headings (plain text, no # symbols) and substantive paragraphs.';
+
+    var reportText = await streamClaudeToSSE(
+      [{ role: 'user', content: prompt }],
+      sysPrompt,
+      send,
+      16384
+    );
+
+    reportText = stripMarkdownFromOutput(reportText);
+    send({ type: 'progress', current: 2, total: 2 });
+    send({ type: 'complete', totalWords: reportText.split(/\s+/).length, cleanedText: reportText });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('Report generation error:', err.message);
+    send({ type: 'error', error: err.message });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
 app.post('/api/tractator/generate', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

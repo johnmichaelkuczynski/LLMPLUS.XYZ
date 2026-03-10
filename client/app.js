@@ -2542,6 +2542,122 @@
   });
 
   // --- Tractator ---
+  var reportGenModal = document.getElementById('report-generator-modal');
+  var reportGenScope = document.getElementById('report-scope');
+  var reportGenInstructions = document.getElementById('report-instructions');
+  var reportGenStatus = document.getElementById('report-gen-status');
+  var reportGenStatusText = document.getElementById('report-gen-status-text');
+  var reportGenFill = document.getElementById('report-gen-fill');
+  var reportGenGoBtn = document.getElementById('report-gen-go');
+
+  document.getElementById('btn-report-generator').addEventListener('click', async function() {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    reportGenModal.classList.add('active');
+    reportGenStatus.style.display = 'none';
+    reportGenGoBtn.disabled = false;
+    reportGenInstructions.value = '';
+    reportGenFill.style.width = '0%';
+
+    reportGenScope.innerHTML = '<option value="project">Entire Project</option>';
+    try {
+      var scopes = await api('/api/report/scopes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: state.currentProject.id })
+      });
+      for (var i = 1; i < scopes.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = scopes[i].value;
+        opt.textContent = scopes[i].label;
+        reportGenScope.appendChild(opt);
+      }
+    } catch (err) {
+      console.error('Failed to load scopes:', err);
+    }
+  });
+
+  document.getElementById('close-report-gen').addEventListener('click', function() {
+    reportGenModal.classList.remove('active');
+  });
+  document.getElementById('report-gen-cancel').addEventListener('click', function() {
+    reportGenModal.classList.remove('active');
+  });
+  reportGenModal.addEventListener('mousedown', function(e) {
+    if (e.target === reportGenModal) reportGenModal.classList.remove('active');
+  });
+  reportGenModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+  reportGenGoBtn.addEventListener('click', async function() {
+    if (!state.currentProject) return;
+    reportGenGoBtn.disabled = true;
+    reportGenStatus.style.display = 'block';
+    reportGenStatusText.textContent = 'Starting...';
+    reportGenFill.style.width = '10%';
+
+    var scope = reportGenScope.value;
+    var instructions = reportGenInstructions.value.trim();
+    var fullReport = '';
+
+    try {
+      var resp = await fetch('/api/report/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: state.currentProject.id,
+          scope: scope,
+          instructions: instructions
+        })
+      });
+
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      while (true) {
+        var chunk = reader.read ? await reader.read() : { done: true };
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (!line.startsWith('data: ')) continue;
+          var data = line.substring(6);
+          if (data === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'status') {
+              reportGenStatusText.textContent = parsed.message;
+            } else if (parsed.type === 'progress') {
+              reportGenFill.style.width = Math.round((parsed.current / parsed.total) * 100) + '%';
+            } else if (parsed.type === 'token') {
+              fullReport += parsed.text;
+            } else if (parsed.type === 'complete') {
+              if (parsed.cleanedText) fullReport = parsed.cleanedText;
+              reportGenStatusText.textContent = 'Complete! (' + (parsed.totalWords || fullReport.split(/\s+/).length) + ' words)';
+              reportGenFill.style.width = '100%';
+            } else if (parsed.type === 'error') {
+              reportGenStatusText.textContent = 'Error: ' + parsed.error;
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (fullReport.trim()) {
+        var scopeLabel = reportGenScope.options[reportGenScope.selectedIndex].text;
+        var title = 'Report — ' + scopeLabel + ' — ' + (state.currentProject ? state.currentProject.name : 'Project');
+        reportGenModal.classList.remove('active');
+        showArtifact(fullReport, title, { raw: false });
+      }
+    } catch (err) {
+      reportGenStatusText.textContent = 'Error: ' + err.message;
+    }
+    reportGenGoBtn.disabled = false;
+  });
+
   var tractatorModal = document.getElementById('tractator-modal');
   var tractatorDepth = 0;
   var tractatorSource = null;
