@@ -1,0 +1,67 @@
+Add recursive memory compression to LLM Plus using second-order Tractatus trees
+
+The app already stores one Tractatus tree per project in the database. This tree grows every time the user chats, adding new numbered nodes (1.0, 1.1, 2.0, etc.) that capture key information in compressed form.
+
+The problem: As the tree grows past 2,000-3,000 nodes, it becomes less effective. Recent high-resolution nodes get buried. The tree still works, but it's not optimal.
+
+The solution: Every time a project's Tractatus tree reaches 500 nodes, generate a "second-order" Tractatus tree that summarizes the first 500. Then reset the main tree to empty and start fresh with new high-resolution nodes. The second-order tree becomes permanent memory. The main tree handles recent conversation.
+
+How it works:
+
+In the projects table, add two columns:
+
+tractatus_tier (integer, default 1) — 1 = main tree, 2 = summary tree, 3 = meta-summary, etc.
+
+parent_project_id (UUID, references projects.id) — links summary trees back to the project they summarize
+
+When a project's main tree hits 500 nodes:
+
+Send the entire tree to Claude with this prompt: "Below is a Tractatus tree from a legal case project. Generate a compressed second-order Tractatus tree that captures all key information at a higher level of abstraction. Use the same tagging system (ASSERTS, DOCUMENT, REJECTS, OPEN, RESOLVED, QUESTION). Return only JSON."
+
+Create a new project record with:
+
+Name = "[Original Project Name] - Summary [Date]"
+
+tractatus_tier = 2
+
+parent_project_id = original project's ID
+
+tractatus_tree = the summary JSON from Claude
+
+Delete all nodes from the original project's main tree (or archive them to a separate table if you want historical preservation)
+
+When loading a project for chat:
+
+Recursively fetch all ancestor projects (parent_project_id chain)
+
+Collect their Tractatus trees
+
+Inject into system prompt as:
+"Project memory (Tier 1 - recent): [main tree]
+Project memory (Tier 2 - summary): [second-order tree]
+Project memory (Tier 3 - archive): [third-order tree if exists]"
+
+For very long-running projects, this can continue indefinitely:
+
+Tier 1: 0-500 nodes (high resolution, recent)
+
+Tier 2: summarizes first 500 nodes (medium resolution, older)
+
+Tier 3: summarizes 5-10 Tier 2 trees (low resolution, ancient)
+
+Tier 4: summarizes multiple Tier 3 trees (very low resolution, archive)
+
+The UI should have a "Memory Hierarchy" view showing all tiers with expand/collapse, so users can see what's being remembered at each level.
+
+Edge cases:
+
+If user keeps chatting after Tier 1 resets, the new Tier 1 fills up again and triggers another Tier 2 summary (which gets merged with existing Tier 2 or creates parallel summaries)
+
+This creates a forest of summary trees, not just a single chain—the system should collect all ancestors recursively, not assume a straight line
+
+Database changes needed:
+
+sql
+ALTER TABLE projects ADD COLUMN tractatus_tier INTEGER DEFAULT 1;
+ALTER TABLE projects ADD COLUMN parent_project_id UUID REFERENCES projects(id);
+CREATE TABLE tractatus_archive (similar to projects but for historical preservation);

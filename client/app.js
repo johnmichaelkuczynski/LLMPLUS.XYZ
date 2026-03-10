@@ -134,6 +134,117 @@
     els.artifactWordcount.textContent = wc.toLocaleString() + ' words';
   }
 
+  function showMemoryHierarchy(memory) {
+    var tiers = memory.tiers || [];
+    var archives = memory.archives || [];
+    var projectName = state.currentProject ? state.currentProject.name : 'Project';
+
+    var html = '';
+    if (tiers.length === 0 && archives.length === 0) {
+      html = '<div style="text-align:center;padding:40px;color:#6b7280"><p style="font-size:24px;margin:0 0 12px">&#129504;</p><p>No memory stored yet. Chat with the project to build its Tractatus tree.</p></div>';
+    } else {
+      html += '<div style="padding:4px 0">';
+      var totalNodes = 0;
+      for (var t = 0; t < tiers.length; t++) totalNodes += tiers[t].nodes;
+
+      html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:16px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      html += '<span style="font-weight:600;color:#166534">Total Memory: ' + totalNodes + ' nodes across ' + tiers.length + ' tier' + (tiers.length !== 1 ? 's' : '') + '</span>';
+      if (archives.length > 0) {
+        html += '<span style="font-size:12px;color:#6b7280">' + archives.length + ' archived snapshot' + (archives.length !== 1 ? 's' : '') + '</span>';
+      }
+      html += '</div></div>';
+
+      for (var i = 0; i < tiers.length; i++) {
+        var tier = tiers[i];
+        var tierColor = tier.tier === 1 ? '#059669' : tier.tier === 2 ? '#7c3aed' : tier.tier === 3 ? '#dc2626' : '#6b7280';
+        var tierIcon = tier.tier === 1 ? '&#127919;' : tier.tier === 2 ? '&#128202;' : tier.tier === 3 ? '&#128451;' : '&#128190;';
+        var tierLabel = tier.tier === 1 ? 'Recent (High Resolution)' :
+                        tier.tier === 2 ? 'Summary (Medium Resolution)' :
+                        tier.tier === 3 ? 'Archive (Lower Resolution)' :
+                        'Deep Archive (Tier ' + tier.tier + ')';
+
+        html += '<div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:12px;overflow:hidden" data-testid="memory-tier-' + tier.tier + '">';
+        html += '<div class="mem-tier-header" style="background:linear-gradient(135deg,' + tierColor + '10,' + tierColor + '05);padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb" data-tier="' + i + '">';
+        html += '<div>' + tierIcon + ' <strong style="color:' + tierColor + '">Tier ' + tier.tier + '</strong> — ' + tierLabel + '</div>';
+        html += '<div style="display:flex;align-items:center;gap:12px"><span style="background:' + tierColor + ';color:#fff;font-size:11px;padding:2px 8px;border-radius:10px">' + tier.nodes + ' nodes</span>';
+        html += '<span class="mem-tier-arrow" style="font-size:14px;transition:transform 0.2s">&#9660;</span></div></div>';
+        html += '<div class="mem-tier-body" style="max-height:400px;overflow-y:auto;padding:12px;font-family:\'SF Mono\',Consolas,monospace;font-size:11px;line-height:1.5;display:none">';
+
+        var treeKeys = Object.keys(tier.tree);
+        treeKeys.sort(function(a, b) {
+          var pa = a.split('.').map(Number);
+          var pb = b.split('.').map(Number);
+          for (var k = 0; k < Math.max(pa.length, pb.length); k++) {
+            var va = pa[k] || 0, vb = pb[k] || 0;
+            if (va !== vb) return va - vb;
+          }
+          return 0;
+        });
+
+        for (var k = 0; k < treeKeys.length; k++) {
+          var key = treeKeys[k];
+          var depth = key.split('.').length - 1;
+          var indent = depth * 16;
+          var val = tier.tree[key];
+          var tagMatch = typeof val === 'string' ? val.match(/^(ASSERTS|REJECTS|ASSUMES|OPEN|RESOLVED|DOCUMENT|QUESTION):/) : null;
+          var tagColor = tagMatch ? ({
+            'ASSERTS': '#059669', 'REJECTS': '#dc2626', 'ASSUMES': '#d97706',
+            'OPEN': '#7c3aed', 'RESOLVED': '#6b7280', 'DOCUMENT': '#2563eb', 'QUESTION': '#ec4899'
+          })[tagMatch[1]] || '#374151' : '#374151';
+          html += '<div style="padding:2px 0;padding-left:' + indent + 'px">';
+          html += '<span style="color:#9ca3af;font-size:10px;margin-right:6px">' + esc(key) + '</span>';
+          if (tagMatch) {
+            html += '<span style="color:' + tagColor + ';font-weight:600;font-size:10px">' + tagMatch[1] + ':</span> ';
+            html += '<span style="color:#374151">' + esc(val.substring(tagMatch[0].length).trim()) + '</span>';
+          } else {
+            html += '<span style="color:#374151">' + esc(typeof val === 'string' ? val : JSON.stringify(val)) + '</span>';
+          }
+          html += '</div>';
+        }
+
+        html += '</div></div>';
+      }
+
+      if (archives.length > 0) {
+        html += '<div style="border:1px solid #e5e7eb;border-radius:8px;margin-top:16px;overflow:hidden">';
+        html += '<div style="padding:12px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb"><strong style="color:#6b7280">&#128451; Archived Snapshots</strong></div>';
+        html += '<div style="padding:12px">';
+        for (var a = 0; a < archives.length; a++) {
+          var arch = archives[a];
+          var archDate = new Date(arch.created_at).toLocaleDateString();
+          html += '<div style="padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#6b7280">';
+          html += 'Tier ' + arch.tier + ' snapshot — ' + (arch.node_count || '?') + ' nodes — ' + archDate;
+          html += '</div>';
+        }
+        html += '</div></div>';
+      }
+
+      html += '</div>';
+    }
+
+    var title = '&#129504; Memory Hierarchy — ' + esc(projectName);
+    currentArtifact = { text: JSON.stringify(memory, null, 2), title: title };
+    els.artifactTitle.innerHTML = title;
+    els.artifactBody.innerHTML = html;
+    els.artifactPanel.classList.remove('hidden');
+    els.artifactSave.disabled = true;
+
+    els.artifactBody.querySelectorAll('.mem-tier-header').forEach(function(header) {
+      header.addEventListener('click', function() {
+        var body = header.nextElementSibling;
+        var arrow = header.querySelector('.mem-tier-arrow');
+        if (body.style.display === 'none') {
+          body.style.display = 'block';
+          arrow.style.transform = 'rotate(180deg)';
+        } else {
+          body.style.display = 'none';
+          arrow.style.transform = '';
+        }
+      });
+    });
+  }
+
   function showArtifact(text, title, opts) {
     opts = opts || {};
     var cleaned = opts.raw ? text : stripTractatusContent(text);
@@ -2262,6 +2373,19 @@
       notify('Failed to load Tractatus tree', 'error');
     }
   });
+  document.getElementById('btn-memory-hierarchy').addEventListener('click', async function() {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    try {
+      var memory = await api('/api/projects/' + state.currentProject.id + '/memory-hierarchy');
+      showMemoryHierarchy(memory);
+    } catch (err) {
+      notify('Failed to load memory hierarchy', 'error');
+    }
+  });
+
   document.getElementById('close-library').addEventListener('click', function() {
     els.libraryModal.classList.remove('active');
   });

@@ -69,12 +69,27 @@ CREATE TABLE IF NOT EXISTS document_chunks (
   chunk_delta JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS tractatus_archive (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  tier INTEGER NOT NULL DEFAULT 1,
+  tree JSONB NOT NULL,
+  node_count INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 `;
 
 async function initDB() {
   const client = await pool.connect();
   try {
     await client.query(SCHEMA_SQL);
+    try {
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS tractatus_tier INTEGER DEFAULT 1");
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS parent_project_id UUID");
+      try {
+        await client.query("ALTER TABLE projects ADD CONSTRAINT fk_parent_project FOREIGN KEY (parent_project_id) REFERENCES projects(id) ON DELETE CASCADE");
+      } catch (fkErr) { /* constraint may already exist */ }
+    } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
     if (projects.rows.length === 0) {
@@ -198,7 +213,7 @@ function extractSectionOutline(text) {
   return outline.join('\n') || '(no clear section structure detected)';
 }
 
-function buildSystemPrompt(tree) {
+function buildSystemPrompt(tree, tieredMemory) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
   prompt += '\n\nIMPORTANT WRITING RULES:';
   prompt += '\n- When the user asks you to write, draft, or compose anything (motions, briefs, letters, essays, papers, code, etc.), write the FULL, COMPLETE document. Do NOT summarize. Do NOT abbreviate. Do NOT use placeholders like "[continue here]" or "[additional arguments]".';
@@ -207,7 +222,21 @@ function buildSystemPrompt(tree) {
   prompt += '\n- Use proper formatting for the document type: legal documents should have proper caption, headings, numbered paragraphs, signature blocks, etc. Letters should have proper salutation and closing. Academic papers should have sections, citations, etc.';
   prompt += '\n- Never cut yourself short. If you run out of space, the system will automatically continue your response. Use ALL available tokens before stopping.';
   prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
-  if (tree && Object.keys(tree).length > 0) {
+
+  if (tieredMemory && tieredMemory.tiers && tieredMemory.tiers.length > 0) {
+    prompt += '\n\n## Project Memory (Tiered Tractatus)';
+    for (var t = 0; t < tieredMemory.tiers.length; t++) {
+      var tier = tieredMemory.tiers[t];
+      var tierLabel = tier.tier === 1 ? 'Tier 1 — recent, high resolution' :
+                      tier.tier === 2 ? 'Tier 2 — summary, medium resolution' :
+                      tier.tier === 3 ? 'Tier 3 — archive, lower resolution' :
+                      'Tier ' + tier.tier + ' — deep archive';
+      prompt += '\n\n### ' + tierLabel + ' (' + tier.nodes + ' nodes):\n';
+      var treeStr = JSON.stringify(tier.tree, null, 1);
+      var maxLen = tier.tier === 1 ? 12000 : tier.tier === 2 ? 6000 : 3000;
+      prompt += treeStr.length > maxLen ? treeStr.substring(0, maxLen) + '\n[...truncated...]' : treeStr;
+    }
+  } else if (tree && Object.keys(tree).length > 0) {
     prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
   }
   return prompt;
@@ -215,7 +244,7 @@ function buildSystemPrompt(tree) {
 
 app.get('/api/projects', async function(req, res) {
   try {
-    var result = await pool.query('SELECT * FROM projects ORDER BY created_at ASC');
+    var result = await pool.query('SELECT * FROM projects WHERE tractatus_tier = 1 OR tractatus_tier IS NULL ORDER BY created_at ASC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -257,6 +286,15 @@ app.get('/api/projects/:id/tractatus', async function(req, res) {
   try {
     var result = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [req.params.id]);
     res.json(result.rows[0] ? result.rows[0].tractatus_tree || {} : {});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/projects/:id/memory-hierarchy', async function(req, res) {
+  try {
+    var memory = await loadTieredMemory(req.params.id);
+    res.json(memory);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -393,6 +431,8 @@ app.post('/api/chat', async function(req, res) {
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
 
+    var tieredMemory = await loadTieredMemory(projectId);
+
     var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
     var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
 
@@ -421,7 +461,7 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
-    var systemPrompt = buildSystemPrompt(tree);
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory);
     if (crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nThe user has had other conversations in this project. Here are excerpts so you can maintain continuity:\n' + crossSessionContext;
     }
@@ -834,6 +874,17 @@ app.post('/api/tractatus/update', async function(req, res) {
     var nodeCount = Object.keys(merged).length;
     await pool.query('UPDATE projects SET tractatus_tree = $1 WHERE id = $2', [JSON.stringify(merged), projectId]);
     send({ type: 'complete', nodes: nodeCount });
+
+    if (nodeCount >= 500) {
+      send({ type: 'status', message: 'Tree reached ' + nodeCount + ' nodes. Compressing to higher tier...' });
+      try {
+        await compressTractatusTier(projectId, merged, nodeCount, send);
+      } catch (compErr) {
+        console.error('Tractatus compression error:', compErr.message);
+        send({ type: 'status', message: 'Compression deferred: ' + compErr.message });
+      }
+    }
+
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
@@ -843,6 +894,170 @@ app.post('/api/tractatus/update', async function(req, res) {
     res.end();
   }
 });
+
+async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn) {
+  console.log('[Tractatus] Compressing ' + nodeCount + ' nodes for project ' + projectId);
+
+  var projectResult = await pool.query('SELECT name, tractatus_tier FROM projects WHERE id = $1', [projectId]);
+  var projectName = projectResult.rows[0] ? projectResult.rows[0].name : 'Unknown';
+  var currentTier = projectResult.rows[0] ? (projectResult.rows[0].tractatus_tier || 1) : 1;
+
+  var compressPrompt = 'Below is a Tractatus tree with ' + nodeCount + ' nodes from a project called "' + projectName + '".\n\n';
+  compressPrompt += JSON.stringify(fullTree, null, 1) + '\n\n';
+  compressPrompt += 'Generate a compressed second-order Tractatus tree that captures ALL key information at a higher level of abstraction.\n';
+  compressPrompt += 'Rules:\n';
+  compressPrompt += '- Reduce to roughly 50-80 nodes maximum\n';
+  compressPrompt += '- Preserve all critical facts, assertions, evidence, and unresolved questions\n';
+  compressPrompt += '- Use the same tagging system: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:\n';
+  compressPrompt += '- Merge related nodes, eliminate redundancy, synthesize patterns\n';
+  compressPrompt += '- Use standard Tractatus numbering: "1.0", "1.1", "1.1.1", etc.\n';
+  compressPrompt += '- Return ONLY the JSON object. No markdown, no commentary.';
+
+  var summaryRaw = await callClaude(
+    [{ role: 'user', content: compressPrompt }],
+    'You output only valid JSON objects. No markdown, no commentary, no fences.',
+    false,
+    8192
+  );
+
+  var summaryTree;
+  try {
+    var cleaned = summaryRaw;
+    if (typeof cleaned === 'object' && cleaned.content) {
+      cleaned = cleaned.content.map(function(c) { return c.text || ''; }).join('');
+    }
+    if (typeof cleaned === 'string' && cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    }
+    summaryTree = JSON.parse(cleaned);
+  } catch (e) {
+    var match = (typeof summaryRaw === 'string' ? summaryRaw : JSON.stringify(summaryRaw)).match(/\{[\s\S]*\}/);
+    if (match) {
+      summaryTree = JSON.parse(match[0]);
+    } else {
+      throw new Error('Failed to parse compression result');
+    }
+  }
+
+  var summaryNodeCount = Object.keys(summaryTree).length;
+  console.log('[Tractatus] Compressed ' + nodeCount + ' nodes → ' + summaryNodeCount + ' summary nodes');
+
+  var summaryTier = currentTier + 1;
+  var txClient = await pool.connect();
+  try {
+    await txClient.query('BEGIN');
+
+    await txClient.query(
+      'INSERT INTO tractatus_archive (project_id, tier, tree, node_count) VALUES ($1, $2, $3, $4)',
+      [projectId, currentTier, JSON.stringify(fullTree), nodeCount]
+    );
+
+    var existingSummaries = await txClient.query(
+      'SELECT id, tractatus_tree FROM projects WHERE parent_project_id = $1 AND tractatus_tier = $2',
+      [projectId, summaryTier]
+    );
+
+    var recurseTarget = null;
+    if (existingSummaries.rows.length > 0) {
+      var existingSummary = existingSummaries.rows[0].tractatus_tree || {};
+      var mergedSummary = Object.assign({}, existingSummary, summaryTree);
+      var mergedCount = Object.keys(mergedSummary).length;
+      await txClient.query(
+        'UPDATE projects SET tractatus_tree = $1 WHERE id = $2',
+        [JSON.stringify(mergedSummary), existingSummaries.rows[0].id]
+      );
+      console.log('[Tractatus] Merged into existing Tier ' + summaryTier + ' summary (' + mergedCount + ' nodes)');
+      if (mergedCount >= 500) {
+        recurseTarget = { id: existingSummaries.rows[0].id, tree: mergedSummary, count: mergedCount };
+      }
+    } else {
+      var dateStr = new Date().toISOString().split('T')[0];
+      var summaryName = projectName + ' — Tier ' + summaryTier + ' Summary (' + dateStr + ')';
+      await txClient.query(
+        'INSERT INTO projects (name, tractatus_tree, tractatus_tier, parent_project_id) VALUES ($1, $2, $3, $4)',
+        [summaryName, JSON.stringify(summaryTree), summaryTier, projectId]
+      );
+      console.log('[Tractatus] Created new Tier ' + summaryTier + ' summary project');
+    }
+
+    await txClient.query(
+      "UPDATE projects SET tractatus_tree = '{}' WHERE id = $1",
+      [projectId]
+    );
+
+    await txClient.query('COMMIT');
+
+    if (recurseTarget) {
+      console.log('[Tractatus] Tier ' + summaryTier + ' also hit 500, recursing...');
+      await compressTractatusTier(recurseTarget.id, recurseTarget.tree, recurseTarget.count, sendFn);
+    }
+  } catch (txErr) {
+    await txClient.query('ROLLBACK');
+    throw txErr;
+  } finally {
+    txClient.release();
+  }
+
+  if (sendFn) {
+    sendFn({ type: 'status', message: 'Memory compressed: ' + nodeCount + ' → ' + summaryNodeCount + ' nodes (Tier ' + summaryTier + ')' });
+    sendFn({ type: 'compressed', tier: summaryTier, originalNodes: nodeCount, summaryNodes: summaryNodeCount });
+  }
+}
+
+async function loadTieredMemory(projectId) {
+  var tiers = [];
+
+  var mainResult = await pool.query('SELECT tractatus_tree, tractatus_tier, name FROM projects WHERE id = $1', [projectId]);
+  if (mainResult.rows.length > 0) {
+    var mainTree = mainResult.rows[0].tractatus_tree || {};
+    if (Object.keys(mainTree).length > 0) {
+      tiers.push({
+        tier: mainResult.rows[0].tractatus_tier || 1,
+        label: 'recent',
+        name: mainResult.rows[0].name,
+        tree: mainTree,
+        nodes: Object.keys(mainTree).length
+      });
+    }
+  }
+
+  var queue = [projectId];
+  var visited = {};
+  visited[projectId] = true;
+  while (queue.length > 0) {
+    var parentId = queue.shift();
+    var children = await pool.query(
+      'SELECT id, name, tractatus_tree, tractatus_tier FROM projects WHERE parent_project_id = $1 ORDER BY tractatus_tier ASC, created_at ASC',
+      [parentId]
+    );
+    for (var i = 0; i < children.rows.length; i++) {
+      var child = children.rows[i];
+      if (visited[child.id]) continue;
+      visited[child.id] = true;
+      var cTree = child.tractatus_tree || {};
+      if (Object.keys(cTree).length > 0) {
+        var tierNum = child.tractatus_tier || 2;
+        tiers.push({
+          tier: tierNum,
+          label: tierNum === 2 ? 'summary' : tierNum === 3 ? 'archive' : 'deep-archive',
+          name: child.name,
+          tree: cTree,
+          nodes: Object.keys(cTree).length,
+          childProjectId: child.id
+        });
+      }
+      queue.push(child.id);
+    }
+  }
+
+  var archives = await pool.query(
+    'SELECT tier, tree, node_count, created_at FROM tractatus_archive WHERE project_id = $1 ORDER BY tier ASC, created_at DESC LIMIT 10',
+    [projectId]
+  );
+
+  tiers.sort(function(a, b) { return a.tier - b.tier; });
+  return { tiers: tiers, archives: archives.rows };
+}
 
 async function streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens) {
   var anthropicRes = await callClaude(messages, systemPrompt, true, maxTokens || 16384);
