@@ -8,7 +8,7 @@ Minimalist web chat app connecting to Anthropic Claude with document management,
 - Node.js + Express backend (ESM due to locked package.json)
 - Raw pg Pool for PostgreSQL (Neon database via NEON_DATABASE_URL)
 - Official Anthropic API (https://api.anthropic.com/v1/messages, x-api-key header)
-- Model: claude-sonnet-4-20250514, max_tokens: 8192
+- Model: claude-sonnet-4-20250514, max_tokens: 16384
 
 ## File Structure
 ```
@@ -27,7 +27,7 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **Three-Pass Coherence Engine**: Outline → streaming section writing → global stitch & repair. Streams tokens live into paper popup. Short docs (≤5000 words) or auto-length use single-call mode. User instructions are prioritized; chat transcript is NOT injected into paper prompts. Word count is optional (auto mode). Source document upload available in paper writer modal. "Revise" button on completed output lets users iteratively refine without starting over — sends previous output + revision instructions to `/api/coherence/revise`. New doc types: legal_brief, rewrite, letter.
 - **Document Upload**: PDF, DOCX, DOC, TXT, and image files (PNG, JPG, GIF, BMP, TIFF, WebP) via click or drag-and-drop. Images are processed with Google Cloud Vision OCR.
 - **Document Library**: Two-tier library system — General Library (global, cross-project) and Project Library (scoped to each project). Both have keyword search, upload (button or drag-and-drop), select & send to chat, download, delete. Project Library also has "Copy to General" for selected docs. Sidebar buttons for both.
-- **Artifact Panel**: When Claude generates a document (detected by length + structure), a formatted preview panel slides in from the right with proper document formatting (serif font, headings, justified text). Download as TXT/DOCX/PDF or save to library. "View as Document" button appears in chat to reopen the panel. Works for both streamed responses and transcript replay.
+- **Artifact Panel**: When Claude generates a document-like response (detected by word count + structure: 150+ words with headings, 200+ words with paragraphs, 300+ words with numbered lists, or 800+ words), a formatted side panel auto-opens during streaming — slides in from right with live updates every 300ms. Buttons: Copy to clipboard, Download TXT/DOCX/PDF, Save to Library, Close. "View as Document" button appears in chat to reopen. Works for both streamed responses and transcript replay.
 - **Download**: Export coherence engine output and artifacts as TXT, DOCX, PDF
 - **Collapsed Messages**: Large user messages (200+ words) show collapsed card with expand button
 - **Context Management**: Chat messages truncated to 12K chars each, total context capped at 150K chars, cross-session context capped at 15K chars to prevent exceeding API token limits.

@@ -40,7 +40,8 @@
     artifactDownloadTxt: document.getElementById('artifact-download-txt'),
     artifactDownloadDocx: document.getElementById('artifact-download-docx'),
     artifactDownloadPdf: document.getElementById('artifact-download-pdf'),
-    artifactSave: document.getElementById('artifact-save')
+    artifactSave: document.getElementById('artifact-save'),
+    artifactCopy: document.getElementById('artifact-copy')
   };
 
   var currentArtifact = null;
@@ -56,20 +57,24 @@
   }
 
   function isDocumentArtifact(text) {
-    if (!text || text.length < 400) return false;
+    if (!text || text.length < 300) return false;
     var cleaned = stripTractatusContent(text);
-    if (cleaned.length < 400) return false;
+    if (cleaned.length < 300) return false;
     var lines = cleaned.split('\n');
     var headingCount = 0;
     var paragraphCount = 0;
+    var numberedLines = 0;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i].trim();
       if (/^#{1,3}\s/.test(line) || /^[IVXLC]+\.\s/.test(line) || /^[A-Z][A-Z\s,]{10,}$/.test(line)) headingCount++;
-      if (line.length > 80) paragraphCount++;
+      if (line.length > 60) paragraphCount++;
+      if (/^\d+\.\s/.test(line)) numberedLines++;
     }
     var words = cleaned.split(/\s+/).length;
-    if (words >= 300 && headingCount >= 2 && paragraphCount >= 3) return true;
-    if (words >= 500 && paragraphCount >= 5) return true;
+    if (words >= 150 && headingCount >= 1 && paragraphCount >= 2) return true;
+    if (words >= 200 && paragraphCount >= 3) return true;
+    if (words >= 300 && numberedLines >= 3) return true;
+    if (words >= 800) return true;
     return false;
   }
 
@@ -138,6 +143,23 @@
   }
 
   els.artifactClose.addEventListener('click', closeArtifact);
+
+  els.artifactCopy.addEventListener('click', function() {
+    if (!currentArtifact) return;
+    navigator.clipboard.writeText(currentArtifact.text).then(function() {
+      els.artifactCopy.textContent = '\u2705 Copied';
+      setTimeout(function() { els.artifactCopy.innerHTML = '&#128203; Copy'; }, 2000);
+    }).catch(function() {
+      var ta = document.createElement('textarea');
+      ta.value = currentArtifact.text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      els.artifactCopy.textContent = '\u2705 Copied';
+      setTimeout(function() { els.artifactCopy.innerHTML = '&#128203; Copy'; }, 2000);
+    });
+  });
 
   els.artifactDownloadTxt.addEventListener('click', function() {
     if (!currentArtifact) return;
@@ -617,10 +639,41 @@
     var decoder = new TextDecoder();
     var buffer = '';
     var fullText = '';
+    var artifactOpened = false;
+    var artifactCheckInterval = null;
+    var lastArtifactLen = 0;
+
+    function updateLiveArtifact() {
+      if (!artifactOpened) return;
+      if (fullText.length === lastArtifactLen) return;
+      lastArtifactLen = fullText.length;
+      var cleaned = stripTractatusContent(fullText);
+      currentArtifact.text = cleaned;
+      els.artifactBody.innerHTML = formatArtifactHtml(cleaned) + '<span class="cursor-blink"></span>';
+      els.artifactBody.scrollTop = els.artifactBody.scrollHeight;
+    }
+
+    function checkAndOpenArtifact() {
+      if (artifactOpened) return;
+      if (isDocumentArtifact(fullText)) {
+        artifactOpened = true;
+        var artTitle = extractArtifactTitle(fullText);
+        currentArtifact = { text: stripTractatusContent(fullText), title: artTitle };
+        els.artifactTitle.textContent = artTitle;
+        els.artifactPanel.classList.remove('hidden');
+        els.artifactSave.disabled = false;
+        els.artifactSave.innerHTML = '&#128218; Save';
+        updateLiveArtifact();
+        if (!artifactCheckInterval) {
+          artifactCheckInterval = setInterval(updateLiveArtifact, 300);
+        }
+      }
+    }
 
     function pump() {
       reader.read().then(function(result) {
         if (result.done) {
+          if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
           var c = textEl.querySelector('.cursor-blink');
           if (c) c.remove();
           textEl.innerHTML = fmt(fullText);
@@ -652,6 +705,9 @@
                 if (c) c.remove();
                 textEl.innerHTML = fmt(fullText) + '<span class="cursor-blink"></span>';
                 scrollBottom();
+                if (!artifactOpened && fullText.split(/\s+/).length > 120) {
+                  checkAndOpenArtifact();
+                }
               } else if (parsed.type === 'error') {
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {
@@ -662,6 +718,7 @@
         }
         pump();
       }).catch(function(err) {
+        if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
         var c = textEl.querySelector('.cursor-blink');
         if (c) c.remove();
         if (onDone) onDone(fullText);
