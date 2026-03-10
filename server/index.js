@@ -1110,7 +1110,8 @@ async function streamClaudeWithContinuation(messages, systemPrompt, sendFn, maxT
     contPrompt += 'Here is where you left off (last paragraph):\n"""' + lastParagraph + '"""\n\n';
     contPrompt += 'CONTINUE writing from EXACTLY where you left off. Do NOT repeat any content. Do NOT start over.\n';
     contPrompt += 'Write at least ' + remaining + ' more words of substantive, detailed content.\n';
-    contPrompt += 'Output ONLY the continuation text — no headers, no meta-commentary.';
+    contPrompt += 'Output ONLY the continuation text — no headers, no meta-commentary.\n';
+    contPrompt += 'ABSOLUTELY NO MARKDOWN. No #, ##, **, *, ---. Plain text only.';
 
     var contText = await streamClaudeToSSE(
       [{ role: 'user', content: contPrompt }],
@@ -1130,6 +1131,18 @@ async function streamClaudeWithContinuation(messages, systemPrompt, sendFn, maxT
 
   console.log('[Section complete] Final words: ' + wordCount + ' (target: ' + targetWords + ')');
   return fullText;
+}
+
+function stripMarkdownFromOutput(text) {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, '$1')
+    .replace(/(?<!\w)__([^_]+)__(?!\w)/g, '$1')
+    .replace(/(?<!\w)_([^_]+)_(?!\w)/g, '$1')
+    .replace(/^---+$/gm, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1');
 }
 
 function splitIntoChunks(text, targetWords) {
@@ -1231,13 +1244,16 @@ app.post('/api/coherence', async function(req, res) {
       }
       if (treeContext) singlePrompt += treeContext;
       if (sourceContent) singlePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
+      singlePrompt += 'ABSOLUTELY NO MARKDOWN FORMATTING. Do NOT use #, ##, ###, **, *, ---, ``` or any markdown syntax.\n';
+      singlePrompt += 'Use plain text only. For headings, just write the heading text on its own line (no # symbols). For emphasis, use the words themselves — no asterisks or underscores.\n';
+      singlePrompt += 'For lists, use "1." or "a)" or dashes, but never markdown bullet syntax.\n\n';
       singlePrompt += autoLength
-        ? 'CRITICAL: Follow the user\'s instructions EXACTLY. Write a complete, thorough document. Output ONLY the document text.'
-        : 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text.';
+        ? 'CRITICAL: Follow the user\'s instructions EXACTLY. Write a complete, thorough document. Output ONLY the document text — plain text, no markdown.'
+        : 'CRITICAL: Follow the user\'s instructions EXACTLY. Write EXACTLY ' + targetWords + ' words. Output ONLY the document text — plain text, no markdown.';
 
       var singleSysPrompt = 'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. '
         + (autoLength ? 'Write a thorough, complete document of appropriate length.' : 'Write exactly the requested number of words.')
-        + ' Output ONLY the document — no meta-commentary.';
+        + ' Output ONLY the document — no meta-commentary. NEVER use markdown formatting (no #, ##, **, *, ---, ```). Use plain text only.';
       var singleResult = autoLength
         ? await streamClaudeToSSE(
             [{ role: 'user', content: singlePrompt }],
@@ -1254,6 +1270,7 @@ app.post('/api/coherence', async function(req, res) {
             6
           );
 
+      singleResult = stripMarkdownFromOutput(singleResult);
       var singleWords = singleResult.split(/\s+/).length;
 
       await pool.query(
@@ -1484,12 +1501,15 @@ app.post('/api/coherence', async function(req, res) {
       sectionPrompt += '- Transitions between ideas\n';
       sectionPrompt += 'Fill the ENTIRE response with substantive content. Use ALL available output space.\n';
       sectionPrompt += 'Output ONLY the section text. No headers saying "Section X". No meta-commentary. Just the prose.\n';
+      sectionPrompt += 'ABSOLUTELY NO MARKDOWN. Do NOT use #, ##, ###, **, *, ---, ``` or any markdown syntax.\n';
+      sectionPrompt += 'Write in plain text only. For emphasis, use the words themselves. No asterisks, no underscores, no hash symbols.\n';
 
       var sysPrompt = 'You are a prolific academic writer producing a ' + doctype.replace(/_/g, ' ') + '. ';
       sysPrompt += 'You write LONG, DETAILED sections. Your minimum output for any section is ' + sectionTargetWords + ' words. ';
       sysPrompt += 'You never summarize when you can elaborate. You never abbreviate when you can expand. ';
       sysPrompt += 'You use every available token to produce rich, substantive, scholarly content. ';
-      sysPrompt += 'Output ONLY the section text — no JSON, no markdown headers, no meta-commentary.';
+      sysPrompt += 'Output ONLY the section text — no JSON, no meta-commentary. ';
+      sysPrompt += 'NEVER use markdown formatting — no #, ##, **, *, ---, ```. Write in clean plain text only.';
 
       send({ type: 'section_start', index: i, title: section.title });
       var sectionText = await streamClaudeWithContinuation(
@@ -1525,7 +1545,7 @@ app.post('/api/coherence', async function(req, res) {
 
     send({ type: 'status', pass: 3, message: 'Pass 3: Coherence review (' + totalWordsSoFar + ' words generated)...' });
 
-    var finalOutput = allSections.join('\n\n');
+    var finalOutput = stripMarkdownFromOutput(allSections.join('\n\n'));
 
     await pool.query(
       "UPDATE document_jobs SET final_output = $1, status = 'complete' WHERE id = $2",
