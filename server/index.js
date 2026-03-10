@@ -117,6 +117,11 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
 
 function extractRequestedWordCount(text) {
   var t = text.toLowerCase();
+  var kMatch = t.match(/(\d+)\s*k\s*(?:words?|word)/);
+  if (kMatch) {
+    var kn = parseInt(kMatch[1], 10) * 1000;
+    if (kn >= 500 && kn <= 100000) return kn;
+  }
   var patterns = [
     /(\d[\d,]*)\s*(?:words?\s+long|word\s+(?:essay|paper|document|summary|analysis|brief|letter|memo|report|review|article|response|answer))/,
     /(?:around|about|approximately|roughly|at\s+least|minimum|up\s+to)\s+(\d[\d,]*)\s*words/,
@@ -400,69 +405,129 @@ app.post('/api/chat', async function(req, res) {
 
     var requestedWords = extractRequestedWordCount(userContent);
     var fullText = '';
-    var continuationMsgs = msgs.slice();
-    var maxContinuations = 20;
+    var maxContinuations = 40;
     var continuationCount = 0;
 
-    while (continuationCount < maxContinuations) {
-      var anthropicRes = await callClaude(continuationMsgs, systemPrompt, true);
-      var reader = anthropicRes.body.getReader();
-      var decoder = new TextDecoder();
-      var buffer = '';
-      var segmentText = '';
-      var stopReason = 'end_turn';
+    async function streamOneCall(callMsgs) {
+      try {
+        var anthropicRes = await callClaude(callMsgs, systemPrompt, true);
+        if (!anthropicRes.ok) {
+          var errBody = await anthropicRes.text();
+          console.error('[streamOneCall] API error: ' + anthropicRes.status + ' ' + errBody.substring(0, 500));
+          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error: API returned ' + anthropicRes.status + ']\n\n' }) + '\n\n');
+          return { segmentText: '', stopReason: 'error' };
+        }
+        var reader = anthropicRes.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        var segmentText = '';
+        var stopReason = 'end_turn';
 
-      while (true) {
-        var chunk = await reader.read();
-        if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true });
-        var lines = buffer.split('\n');
-        buffer = lines.pop();
-        for (var j = 0; j < lines.length; j++) {
-          var line = lines[j];
-          if (line.startsWith('data: ')) {
-            var data = line.slice(6).trim();
-            if (!data || data === '[DONE]') continue;
-            try {
-              var parsed = JSON.parse(data);
-              if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
-                segmentText += parsed.delta.text;
-                res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
-              } else if (parsed.type === 'message_delta' && parsed.delta && parsed.delta.stop_reason) {
-                stopReason = parsed.delta.stop_reason;
-              }
-            } catch (e) {}
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (var j = 0; j < lines.length; j++) {
+            var line = lines[j];
+            if (line.startsWith('data: ')) {
+              var data = line.slice(6).trim();
+              if (!data || data === '[DONE]') continue;
+              try {
+                var parsed = JSON.parse(data);
+                if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+                  segmentText += parsed.delta.text;
+                  res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
+                } else if (parsed.type === 'message_delta' && parsed.delta && parsed.delta.stop_reason) {
+                  stopReason = parsed.delta.stop_reason;
+                } else if (parsed.type === 'error') {
+                  console.error('[streamOneCall] Stream error:', JSON.stringify(parsed));
+                }
+              } catch (e) {}
+            }
           }
         }
+        return { segmentText: segmentText, stopReason: stopReason };
+      } catch (err) {
+        console.error('[streamOneCall] Exception:', err.message);
+        return { segmentText: '', stopReason: 'error' };
+      }
+    }
+
+    function getLastNWords(text, n) {
+      var words = text.split(/\s+/);
+      if (words.length <= n) return text;
+      return '...' + words.slice(-n).join(' ');
+    }
+
+    function countWords(text) {
+      return text.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+    }
+
+    console.log('[Chat] requestedWords=' + requestedWords + ' isLongform=' + isLongformRequest(userContent));
+    var lastResult = await streamOneCall(msgs);
+    fullText = lastResult.segmentText;
+    continuationCount = 1;
+    console.log('[Chat first call] words=' + countWords(fullText) + ' stopReason=' + lastResult.stopReason);
+
+    while (continuationCount < maxContinuations) {
+      var currentWords = countWords(fullText);
+      var needsMore = false;
+
+      if (lastResult.stopReason === 'max_tokens') {
+        needsMore = true;
+        console.log('[Chat] continuing: max_tokens hit');
+      } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.75) {
+        needsMore = true;
+        console.log('[Chat] continuing: end_turn but only ' + currentWords + '/' + requestedWords + ' words');
+      } else if (lastResult.stopReason === 'end_turn' && requestedWords === 0 && isLongformRequest(userContent) && currentWords < 3000 && continuationCount === 1) {
+        needsMore = true;
+        console.log('[Chat] continuing: longform request with only ' + currentWords + ' words');
+      } else {
+        console.log('[Chat] stopping: stopReason=' + lastResult.stopReason + ' words=' + currentWords + ' requestedWords=' + requestedWords);
       }
 
-      fullText += segmentText;
-      continuationCount++;
+      if (!needsMore) break;
 
-      var currentWords = fullText.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
-      var needsMore = false;
+      var remaining = requestedWords > 0 ? requestedWords - currentWords : 5000;
+      var tailContext = getLastNWords(fullText, 500);
       var continuePrompt = '';
 
-      if (stopReason === 'max_tokens' && segmentText.length > 100) {
-        needsMore = true;
-        continuePrompt = 'Continue writing exactly where you left off. Do not repeat anything. Do not add any preamble or commentary. Just continue the text seamlessly.';
-      } else if (stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.8) {
-        needsMore = true;
-        var remaining = requestedWords - currentWords;
-        continuePrompt = 'You have written approximately ' + currentWords + ' words so far but I asked for around ' + requestedWords + ' words. You still need approximately ' + remaining + ' more words. Continue writing from exactly where you stopped. Do NOT repeat any content. Do NOT add meta-commentary like "Continuing from where I left off." Just seamlessly continue the document with new substantive content, expanding on points, adding more detail, more analysis, more examples, and more depth. Write at least ' + Math.min(remaining, 4000) + ' more words right now.';
-      } else if (stopReason === 'end_turn' && requestedWords === 0 && isLongformRequest(userContent) && currentWords < 2000 && continuationCount === 1) {
-        needsMore = true;
-        continuePrompt = 'Your response seems incomplete for the scope of what was requested. You wrote approximately ' + currentWords + ' words. The user asked for a comprehensive, thorough, complete piece of writing. Continue from exactly where you left off and significantly expand the document with much more detail, analysis, depth, and substance. Do NOT repeat content. Do NOT add meta-commentary. Just seamlessly continue writing.';
+      if (requestedWords > 0) {
+        continuePrompt = 'You are writing a long document for the user. So far you have written approximately ' + currentWords + ' words. The target is ' + requestedWords + ' words — you need approximately ' + remaining + ' more words.\n\n';
+        continuePrompt += 'Here is the end of what you have written so far (for continuity):\n"""\n' + tailContext + '\n"""\n\n';
+        continuePrompt += 'CRITICAL INSTRUCTIONS:\n';
+        continuePrompt += '1. Continue EXACTLY where the text above left off. Pick up mid-sentence if needed.\n';
+        continuePrompt += '2. Do NOT repeat ANY content already written.\n';
+        continuePrompt += '3. Do NOT add meta-commentary like "Continuing from where I left off" or "As discussed above."\n';
+        continuePrompt += '4. Write at LEAST ' + Math.min(remaining, 4000) + ' more words of NEW, substantive content.\n';
+        continuePrompt += '5. Go DEEP — expand each point with detailed analysis, specific examples, concrete evidence, legal citations, factual details, and thorough discussion.\n';
+        continuePrompt += '6. Do NOT wrap up or conclude until you have reached the target word count.\n';
+        continuePrompt += '7. Use ALL your available tokens. Do NOT stop early.';
+      } else {
+        continuePrompt = 'You are writing a comprehensive document. So far you have written approximately ' + currentWords + ' words but the response is incomplete.\n\n';
+        continuePrompt += 'Here is the end of what you have written so far:\n"""\n' + tailContext + '\n"""\n\n';
+        continuePrompt += 'Continue EXACTLY where you left off. Do NOT repeat content. Do NOT add meta-commentary. Write substantially more content with deep detail and analysis. Use ALL available tokens.';
       }
 
-      if (needsMore) {
-        continuationMsgs = msgs.slice(0, -1);
-        continuationMsgs.push({ role: 'user', content: userContent });
-        continuationMsgs.push({ role: 'assistant', content: fullText });
-        continuationMsgs.push({ role: 'user', content: continuePrompt });
-      } else {
-        break;
-      }
+      var origContext = userContent.length > 6000 ? userContent.substring(0, 6000) + '\n[...truncated for continuation...]' : userContent;
+      var continuationMsgs = [
+        { role: 'user', content: origContext + '\n\n[SYSTEM NOTE: The user wants approximately ' + (requestedWords || 'many thousands of') + ' words total. You are continuing a long document. Write as much as possible. Use ALL available tokens. Do NOT stop early. Do NOT summarize. Do NOT conclude prematurely.]' },
+        { role: 'assistant', content: tailContext },
+        { role: 'user', content: continuePrompt }
+      ];
+
+      var lastResult = await streamOneCall(continuationMsgs);
+      fullText += lastResult.segmentText;
+      continuationCount++;
+
+      console.log('[Continuation ' + continuationCount + '] Words so far: ' + countWords(fullText) + ' / target: ' + (requestedWords || 'auto') + ' | stop_reason: ' + lastResult.stopReason);
+    }
+
+    if (requestedWords > 0) {
+      var finalWords = countWords(fullText);
+      console.log('[Chat complete] Total words: ' + finalWords + ' / requested: ' + requestedWords + ' | continuations: ' + continuationCount);
     }
 
     var existingTranscript = transcript.slice();
