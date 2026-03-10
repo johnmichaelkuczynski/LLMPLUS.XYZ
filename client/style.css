@@ -663,12 +663,52 @@ html, body {
 .doc-panel-header {
   padding: 16px 16px 12px;
   border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .doc-panel-title {
   font-size: 14px;
   font-weight: 600;
   color: #111827;
+}
+
+.doc-panel-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.doc-panel-toggle:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.doc-panel-collapsed {
+  width: 40px !important;
+  min-width: 40px !important;
+}
+
+.doc-panel-collapsed .doc-panel-title {
+  display: none;
+}
+
+.doc-panel-collapsed .doc-panel-list {
+  display: none;
+}
+
+.doc-panel-collapsed .doc-panel-header {
+  justify-content: center;
+  padding: 12px 8px;
+}
+
+.doc-panel-collapsed .doc-panel-toggle {
+  transform: none;
 }
 
 .doc-panel-list {
@@ -752,6 +792,11 @@ html, body {
 .dp-action-btn:hover {
   background: #dbeafe;
   color: #2563eb;
+}
+
+.dp-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .drop-overlay {

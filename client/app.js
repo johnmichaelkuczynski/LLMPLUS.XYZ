@@ -30,6 +30,8 @@
     projectNameInput: document.getElementById('project-name-input'),
     globalDocs: document.getElementById('global-docs'),
     docPanelList: document.getElementById('doc-panel-list'),
+    docPanel: document.getElementById('doc-panel'),
+    docPanelToggle: document.getElementById('doc-panel-toggle'),
     ccStatus: document.getElementById('cc-status'),
     ccStatusText: document.getElementById('cc-status-text'),
     ccFill: document.getElementById('cc-fill'),
@@ -1301,6 +1303,13 @@
     }
   }
 
+  els.docPanelToggle.addEventListener('click', function() {
+    els.docPanel.classList.toggle('doc-panel-collapsed');
+    var collapsed = els.docPanel.classList.contains('doc-panel-collapsed');
+    els.docPanelToggle.innerHTML = collapsed ? '&#9650;' : '&#9660;';
+    els.docPanelToggle.title = collapsed ? 'Expand' : 'Minimize';
+  });
+
   function renderDocPanel() {
     els.docPanelList.innerHTML = '';
     if (state.projectDocs.length === 0) {
@@ -1314,8 +1323,11 @@
       item.setAttribute('data-testid', 'dp-doc-' + doc.id);
       item.innerHTML = '<span class="dp-icon">&#128196;</span>' +
         '<div class="dp-info"><div class="dp-name">' + esc(doc.name) + '</div><div class="dp-words">' + (doc.word_count || '?') + ' words</div></div>' +
-        '<div class="dp-actions"><button class="dp-action-btn" title="Inject into chat" data-testid="dp-inject-' + doc.id + '">&#8618;</button>' +
-        '<button class="dp-action-btn" title="Copy to General Library" data-testid="dp-global-' + doc.id + '">&#128218;</button></div>';
+        '<div class="dp-actions">' +
+        '<button class="dp-action-btn" title="Inject into chat" data-testid="dp-inject-' + doc.id + '">&#8618;</button>' +
+        '<button class="dp-action-btn" title="Copy to General Library" data-testid="dp-global-' + doc.id + '">&#128218;</button>' +
+        '<button class="dp-action-btn dp-delete-btn" title="Delete" data-testid="dp-delete-' + doc.id + '">&#128465;</button>' +
+        '</div>';
 
       (function(d) {
         item.querySelector('[data-testid="dp-inject-' + d.id + '"]').addEventListener('click', function(e) {
@@ -1326,12 +1338,27 @@
           e.stopPropagation();
           copyToGlobal(d.id);
         });
+        item.querySelector('[data-testid="dp-delete-' + d.id + '"]').addEventListener('click', function(e) {
+          e.stopPropagation();
+          deleteProjectDoc(d.id, d.name);
+        });
         item.addEventListener('click', function() {
           injectDocIntoChat(d.id);
         });
       })(doc);
 
       els.docPanelList.appendChild(item);
+    }
+  }
+
+  async function deleteProjectDoc(docId, docName) {
+    try {
+      await api('/api/projects/documents/' + docId, { method: 'DELETE' });
+      state.projectDocs = state.projectDocs.filter(function(d) { return d.id !== docId; });
+      renderDocPanel();
+      notify('Deleted "' + docName + '"', 'success');
+    } catch (err) {
+      notify('Delete failed: ' + err.message, 'error');
     }
   }
 
