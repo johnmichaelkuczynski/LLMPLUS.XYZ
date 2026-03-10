@@ -1595,7 +1595,18 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
-  margin-right: 12px;
+  margin-right: 8px;
+}
+
+.artifact-wordcount {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .artifact-controls {

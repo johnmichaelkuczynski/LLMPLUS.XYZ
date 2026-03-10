@@ -115,13 +115,49 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
   return data.content[0].text;
 }
 
+function extractRequestedWordCount(text) {
+  var t = text.toLowerCase();
+  var patterns = [
+    /(\d[\d,]*)\s*(?:words?\s+long|word\s+(?:essay|paper|document|summary|analysis|brief|letter|memo|report|review|article|response|answer))/,
+    /(?:around|about|approximately|roughly|at\s+least|minimum|up\s+to)\s+(\d[\d,]*)\s*words/,
+    /(\d[\d,]*)\s*words/,
+    /(\d[\d,]*)\s*-?\s*word/
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = t.match(patterns[i]);
+    if (m) {
+      var n = parseInt(m[1].replace(/,/g, ''), 10);
+      if (n >= 500 && n <= 100000) return n;
+    }
+  }
+  return 0;
+}
+
+function isLongformRequest(text) {
+  var t = text.toLowerCase();
+  var keywords = [
+    'complete summary', 'complete analysis', 'comprehensive', 'detailed analysis',
+    'thorough', 'in-depth', 'full summary', 'full analysis', 'exhaustive',
+    'write a complete', 'write a full', 'write a detailed', 'write a thorough',
+    'write a comprehensive', 'long form', 'longform', 'lengthy',
+    'write me a', 'draft a', 'compose a',
+    'motion to', 'legal brief', 'memorandum', 'complaint',
+    'research paper', 'white paper', 'case study', 'literature review'
+  ];
+  for (var i = 0; i < keywords.length; i++) {
+    if (t.indexOf(keywords[i]) !== -1) return true;
+  }
+  return false;
+}
+
 function buildSystemPrompt(tree) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
   prompt += '\n\nIMPORTANT WRITING RULES:';
   prompt += '\n- When the user asks you to write, draft, or compose anything (motions, briefs, letters, essays, papers, code, etc.), write the FULL, COMPLETE document. Do NOT summarize. Do NOT abbreviate. Do NOT use placeholders like "[continue here]" or "[additional arguments]".';
   prompt += '\n- Write as long as needed. If a legal motion needs 20 pages, write 20 pages. If a letter needs 3 paragraphs, write 3 paragraphs. Match the length to the task.';
+  prompt += '\n- If the user specifies a word count (e.g. "10000 words"), you MUST write that many words. Do not stop early. Fill every section with deep, substantive, original analysis. Use as many tokens as you have available. The system will automatically request continuation if you run out of tokens.';
   prompt += '\n- Use proper formatting for the document type: legal documents should have proper caption, headings, numbered paragraphs, signature blocks, etc. Letters should have proper salutation and closing. Academic papers should have sections, citations, etc.';
-  prompt += '\n- Never cut yourself short. If you run out of space, the system will automatically continue your response.';
+  prompt += '\n- Never cut yourself short. If you run out of space, the system will automatically continue your response. Use ALL available tokens before stopping.';
   prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
   if (tree && Object.keys(tree).length > 0) {
     prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
@@ -362,6 +398,7 @@ app.post('/api/chat', async function(req, res) {
     }
     msgs.push({ role: 'user', content: userContent });
 
+    var requestedWords = extractRequestedWordCount(userContent);
     var fullText = '';
     var continuationMsgs = msgs.slice();
     var maxContinuations = 20;
@@ -402,11 +439,27 @@ app.post('/api/chat', async function(req, res) {
       fullText += segmentText;
       continuationCount++;
 
+      var currentWords = fullText.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+      var needsMore = false;
+      var continuePrompt = '';
+
       if (stopReason === 'max_tokens' && segmentText.length > 100) {
+        needsMore = true;
+        continuePrompt = 'Continue writing exactly where you left off. Do not repeat anything. Do not add any preamble or commentary. Just continue the text seamlessly.';
+      } else if (stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.8) {
+        needsMore = true;
+        var remaining = requestedWords - currentWords;
+        continuePrompt = 'You have written approximately ' + currentWords + ' words so far but I asked for around ' + requestedWords + ' words. You still need approximately ' + remaining + ' more words. Continue writing from exactly where you stopped. Do NOT repeat any content. Do NOT add meta-commentary like "Continuing from where I left off." Just seamlessly continue the document with new substantive content, expanding on points, adding more detail, more analysis, more examples, and more depth. Write at least ' + Math.min(remaining, 4000) + ' more words right now.';
+      } else if (stopReason === 'end_turn' && requestedWords === 0 && isLongformRequest(userContent) && currentWords < 2000 && continuationCount === 1) {
+        needsMore = true;
+        continuePrompt = 'Your response seems incomplete for the scope of what was requested. You wrote approximately ' + currentWords + ' words. The user asked for a comprehensive, thorough, complete piece of writing. Continue from exactly where you left off and significantly expand the document with much more detail, analysis, depth, and substance. Do NOT repeat content. Do NOT add meta-commentary. Just seamlessly continue writing.';
+      }
+
+      if (needsMore) {
         continuationMsgs = msgs.slice(0, -1);
         continuationMsgs.push({ role: 'user', content: userContent });
         continuationMsgs.push({ role: 'assistant', content: fullText });
-        continuationMsgs.push({ role: 'user', content: 'Continue writing exactly where you left off. Do not repeat anything. Do not add any preamble or commentary. Just continue the text seamlessly.' });
+        continuationMsgs.push({ role: 'user', content: continuePrompt });
       } else {
         break;
       }

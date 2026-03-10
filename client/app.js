@@ -41,7 +41,8 @@
     artifactDownloadDocx: document.getElementById('artifact-download-docx'),
     artifactDownloadPdf: document.getElementById('artifact-download-pdf'),
     artifactSave: document.getElementById('artifact-save'),
-    artifactCopy: document.getElementById('artifact-copy')
+    artifactCopy: document.getElementById('artifact-copy'),
+    artifactWordcount: document.getElementById('artifact-wordcount')
   };
 
   var currentArtifact = null;
@@ -126,6 +127,11 @@
     return result;
   }
 
+  function updateWordCount(text) {
+    var wc = text.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+    els.artifactWordcount.textContent = wc.toLocaleString() + ' words';
+  }
+
   function showArtifact(text, title, opts) {
     opts = opts || {};
     var cleaned = opts.raw ? text : stripTractatusContent(text);
@@ -135,6 +141,7 @@
     els.artifactPanel.classList.remove('hidden');
     els.artifactSave.disabled = false;
     els.artifactSave.innerHTML = '&#128218; Save';
+    updateWordCount(cleaned);
   }
 
   function closeArtifact() {
@@ -651,6 +658,7 @@
       currentArtifact.text = cleaned;
       els.artifactBody.innerHTML = formatArtifactHtml(cleaned) + '<span class="cursor-blink"></span>';
       els.artifactBody.scrollTop = els.artifactBody.scrollHeight;
+      updateWordCount(cleaned);
     }
 
     function checkAndOpenArtifact() {
