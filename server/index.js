@@ -155,6 +155,49 @@ function isLongformRequest(text) {
   return false;
 }
 
+function extractSectionOutline(text) {
+  var lines = text.split('\n');
+  var outline = [];
+  var sectionCount = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var isHeading = false;
+    var headingText = '';
+    if (/^#{1,4}\s+(.+)/.test(line)) {
+      headingText = line.replace(/^#+\s+/, '').replace(/\*\*/g, '');
+      isHeading = true;
+    } else if (/^[IVXLC]+\.\s+/.test(line)) {
+      headingText = line;
+      isHeading = true;
+    } else if (/^[A-Z][A-Z\s,'\-]{8,}$/.test(line) && line.length < 120) {
+      headingText = line;
+      isHeading = true;
+    } else if (/^\d+\.\s+[A-Z]/.test(line) && line.length < 120 && line.length > 10) {
+      var restOfLine = line.replace(/^\d+\.\s+/, '');
+      var upperRatio = (restOfLine.match(/[A-Z]/g) || []).length / restOfLine.length;
+      if (upperRatio > 0.5 || /\*\*/.test(lines[i])) {
+        headingText = line.replace(/\*\*/g, '');
+        isHeading = true;
+      }
+    }
+    if (isHeading && headingText.length > 3) {
+      sectionCount++;
+      outline.push(sectionCount + '. ' + headingText);
+    }
+  }
+  if (outline.length === 0) {
+    var paragraphs = text.split(/\n\n+/);
+    for (var p = 0; p < Math.min(paragraphs.length, 20); p++) {
+      var firstSentence = paragraphs[p].trim().split(/[.!?]/)[0];
+      if (firstSentence && firstSentence.length > 10 && firstSentence.length < 150) {
+        outline.push('- Topic: ' + firstSentence.substring(0, 100));
+      }
+    }
+  }
+  return outline.join('\n') || '(no clear section structure detected)';
+}
+
 function buildSystemPrompt(tree) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
   prompt += '\n\nIMPORTANT WRITING RULES:';
@@ -491,29 +534,35 @@ app.post('/api/chat', async function(req, res) {
       if (!needsMore) break;
 
       var remaining = requestedWords > 0 ? requestedWords - currentWords : 5000;
-      var tailContext = getLastNWords(fullText, 500);
+      var tailContext = getLastNWords(fullText, 300);
+
+      var sectionOutline = extractSectionOutline(fullText);
+
       var continuePrompt = '';
 
       if (requestedWords > 0) {
-        continuePrompt = 'You are writing a long document for the user. So far you have written approximately ' + currentWords + ' words. The target is ' + requestedWords + ' words — you need approximately ' + remaining + ' more words.\n\n';
-        continuePrompt += 'Here is the end of what you have written so far (for continuity):\n"""\n' + tailContext + '\n"""\n\n';
-        continuePrompt += 'CRITICAL INSTRUCTIONS:\n';
-        continuePrompt += '1. Continue EXACTLY where the text above left off. Pick up mid-sentence if needed.\n';
-        continuePrompt += '2. Do NOT repeat ANY content already written.\n';
-        continuePrompt += '3. Do NOT add meta-commentary like "Continuing from where I left off" or "As discussed above."\n';
-        continuePrompt += '4. Write at LEAST ' + Math.min(remaining, 4000) + ' more words of NEW, substantive content.\n';
-        continuePrompt += '5. Go DEEP — expand each point with detailed analysis, specific examples, concrete evidence, legal citations, factual details, and thorough discussion.\n';
-        continuePrompt += '6. Do NOT wrap up or conclude until you have reached the target word count.\n';
-        continuePrompt += '7. Use ALL your available tokens. Do NOT stop early.';
+        continuePrompt = 'You are writing a long document. Progress: ' + currentWords + ' / ' + requestedWords + ' words (' + Math.round(currentWords / requestedWords * 100) + '%). You need approximately ' + remaining + ' more words.\n\n';
+        continuePrompt += 'SECTIONS ALREADY WRITTEN (DO NOT REPEAT THESE):\n' + sectionOutline + '\n\n';
+        continuePrompt += 'The document currently ends with:\n"""\n' + tailContext + '\n"""\n\n';
+        continuePrompt += 'CRITICAL RULES:\n';
+        continuePrompt += '1. Continue EXACTLY where the text above ends. Pick up mid-sentence if needed.\n';
+        continuePrompt += '2. NEVER repeat or rephrase content from the sections listed above. Each section heading and argument should appear ONCE in the entire document.\n';
+        continuePrompt += '3. Move to ENTIRELY NEW topics, arguments, evidence, and analysis that have NOT been covered.\n';
+        continuePrompt += '4. Do NOT restate the same point with different wording — that is padding, not substance.\n';
+        continuePrompt += '5. Do NOT add meta-commentary like "Continuing from where I left off."\n';
+        continuePrompt += '6. Write at LEAST ' + Math.min(remaining, 4000) + ' more words of genuinely NEW content.\n';
+        continuePrompt += '7. Do NOT conclude or summarize until the target word count is reached.\n';
+        continuePrompt += '8. Use ALL available tokens.';
       } else {
-        continuePrompt = 'You are writing a comprehensive document. So far you have written approximately ' + currentWords + ' words but the response is incomplete.\n\n';
-        continuePrompt += 'Here is the end of what you have written so far:\n"""\n' + tailContext + '\n"""\n\n';
-        continuePrompt += 'Continue EXACTLY where you left off. Do NOT repeat content. Do NOT add meta-commentary. Write substantially more content with deep detail and analysis. Use ALL available tokens.';
+        continuePrompt = 'You are writing a comprehensive document. Progress: approximately ' + currentWords + ' words so far.\n\n';
+        continuePrompt += 'SECTIONS ALREADY WRITTEN (DO NOT REPEAT):\n' + sectionOutline + '\n\n';
+        continuePrompt += 'The document currently ends with:\n"""\n' + tailContext + '\n"""\n\n';
+        continuePrompt += 'Continue EXACTLY where you left off with ENTIRELY NEW content. Do NOT repeat any section or argument listed above. Use ALL available tokens.';
       }
 
       var origContext = userContent.length > 6000 ? userContent.substring(0, 6000) + '\n[...truncated for continuation...]' : userContent;
       var continuationMsgs = [
-        { role: 'user', content: origContext + '\n\n[SYSTEM NOTE: The user wants approximately ' + (requestedWords || 'many thousands of') + ' words total. You are continuing a long document. Write as much as possible. Use ALL available tokens. Do NOT stop early. Do NOT summarize. Do NOT conclude prematurely.]' },
+        { role: 'user', content: origContext + '\n\n[SYSTEM: Target ~' + (requestedWords || 'many thousands of') + ' words. Continue the document — do NOT repeat prior sections.]' },
         { role: 'assistant', content: tailContext },
         { role: 'user', content: continuePrompt }
       ];
@@ -826,6 +875,48 @@ async function streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens) {
   return fullText;
 }
 
+async function streamClaudeWithContinuation(messages, systemPrompt, sendFn, maxTokens, targetWords, maxContinuations) {
+  targetWords = targetWords || 1500;
+  maxContinuations = maxContinuations || 8;
+  var fullText = '';
+
+  fullText = await streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens || 16384);
+  var wordCount = fullText.split(/\s+/).length;
+
+  var attempt = 0;
+  while (wordCount < targetWords * 0.85 && attempt < maxContinuations) {
+    attempt++;
+    var remaining = targetWords - wordCount;
+    console.log('[Section continuation ' + attempt + '] Words: ' + wordCount + '/' + targetWords + ', need ~' + remaining + ' more');
+    sendFn({ type: 'status', message: 'Continuing section... (' + wordCount + '/' + targetWords + ' words)' });
+
+    var lastParagraph = fullText.substring(fullText.length - 500);
+    var contPrompt = 'You were writing a section and stopped at ' + wordCount + ' words. You need to write ' + remaining + ' MORE words to reach ' + targetWords + ' total.\n\n';
+    contPrompt += 'Here is where you left off (last paragraph):\n"""' + lastParagraph + '"""\n\n';
+    contPrompt += 'CONTINUE writing from EXACTLY where you left off. Do NOT repeat any content. Do NOT start over.\n';
+    contPrompt += 'Write at least ' + remaining + ' more words of substantive, detailed content.\n';
+    contPrompt += 'Output ONLY the continuation text — no headers, no meta-commentary.';
+
+    var contText = await streamClaudeToSSE(
+      [{ role: 'user', content: contPrompt }],
+      systemPrompt,
+      sendFn,
+      maxTokens || 16384
+    );
+
+    if (contText.split(/\s+/).length < 50) break;
+    fullText += '\n\n' + contText;
+    wordCount = fullText.split(/\s+/).length;
+
+    if (attempt < maxContinuations && wordCount < targetWords * 0.85) {
+      await sleep(2000);
+    }
+  }
+
+  console.log('[Section complete] Final words: ' + wordCount + ' (target: ' + targetWords + ')');
+  return fullText;
+}
+
 function splitIntoChunks(text, targetWords) {
   targetWords = targetWords || 500;
   var paragraphs = text.split(/\n\n+/);
@@ -932,12 +1023,21 @@ app.post('/api/coherence', async function(req, res) {
       var singleSysPrompt = 'You are writing a ' + doctype.replace(/_/g, ' ') + '. Follow the user\'s instructions precisely. '
         + (autoLength ? 'Write a thorough, complete document of appropriate length.' : 'Write exactly the requested number of words.')
         + ' Output ONLY the document — no meta-commentary.';
-      var singleResult = await streamClaudeToSSE(
-        [{ role: 'user', content: singlePrompt }],
-        singleSysPrompt,
-        send,
-        16384
-      );
+      var singleResult = autoLength
+        ? await streamClaudeToSSE(
+            [{ role: 'user', content: singlePrompt }],
+            singleSysPrompt,
+            send,
+            16384
+          )
+        : await streamClaudeWithContinuation(
+            [{ role: 'user', content: singlePrompt }],
+            singleSysPrompt,
+            send,
+            16384,
+            targetWords,
+            6
+          );
 
       var singleWords = singleResult.split(/\s+/).length;
 
@@ -983,7 +1083,7 @@ app.post('/api/coherence', async function(req, res) {
 
       send({ type: 'status', pass: 0, message: 'Split into ' + segments.length + ' segments. Extracting skeletons...' });
 
-      var wordsPerSection = 1500;
+      var wordsPerSection = targetWords > 20000 ? 3000 : targetWords > 10000 ? 2000 : 1500;
       var numSections = Math.max(3, Math.ceil(targetWords / wordsPerSection));
       var partialSkeletons = [];
 
@@ -1065,7 +1165,7 @@ app.post('/api/coherence', async function(req, res) {
 
       send({ type: 'status', pass: 1, message: 'Pass 1: Creating detailed outline...' });
 
-      var wordsPerSection = 1500;
+      var wordsPerSection = targetWords > 20000 ? 3000 : targetWords > 10000 ? 2000 : 1500;
       var numSections = Math.max(3, Math.ceil(targetWords / wordsPerSection));
 
       var outlinePrompt = 'Create a detailed section-by-section outline for a ' + targetWords + '-word ' + doctype.replace(/_/g, ' ') + '.\n\n';
@@ -1073,7 +1173,7 @@ app.post('/api/coherence', async function(req, res) {
       if (instructions) outlinePrompt += '=== USER INSTRUCTIONS (follow these exactly) ===\n' + instructions + '\n=== END INSTRUCTIONS ===\n\n';
       outlinePrompt += 'Target: approximately ' + numSections + ' sections, each roughly ' + wordsPerSection + ' words.\n\n';
       if (treeContext) outlinePrompt += treeContext;
-      if (sourceContent) outlinePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 15000) + '\n\n';
+      if (sourceContent) outlinePrompt += 'Source documents for reference:\n' + sourceContent.substring(0, 40000) + '\n\n';
       outlinePrompt += 'Return ONLY a JSON array of section objects:\n';
       outlinePrompt += '[{"title": "Section Title", "description": "What this section covers", "key_points": ["point1", "point2"], "target_words": ' + wordsPerSection + '}]\n';
       outlinePrompt += 'Include all major sections. Return ONLY the JSON array.';
@@ -1139,7 +1239,23 @@ app.post('/api/coherence', async function(req, res) {
       if (prevSectionSummaries) sectionPrompt += prevSectionSummaries + '\n';
 
       if (sourceContent) {
-        sectionPrompt += 'Source material (draw from this heavily, quote and cite extensively):\n' + sourceContent.substring(0, 15000) + '\n\n';
+        var sectionKeywords = (section.title + ' ' + section.description + ' ' + (section.key_points || []).join(' ')).toLowerCase().split(/\s+/);
+        var sourceParagraphs = sourceContent.split(/\n\n+/);
+        var scored = sourceParagraphs.map(function(para, idx) {
+          var paraLower = para.toLowerCase();
+          var hits = 0;
+          for (var kw = 0; kw < sectionKeywords.length; kw++) {
+            if (sectionKeywords[kw].length > 3 && paraLower.indexOf(sectionKeywords[kw]) !== -1) hits++;
+          }
+          return { text: para, score: hits, idx: idx };
+        });
+        scored.sort(function(a, b) { return b.score - a.score || a.idx - b.idx; });
+        var relevantSource = '';
+        var srcCharBudget = 50000;
+        for (var rs = 0; rs < scored.length && relevantSource.length < srcCharBudget; rs++) {
+          if (scored[rs].text.trim()) relevantSource += scored[rs].text + '\n\n';
+        }
+        sectionPrompt += 'Source material (draw from this heavily, quote and cite extensively):\n' + relevantSource + '\n\n';
       }
 
       sectionPrompt += '\n\n=== CRITICAL LENGTH REQUIREMENT ===\n';
@@ -1161,42 +1277,16 @@ app.post('/api/coherence', async function(req, res) {
       sysPrompt += 'Output ONLY the section text — no JSON, no markdown headers, no meta-commentary.';
 
       send({ type: 'section_start', index: i, title: section.title });
-      var sectionText = await streamClaudeToSSE(
+      var sectionText = await streamClaudeWithContinuation(
         [{ role: 'user', content: sectionPrompt }],
         sysPrompt,
         send,
-        16384
+        16384,
+        sectionTargetWords,
+        6
       );
 
       var sectionWordCount = sectionText.split(/\s+/).length;
-      var minAcceptable = Math.min(sectionTargetWords * 0.5, 800);
-
-      if (sectionWordCount < minAcceptable) {
-        send({ type: 'status', pass: 2, message: 'Section ' + (i + 1) + ' too short (' + sectionWordCount + ' words). Expanding...' });
-
-        var expandPrompt = 'The following section is only ' + sectionWordCount + ' words. It MUST be at least ' + sectionTargetWords + ' words.\n\n';
-        expandPrompt += 'Current text:\n' + sectionText + '\n\n';
-        expandPrompt += 'EXPAND this section to ' + sectionTargetWords + ' words minimum. Add:\n';
-        expandPrompt += '- More detailed analysis and examples\n';
-        expandPrompt += '- Additional evidence and argumentation\n';
-        expandPrompt += '- Deeper exploration of each point\n';
-        expandPrompt += '- More transitions and connective prose\n';
-        if (sourceContent) expandPrompt += '\nSource material to draw from:\n' + sourceContent.substring(0, 10000) + '\n';
-        expandPrompt += '\nOutput ONLY the expanded section text. No meta-commentary.';
-
-        send({ type: 'section_start', index: i, title: section.title + ' (expanding)' });
-        var expandedText = await streamClaudeToSSE(
-          [{ role: 'user', content: expandPrompt }],
-          sysPrompt,
-          send,
-          16384
-        );
-
-        if (expandedText.split(/\s+/).length > sectionWordCount) {
-          sectionText = expandedText;
-          sectionWordCount = sectionText.split(/\s+/).length;
-        }
-      }
 
       allSections.push(sectionText);
       totalWordsSoFar += sectionWordCount;
@@ -1430,6 +1520,18 @@ app.delete('/api/projects/documents/:id', async function(req, res) {
     var result = await pool.query('DELETE FROM project_documents WHERE id = $1 RETURNING id', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/projects/documents/:id/move', async function(req, res) {
+  try {
+    var targetProjectId = req.body.targetProjectId;
+    if (!targetProjectId) return res.status(400).json({ error: 'targetProjectId required' });
+    var result = await pool.query('UPDATE project_documents SET project_id = $1 WHERE id = $2 RETURNING id, name', [targetProjectId, req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ success: true, name: result.rows[0].name });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

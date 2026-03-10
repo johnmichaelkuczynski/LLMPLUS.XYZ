@@ -799,6 +799,27 @@ html, body {
   color: #dc2626;
 }
 
+.move-project-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  color: #1f2937;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.move-project-btn:hover {
+  background: #f3e8ff;
+  border-color: #a78bfa;
+  color: #6d28d9;
+}
+
 .drop-overlay {
   position: fixed;
   inset: 0;

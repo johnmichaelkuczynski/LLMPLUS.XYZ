@@ -402,6 +402,7 @@
       d.setAttribute('data-testid', 'session-' + s.id);
       d.innerHTML = '<span class="si-icon">&#128172;</span><span class="si-text">' + esc(s.title || 'New Chat') + '</span>' +
         '<span class="si-actions">' +
+        '<button class="si-btn si-btn-move" data-testid="btn-move-session-' + s.id + '" title="Move to project">&#128195;</button>' +
         '<button class="si-btn si-btn-rename" data-testid="btn-rename-session-' + s.id + '" title="Rename">&#9998;</button>' +
         '<button class="si-btn si-btn-delete" data-testid="btn-delete-session-' + s.id + '" title="Delete">&#128465;</button>' +
         '</span>';
@@ -409,6 +410,10 @@
         el.addEventListener('click', function(e) {
           if (e.target.closest('.si-btn')) return;
           selectSession(sess);
+        });
+        el.querySelector('.si-btn-move').addEventListener('click', function(e) {
+          e.stopPropagation();
+          showMoveChatModal(sess);
         });
         el.querySelector('.si-btn-rename').addEventListener('click', function(e) {
           e.stopPropagation();
@@ -449,6 +454,70 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newName })
     }).catch(function() { notify('Failed to rename chat', 'error'); });
+  }
+
+  function showMoveChatModal(sess) {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.style.display = 'flex';
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.maxWidth = '400px';
+    modal.innerHTML = '<div class="modal-head"><span class="modal-title">Move Chat</span><button class="modal-x" data-testid="close-move-chat-modal">&times;</button></div>' +
+      '<div style="padding:16px"><p style="margin:0 0 12px;font-size:13px;color:#6b7280">Move "<strong>' + esc(sess.title || 'New Chat') + '</strong>" to:</p>' +
+      '<div id="move-chat-project-list" data-testid="move-chat-project-list" style="max-height:300px;overflow-y:auto"></div></div>';
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    var listEl = modal.querySelector('#move-chat-project-list');
+    var projects = state.projects || [];
+    for (var i = 0; i < projects.length; i++) {
+      if (state.currentProject && projects[i].id === state.currentProject.id) continue;
+      var btn = document.createElement('button');
+      btn.className = 'move-project-btn';
+      btn.setAttribute('data-testid', 'move-chat-to-' + projects[i].id);
+      btn.textContent = projects[i].name;
+      (function(proj) {
+        btn.addEventListener('click', function() {
+          moveChatToProject(sess, proj.id, proj.name, overlay);
+        });
+      })(projects[i]);
+      listEl.appendChild(btn);
+    }
+    if (listEl.children.length === 0) {
+      listEl.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center">No other projects to move to</p>';
+    }
+
+    modal.querySelector('[data-testid="close-move-chat-modal"]').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+    });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) document.body.removeChild(overlay);
+    });
+  }
+
+  async function moveChatToProject(sess, targetProjectId, targetProjectName, overlay) {
+    try {
+      await api('/api/sessions/' + sess.id + '/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetProjectId: targetProjectId })
+      });
+      state.sessions = state.sessions.filter(function(s) { return s.id !== sess.id; });
+      if (state.currentSession && state.currentSession.id === sess.id) {
+        if (state.sessions.length > 0) {
+          selectSession(state.sessions[0]);
+        } else {
+          state.currentSession = null;
+          showWelcome();
+        }
+      }
+      renderSessions();
+      document.body.removeChild(overlay);
+      notify('Moved to "' + targetProjectName + '"', 'success');
+    } catch (err) {
+      notify('Move failed: ' + err.message, 'error');
+    }
   }
 
   function selectSession(s) {
@@ -1325,6 +1394,7 @@
         '<div class="dp-info"><div class="dp-name">' + esc(doc.name) + '</div><div class="dp-words">' + (doc.word_count || '?') + ' words</div></div>' +
         '<div class="dp-actions">' +
         '<button class="dp-action-btn" title="Inject into chat" data-testid="dp-inject-' + doc.id + '">&#8618;</button>' +
+        '<button class="dp-action-btn" title="Move to another project" data-testid="dp-move-' + doc.id + '">&#128259;</button>' +
         '<button class="dp-action-btn" title="Copy to General Library" data-testid="dp-global-' + doc.id + '">&#128218;</button>' +
         '<button class="dp-action-btn dp-delete-btn" title="Delete" data-testid="dp-delete-' + doc.id + '">&#128465;</button>' +
         '</div>';
@@ -1333,6 +1403,10 @@
         item.querySelector('[data-testid="dp-inject-' + d.id + '"]').addEventListener('click', function(e) {
           e.stopPropagation();
           injectDocIntoChat(d.id);
+        });
+        item.querySelector('[data-testid="dp-move-' + d.id + '"]').addEventListener('click', function(e) {
+          e.stopPropagation();
+          showMoveDocModal(d.id, d.name);
         });
         item.querySelector('[data-testid="dp-global-' + d.id + '"]').addEventListener('click', function(e) {
           e.stopPropagation();
@@ -1359,6 +1433,62 @@
       notify('Deleted "' + docName + '"', 'success');
     } catch (err) {
       notify('Delete failed: ' + err.message, 'error');
+    }
+  }
+
+  function showMoveDocModal(docId, docName) {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.style.display = 'flex';
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.maxWidth = '400px';
+    modal.innerHTML = '<div class="modal-head"><span class="modal-title">Move Document</span><button class="modal-x" data-testid="close-move-modal">&times;</button></div>' +
+      '<div style="padding:16px"><p style="margin:0 0 12px;font-size:13px;color:#6b7280">Move "<strong>' + esc(docName) + '</strong>" to:</p>' +
+      '<div id="move-project-list" data-testid="move-project-list" style="max-height:300px;overflow-y:auto"></div></div>';
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    var listEl = modal.querySelector('#move-project-list');
+    var projects = state.projects || [];
+    for (var i = 0; i < projects.length; i++) {
+      if (state.currentProject && projects[i].id === state.currentProject.id) continue;
+      var btn = document.createElement('button');
+      btn.className = 'move-project-btn';
+      btn.setAttribute('data-testid', 'move-to-' + projects[i].id);
+      btn.textContent = projects[i].name;
+      (function(proj) {
+        btn.addEventListener('click', function() {
+          moveDocToProject(docId, docName, proj.id, proj.name, overlay);
+        });
+      })(projects[i]);
+      listEl.appendChild(btn);
+    }
+    if (listEl.children.length === 0) {
+      listEl.innerHTML = '<p style="color:#9ca3af;font-size:13px;text-align:center">No other projects to move to</p>';
+    }
+
+    modal.querySelector('[data-testid="close-move-modal"]').addEventListener('click', function() {
+      document.body.removeChild(overlay);
+    });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) document.body.removeChild(overlay);
+    });
+  }
+
+  async function moveDocToProject(docId, docName, targetProjectId, targetProjectName, overlay) {
+    try {
+      await api('/api/projects/documents/' + docId + '/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetProjectId: targetProjectId })
+      });
+      state.projectDocs = state.projectDocs.filter(function(d) { return d.id !== docId; });
+      renderDocPanel();
+      if (overlay && overlay.parentNode) document.body.removeChild(overlay);
+      notify('Moved "' + docName + '" to ' + targetProjectName, 'success');
+    } catch (err) {
+      notify('Move failed: ' + err.message, 'error');
     }
   }
 
