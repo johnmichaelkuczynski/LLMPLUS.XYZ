@@ -1375,16 +1375,34 @@ app.post('/api/coherence', async function(req, res) {
     var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
     var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
 
-    var docResult = await pool.query('SELECT name, raw_content FROM project_documents WHERE project_id = $1', [projectId]);
-    var projectDocs = docResult.rows;
-
+    var selectedDocs = req.body.selectedDocs || [];
     var sourceContent = '';
-    if (projectDocs.length > 0) {
-      for (var d = 0; d < projectDocs.length; d++) {
-        var docContent = projectDocs[d].raw_content || '';
-        sourceContent += '--- Document: ' + projectDocs[d].name + ' (' + docContent.split(/\s+/).length + ' words) ---\n';
-        sourceContent += docContent;
-        sourceContent += '\n\n';
+
+    if (selectedDocs.length > 0) {
+      for (var sd = 0; sd < selectedDocs.length; sd++) {
+        var docRow;
+        if (selectedDocs[sd].source === 'global') {
+          docRow = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [selectedDocs[sd].id]);
+        } else {
+          docRow = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1 AND project_id = $2', [selectedDocs[sd].id, projectId]);
+        }
+        if (docRow.rows.length > 0) {
+          var docContent = docRow.rows[0].raw_content || '';
+          sourceContent += '--- Document: ' + docRow.rows[0].name + ' (' + docContent.split(/\s+/).length + ' words) ---\n';
+          sourceContent += docContent;
+          sourceContent += '\n\n';
+        }
+      }
+    } else {
+      var docResult = await pool.query('SELECT name, raw_content FROM project_documents WHERE project_id = $1', [projectId]);
+      var projectDocs = docResult.rows;
+      if (projectDocs.length > 0) {
+        for (var d = 0; d < projectDocs.length; d++) {
+          var docContent = projectDocs[d].raw_content || '';
+          sourceContent += '--- Document: ' + projectDocs[d].name + ' (' + docContent.split(/\s+/).length + ' words) ---\n';
+          sourceContent += docContent;
+          sourceContent += '\n\n';
+        }
       }
     }
 

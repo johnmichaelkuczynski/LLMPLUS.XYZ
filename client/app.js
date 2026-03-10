@@ -1236,7 +1236,8 @@
         title: paperSpec.title,
         instructions: paperSpec.instructions,
         wordcount: paperSpec.wordcount,
-        doctype: paperSpec.doctype
+        doctype: paperSpec.doctype,
+        selectedDocs: paperSpec.selectedDocs || []
       })
     }).then(function(res) {
       var reader = res.body.getReader();
@@ -2081,8 +2082,10 @@
     inner += '<input type="text" class="text-input" data-field="title" value="' + esc(defaultTitle) + '" data-testid="paper-title" style="margin-bottom:12px">';
     inner += '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Instructions</label>';
     inner += '<textarea class="text-input" data-field="instructions" data-testid="paper-instructions" style="min-height:80px;resize:vertical;margin-bottom:12px;font-family:inherit">' + esc(defaultInstructions) + '</textarea>';
-    inner += '<div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Upload Source Document (optional)</label>';
-    inner += '<div style="display:flex;gap:8px;align-items:center"><button class="sidebar-btn" data-testid="paper-upload-btn" style="flex:0 0 auto" type="button">&#128194; Upload File</button>';
+    inner += '<div style="margin-bottom:12px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Source Documents <span style="font-weight:400;color:#9ca3af">(select from library)</span></label>';
+    inner += '<div data-testid="paper-doc-list" style="max-height:180px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;padding:2px 0">';
+    inner += '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:12px">Loading documents...</div></div>';
+    inner += '<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="sidebar-btn" data-testid="paper-upload-btn" style="flex:0 0 auto" type="button">&#128194; Upload New</button>';
     inner += '<span data-testid="paper-upload-info" style="font-size:12px;color:#6b7280;flex:1"></span></div>';
     inner += '<input type="file" data-testid="paper-file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" style="display:none"></div>';
     inner += '<div style="display:flex;gap:12px;margin-bottom:12px">';
@@ -2102,11 +2105,55 @@
     });
     modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
 
-    var paperUploadContent = null;
-    var paperUploadName = '';
+    var paperDocList = modal.querySelector('[data-testid="paper-doc-list"]');
     var paperUploadBtn = modal.querySelector('[data-testid="paper-upload-btn"]');
     var paperFileInput = modal.querySelector('[data-testid="paper-file-input"]');
     var paperUploadInfo = modal.querySelector('[data-testid="paper-upload-info"]');
+    var selectedDocs = [];
+
+    function renderDocList(projectDocs, globalDocs) {
+      var html = '';
+      if (projectDocs.length === 0 && globalDocs.length === 0) {
+        html = '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:12px">No documents in library. Upload one below.</div>';
+        paperDocList.innerHTML = html;
+        return;
+      }
+      if (projectDocs.length > 0) {
+        html += '<div style="padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;background:#f3f4f6">Project Documents</div>';
+        for (var i = 0; i < projectDocs.length; i++) {
+          var d = projectDocs[i];
+          var wc = d.word_count ? Number(d.word_count).toLocaleString() + ' words' : '';
+          html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6" data-testid="paper-doc-item-' + d.id + '">';
+          html += '<input type="checkbox" data-doc-id="' + d.id + '" data-doc-source="project" data-doc-name="' + esc(d.name) + '" style="margin:0">';
+          html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">&#128196; ' + esc(d.name) + '</span>';
+          html += '<span style="font-size:11px;color:#9ca3af;flex-shrink:0">' + wc + '</span>';
+          html += '</label>';
+        }
+      }
+      if (globalDocs.length > 0) {
+        html += '<div style="padding:4px 10px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;background:#f3f4f6">General Library</div>';
+        for (var g = 0; g < globalDocs.length; g++) {
+          var gd = globalDocs[g];
+          var gwc = gd.word_count ? Number(gd.word_count).toLocaleString() + ' words' : '';
+          html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6" data-testid="paper-doc-item-' + gd.id + '">';
+          html += '<input type="checkbox" data-doc-id="' + gd.id + '" data-doc-source="global" data-doc-name="' + esc(gd.name) + '" style="margin:0">';
+          html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">&#128218; ' + esc(gd.name) + '</span>';
+          html += '<span style="font-size:11px;color:#9ca3af;flex-shrink:0">' + gwc + '</span>';
+          html += '</label>';
+        }
+      }
+      paperDocList.innerHTML = html;
+    }
+
+    (async function loadPaperDocs() {
+      try {
+        var pDocs = await api('/api/projects/' + state.currentProject.id + '/documents');
+        var gDocs = await api('/api/documents/global');
+        renderDocList(pDocs || [], gDocs || []);
+      } catch (err) {
+        paperDocList.innerHTML = '<div style="text-align:center;color:#ef4444;font-size:12px;padding:12px">Failed to load documents</div>';
+      }
+    })();
 
     paperUploadBtn.addEventListener('click', function() {
       paperFileInput.click();
@@ -2125,10 +2172,12 @@
         var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
         if (!resp.ok) throw new Error(await resp.text());
         var docData = await resp.json();
-        paperUploadContent = docData.raw_content || '';
-        paperUploadName = docData.name;
-        var wc = paperUploadContent.split(/\s+/).length;
-        paperUploadInfo.innerHTML = '&#128196; <strong>' + esc(docData.name) + '</strong> (' + wc.toLocaleString() + ' words)';
+        paperUploadInfo.innerHTML = '&#9989; Uploaded <strong>' + esc(docData.name) + '</strong>';
+        var pDocs = await api('/api/projects/' + state.currentProject.id + '/documents');
+        var gDocs = await api('/api/documents/global');
+        renderDocList(pDocs || [], gDocs || []);
+        var newCheckbox = paperDocList.querySelector('[data-doc-id="' + docData.id + '"]');
+        if (newCheckbox) newCheckbox.checked = true;
       } catch (err) {
         paperUploadInfo.textContent = 'Upload failed: ' + err.message;
       }
@@ -2146,8 +2195,16 @@
         return;
       }
 
-      if (paperUploadContent) {
-        instructions = (instructions ? instructions + '\n\n' : '') + '=== SOURCE DOCUMENT ("' + paperUploadName + '") ===\n' + paperUploadContent;
+      var checkboxes = paperDocList.querySelectorAll('input[type="checkbox"]:checked');
+      selectedDocs = [];
+      var docNames = [];
+      for (var ci = 0; ci < checkboxes.length; ci++) {
+        selectedDocs.push({
+          id: checkboxes[ci].getAttribute('data-doc-id'),
+          source: checkboxes[ci].getAttribute('data-doc-source'),
+          name: checkboxes[ci].getAttribute('data-doc-name')
+        });
+        docNames.push(checkboxes[ci].getAttribute('data-doc-name'));
       }
 
       modal.remove();
@@ -2158,7 +2215,7 @@
       var desc = wordcount
         ? 'Generate a ' + wordcount + '-word ' + doctype.replace(/_/g, ' ') + ': "' + (title || 'Untitled') + '"'
         : 'Generate a ' + doctype.replace(/_/g, ' ') + ' (auto length): "' + (title || 'Untitled') + '"';
-      if (paperUploadName) desc += '\nSource: ' + paperUploadName;
+      if (docNames.length > 0) desc += '\nSource documents: ' + docNames.join(', ');
       addMessage('user', desc);
       scrollBottom();
 
@@ -2166,7 +2223,8 @@
         title: title,
         instructions: instructions,
         wordcount: wordcount,
-        doctype: doctype
+        doctype: doctype,
+        selectedDocs: selectedDocs
       });
     });
 
