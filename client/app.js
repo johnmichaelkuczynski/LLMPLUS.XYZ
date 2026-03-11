@@ -224,7 +224,58 @@
     }
 
     var title = '&#129504; Memory Hierarchy — ' + esc(projectName);
-    currentArtifact = { text: JSON.stringify(memory, null, 2), title: title };
+
+    var txtParts = [];
+    txtParts.push('MEMORY HIERARCHY — ' + projectName);
+    txtParts.push('=' .repeat(60));
+    var totalNodesAll = 0;
+    for (var tn = 0; tn < tiers.length; tn++) totalNodesAll += tiers[tn].nodes;
+    txtParts.push('Total: ' + totalNodesAll + ' nodes across ' + tiers.length + ' tier(s)');
+    if (archives.length > 0) txtParts.push(archives.length + ' archived snapshot(s)');
+    txtParts.push('');
+
+    for (var ti = 0; ti < tiers.length; ti++) {
+      var tt = tiers[ti];
+      var ttLabel = tt.tier === 1 ? 'Recent (High Resolution)' :
+                    tt.tier === 2 ? 'Summary (Medium Resolution)' :
+                    tt.tier === 3 ? 'Archive (Lower Resolution)' :
+                    'Deep Archive (Tier ' + tt.tier + ')';
+      txtParts.push('--- Tier ' + tt.tier + ' — ' + ttLabel + ' (' + tt.nodes + ' nodes) ---');
+      txtParts.push('');
+
+      var ttKeys = Object.keys(tt.tree);
+      ttKeys.sort(function(a, b) {
+        var pa = a.split('.').map(Number);
+        var pb = b.split('.').map(Number);
+        for (var sk = 0; sk < Math.max(pa.length, pb.length); sk++) {
+          var va = pa[sk] || 0, vb = pb[sk] || 0;
+          if (va !== vb) return va - vb;
+        }
+        return 0;
+      });
+
+      for (var tk = 0; tk < ttKeys.length; tk++) {
+        var tKey = ttKeys[tk];
+        var tDepth = tKey.split('.').length - 1;
+        var tIndent = '  '.repeat(tDepth);
+        var tVal = tt.tree[tKey];
+        var tValStr = typeof tVal === 'string' ? tVal : JSON.stringify(tVal);
+        txtParts.push(tIndent + tKey + '  ' + tValStr);
+      }
+      txtParts.push('');
+    }
+
+    if (archives.length > 0) {
+      txtParts.push('--- Archived Snapshots ---');
+      for (var ai = 0; ai < archives.length; ai++) {
+        var aArch = archives[ai];
+        var aDate = new Date(aArch.created_at).toLocaleDateString();
+        txtParts.push('  Tier ' + aArch.tier + ' snapshot — ' + (aArch.node_count || '?') + ' nodes — ' + aDate);
+      }
+    }
+
+    var txtContent = txtParts.join('\n');
+    currentArtifact = { text: txtContent, title: 'Memory Hierarchy — ' + projectName };
     els.artifactTitle.innerHTML = title;
     els.artifactBody.innerHTML = html;
     els.artifactPanel.classList.remove('hidden');
