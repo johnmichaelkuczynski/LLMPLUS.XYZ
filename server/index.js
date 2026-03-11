@@ -1930,6 +1930,16 @@ app.delete('/api/documents/global/:id', async function(req, res) {
   }
 });
 
+app.get('/api/projects/documents/:id/content', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ name: result.rows[0].name, raw_content: result.rows[0].raw_content || '' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/projects/documents/:id/download', async function(req, res) {
   try {
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);

@@ -1580,11 +1580,24 @@
           deleteProjectDoc(d.id, d.name);
         });
         item.addEventListener('click', function() {
-          injectDocIntoChat(d.id);
+          openDocForReading(d.id, d.name);
         });
       })(doc);
 
       els.docPanelList.appendChild(item);
+    }
+  }
+
+  async function openDocForReading(docId, docName) {
+    try {
+      var result = await api('/api/projects/documents/' + docId + '/content');
+      if (result && result.raw_content) {
+        showArtifact(result.raw_content, result.name || docName, { raw: true });
+      } else {
+        notify('Document is empty', 'error');
+      }
+    } catch (err) {
+      notify('Failed to open document: ' + err.message, 'error');
     }
   }
 
