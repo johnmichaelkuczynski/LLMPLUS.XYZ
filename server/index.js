@@ -1349,6 +1349,213 @@ function sleep(ms) {
   return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
+async function fetchWithTimeout(url, timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  try {
+    var resp = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'LLMPlus/1.0 (mailto:jmkuczynski@yahoo.com)' } });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+async function searchSemanticScholar(query) {
+  var results = [];
+  try {
+    var data = await fetchWithTimeout(
+      'https://api.semanticscholar.org/graph/v1/paper/search?query=' + encodeURIComponent(query) + '&fields=title,abstract,year,authors&limit=5',
+      10000
+    );
+    if (data && data.data) {
+      for (var i = 0; i < data.data.length; i++) {
+        var p = data.data[i];
+        if (p.abstract) {
+          results.push({
+            source: 'Semantic Scholar',
+            title: p.title || '',
+            abstract: p.abstract || '',
+            year: p.year || '',
+            authors: (p.authors || []).map(function(a) { return a.name; }).join(', ')
+          });
+        }
+      }
+    }
+  } catch (e) { console.error('SemanticScholar error:', e.message); }
+  return results;
+}
+
+async function searchOpenAlex(query) {
+  var results = [];
+  try {
+    var data = await fetchWithTimeout(
+      'https://api.openalex.org/works?search=' + encodeURIComponent(query) + '&per-page=5&mailto=jmkuczynski@yahoo.com',
+      10000
+    );
+    if (data && data.results) {
+      for (var i = 0; i < data.results.length; i++) {
+        var w = data.results[i];
+        var abText = '';
+        if (w.abstract_inverted_index) {
+          var words = [];
+          var idx = w.abstract_inverted_index;
+          for (var word in idx) {
+            for (var j = 0; j < idx[word].length; j++) {
+              words[idx[word][j]] = word;
+            }
+          }
+          abText = words.filter(Boolean).join(' ');
+        }
+        if (abText || w.title) {
+          results.push({
+            source: 'OpenAlex',
+            title: w.title || '',
+            abstract: abText,
+            year: w.publication_year || '',
+            authors: (w.authorships || []).slice(0, 5).map(function(a) { return a.author ? a.author.display_name : ''; }).join(', '),
+            doi: w.doi || ''
+          });
+        }
+      }
+    }
+  } catch (e) { console.error('OpenAlex error:', e.message); }
+  return results;
+}
+
+async function searchCrossRef(query) {
+  var results = [];
+  try {
+    var data = await fetchWithTimeout(
+      'https://api.crossref.org/works?query=' + encodeURIComponent(query) + '&rows=5&mailto=jmkuczynski@yahoo.com',
+      10000
+    );
+    if (data && data.message && data.message.items) {
+      for (var i = 0; i < data.message.items.length; i++) {
+        var item = data.message.items[i];
+        var abstr = item.abstract || '';
+        abstr = abstr.replace(/<[^>]+>/g, '');
+        if (abstr || item.title) {
+          results.push({
+            source: 'CrossRef',
+            title: Array.isArray(item.title) ? item.title[0] : (item.title || ''),
+            abstract: abstr,
+            year: item.published && item.published['date-parts'] ? item.published['date-parts'][0][0] : '',
+            authors: (item.author || []).slice(0, 5).map(function(a) { return (a.given || '') + ' ' + (a.family || ''); }).join(', '),
+            doi: item.DOI || ''
+          });
+        }
+      }
+    }
+  } catch (e) { console.error('CrossRef error:', e.message); }
+  return results;
+}
+
+async function fetchTextWithTimeout(url, timeoutMs) {
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  try {
+    var resp = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'LLMPlus/1.0 (mailto:jmkuczynski@yahoo.com)' } });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    return await resp.text();
+  } catch (e) {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+async function searchPubMed(query) {
+  var results = [];
+  try {
+    var searchData = await fetchWithTimeout(
+      'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=' + encodeURIComponent(query) + '&retmax=5&retmode=json&email=jmkuczynski@yahoo.com',
+      10000
+    );
+    if (searchData && searchData.esearchresult && searchData.esearchresult.idlist && searchData.esearchresult.idlist.length > 0) {
+      var ids = searchData.esearchresult.idlist;
+      var idStr = ids.join(',');
+      var rawText = await fetchTextWithTimeout(
+        'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=' + idStr + '&retmode=text&rettype=abstract&email=jmkuczynski@yahoo.com',
+        12000
+      );
+      if (rawText) {
+        var entries = rawText.split(/\n\n(?=\d+\.\s)/);
+        if (entries.length <= 1) entries = [rawText];
+        for (var i = 0; i < entries.length && i < ids.length; i++) {
+          var entry = entries[i].trim();
+          if (entry.length > 20) {
+            var titleMatch = entry.match(/\n([^\n]+)\.\n/);
+            results.push({
+              source: 'PubMed',
+              title: titleMatch ? titleMatch[1].trim() : 'PMID:' + ids[i],
+              abstract: entry.substring(0, 2000),
+              year: '',
+              authors: '',
+              pmid: ids[i]
+            });
+          }
+        }
+      }
+    }
+  } catch (e) { console.error('PubMed error:', e.message); }
+  return results;
+}
+
+async function fetchScholarlyResearch(queries, sendFn) {
+  var allResults = [];
+  var seenTitles = {};
+
+  for (var q = 0; q < queries.length; q++) {
+    var query = queries[q];
+    if (sendFn) sendFn({ type: 'research_status', message: 'Searching: "' + query + '" (' + (q + 1) + '/' + queries.length + ')' });
+
+    var apiResults = await Promise.all([
+      searchSemanticScholar(query),
+      searchOpenAlex(query),
+      searchCrossRef(query),
+      searchPubMed(query)
+    ]);
+
+    for (var a = 0; a < apiResults.length; a++) {
+      for (var r = 0; r < apiResults[a].length; r++) {
+        var result = apiResults[a][r];
+        var titleKey = (result.title || '').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 60);
+        if (titleKey && !seenTitles[titleKey]) {
+          seenTitles[titleKey] = true;
+          allResults.push(result);
+        }
+      }
+    }
+
+    if (q < queries.length - 1) await sleep(500);
+  }
+
+  return allResults;
+}
+
+function formatResearchForPrompt(results, charBudget) {
+  if (!results || results.length === 0) return '';
+  var text = '';
+  var count = 0;
+  for (var i = 0; i < results.length && text.length < charBudget; i++) {
+    var r = results[i];
+    text += '\n[' + (count + 1) + '] ';
+    if (r.authors) text += r.authors;
+    if (r.year) text += ' (' + r.year + ')';
+    text += '. "' + r.title + '".';
+    if (r.doi) text += ' DOI: ' + r.doi + '.';
+    if (r.pmid) text += ' PMID: ' + r.pmid + '.';
+    text += ' [' + r.source + ']';
+    if (r.abstract) text += '\n   Abstract: ' + r.abstract.substring(0, 800);
+    text += '\n';
+    count++;
+  }
+  return text;
+}
+
 app.post('/api/coherence', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1368,6 +1575,7 @@ app.post('/api/coherence', async function(req, res) {
     var autoLength = !rawWc || rawWc <= 0;
     var targetWords = autoLength ? 0 : rawWc;
     var doctype = req.body.doctype || 'paper';
+    var fetchResearchFlag = req.body.fetchResearch || false;
 
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
@@ -1629,6 +1837,76 @@ app.post('/api/coherence', async function(req, res) {
 
       send({ type: 'status', pass: 1, message: 'Outline complete: ' + outline.length + ' sections planned.' });
     }
+    var sectionResearch = {};
+
+    if (fetchResearchFlag && outline.length > 0) {
+      send({ type: 'status', pass: 'research', message: 'Research Phase: Generating search queries for ' + outline.length + ' sections...' });
+
+      var queryGenPrompt = 'You are preparing to write a ' + doctype.replace(/_/g, ' ') + '.\n\n';
+      queryGenPrompt += 'Here is the outline:\n';
+      for (var oq = 0; oq < outline.length; oq++) {
+        queryGenPrompt += (oq + 1) + '. ' + outline[oq].title + ': ' + (outline[oq].description || '') + '\n';
+      }
+      queryGenPrompt += '\nFor EACH section, generate 3-5 academic search queries that would find real scholarly papers, case law, or data relevant to that section.\n';
+      queryGenPrompt += 'Return ONLY a JSON object where keys are section indices (0-based) and values are arrays of search query strings.\n';
+      queryGenPrompt += 'Example: {"0": ["query1", "query2", "query3"], "1": ["query4", "query5"]}\n';
+      queryGenPrompt += 'Make queries specific and academic. Return ONLY the JSON.';
+
+      try {
+        var queryGenRaw = await callClaude(
+          [{ role: 'user', content: queryGenPrompt }],
+          'You output only valid JSON. No markdown fences, no commentary.',
+          false
+        );
+        var sectionQueries;
+        try { sectionQueries = JSON.parse(queryGenRaw); } catch (qe) {
+          var qMatch = queryGenRaw.match(/\{[\s\S]*\}/);
+          sectionQueries = qMatch ? JSON.parse(qMatch[0]) : {};
+        }
+
+        var totalQueries = 0;
+        for (var sqk in sectionQueries) {
+          if (Array.isArray(sectionQueries[sqk])) totalQueries += sectionQueries[sqk].length;
+        }
+        send({ type: 'status', pass: 'research', message: 'Research Phase: ' + totalQueries + ' queries across ' + Object.keys(sectionQueries).length + ' sections. Fetching from 4 academic APIs...' });
+
+        for (var si = 0; si < outline.length; si++) {
+          var queries = sectionQueries[String(si)] || sectionQueries[si] || [];
+          if (queries.length === 0) continue;
+
+          send({ type: 'research_status', message: 'Researching section ' + (si + 1) + '/' + outline.length + ': "' + outline[si].title + '" (' + queries.length + ' queries)' });
+
+          var results = await fetchScholarlyResearch(queries, send);
+          if (results.length > 0) {
+            sectionResearch[si] = results;
+            send({ type: 'research_status', message: 'Section ' + (si + 1) + ': found ' + results.length + ' sources' });
+          } else {
+            var rephrasedQueries = queries.map(function(q) {
+              return q.replace(/\b(analysis|study|research)\b/gi, 'review').replace(/\b(impact|effect)\b/gi, 'influence');
+            });
+            send({ type: 'research_status', message: 'Section ' + (si + 1) + ': no results, trying rephrased queries...' });
+            var retryResults = await fetchScholarlyResearch(rephrasedQueries, null);
+            if (retryResults.length > 0) {
+              sectionResearch[si] = retryResults;
+              send({ type: 'research_status', message: 'Section ' + (si + 1) + ': found ' + retryResults.length + ' sources on retry' });
+            } else {
+              send({ type: 'research_status', message: 'Section ' + (si + 1) + ': no external sources found' });
+            }
+          }
+
+          if (si < outline.length - 1) await sleep(1000);
+        }
+
+        var totalSources = 0;
+        for (var srk in sectionResearch) totalSources += sectionResearch[srk].length;
+        send({ type: 'status', pass: 'research', message: 'Research complete: ' + totalSources + ' unique sources fetched across ' + Object.keys(sectionResearch).length + ' sections.' });
+
+      } catch (researchErr) {
+        console.error('Research phase error:', researchErr.message);
+        send({ type: 'research_status', message: 'Research phase encountered errors, continuing with available material...' });
+      }
+    }
+
     send({ type: 'status', pass: 2, message: 'Pass 2: Writing sections...' });
 
     var allSections = [];
@@ -1664,6 +1942,17 @@ app.post('/api/coherence', async function(req, res) {
       if (title) sectionPrompt += '\nOverall paper title: ' + title + '\n';
       if (instructions) sectionPrompt += 'Overall instructions: ' + instructions + '\n\n';
       if (prevSectionSummaries) sectionPrompt += prevSectionSummaries + '\n';
+
+      var researchForSection = sectionResearch[i];
+      if (researchForSection && researchForSection.length > 0) {
+        var researchText = formatResearchForPrompt(researchForSection, 30000);
+        sectionPrompt += '=== FETCHED SCHOLARLY SOURCES (use these as the basis for expansion) ===\n';
+        sectionPrompt += researchText + '\n';
+        sectionPrompt += '=== END SCHOLARLY SOURCES ===\n\n';
+        sectionPrompt += 'CRITICAL: Ground your writing in the scholarly sources above. Cite each source inline (author, year). ';
+        sectionPrompt += 'Do NOT fabricate citations. Every substantive claim should reference one of the sources above. ';
+        sectionPrompt += 'If a source is relevant, discuss its findings in detail — quote key phrases, explain methodology, compare results.\n\n';
+      }
 
       if (sourceContent) {
         var sectionKeywords = (section.title + ' ' + section.description + ' ' + (section.key_points || []).join(' ')).toLowerCase().split(/\s+/);

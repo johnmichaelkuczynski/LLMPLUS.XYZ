@@ -1,0 +1,45 @@
+The Problem to Fix:
+When asked to expand a paper (e.g. 5,000 words → 50,000 words), the app currently bloats with filler language instead of adding real substantive content. Fix this by fetching real external data before writing.
+The Rule:
+Before expanding any section of the paper, the app must first FETCH real content from external sources. No expansion should be written from thin air. Every added paragraph must be grounded in fetched material.
+
+The Four No-Key APIs to Integrate:
+1. Semantic Scholar
+Base URL: https://api.semanticscholar.org/graph/v1
+Search endpoint: GET https://api.semanticscholar.org/graph/v1/paper/search?query=YOUR_QUERY&fields=title,abstract,year,authors&limit=10
+No API key needed. Just hit the endpoint.
+2. OpenAlex
+Base URL: https://api.openalex.org
+Search endpoint: GET https://api.openalex.org/works?search=YOUR_QUERY&per-page=10
+No API key needed.
+3. CrossRef
+Base URL: https://api.crossref.org
+Search endpoint: GET https://api.crossref.org/works?query=YOUR_QUERY&rows=10
+No API key needed.
+4. PubMed E-utilities
+Search endpoint: GET https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=YOUR_QUERY&retmax=10&retmode=json
+Fetch abstract: GET https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=PMID&retmode=text&rettype=abstract
+Include this param in every call: &email=jmkuczynski@yahoo.com
+No API key needed.
+
+The Expansion Workflow to Build:
+1. Receive paper + expansion target (e.g. "expand to 50,000 words")
+
+2. Claude analyzes the paper and breaks it into SECTIONS/THEMES
+   (e.g. "Section 2 is about cognitive dissonance — needs 8,000 more words")
+
+3. For each section, Claude generates 3-5 SEARCH QUERIES
+   representing the real scholarly topics that section touches
+
+4. For each query, hit ALL FOUR APIs in parallel and collect:
+   - Titles
+   - Abstracts
+   - Authors
+   - Years
+   - DOIs where available
+
+5. Feed the fetched abstracts + metadata back to Claude with this instruction:
+   "Using ONLY the following real scholarly sources, expand this section.
+   Cite each source inline. Do not add content not grounded in these sources."
+
+6. Assemble the expanded sections back into a complete document

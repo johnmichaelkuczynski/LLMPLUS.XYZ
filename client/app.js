@@ -1288,7 +1288,8 @@
         instructions: paperSpec.instructions,
         wordcount: paperSpec.wordcount,
         doctype: paperSpec.doctype,
-        selectedDocs: paperSpec.selectedDocs || []
+        selectedDocs: paperSpec.selectedDocs || [],
+        fetchResearch: paperSpec.fetchResearch || false
       })
     }).then(function(res) {
       var reader = res.body.getReader();
@@ -1308,6 +1309,8 @@
               try {
                 var parsed = JSON.parse(data);
                 if (parsed.type === 'status') {
+                  ppStatusText.textContent = parsed.message;
+                } else if (parsed.type === 'research_status') {
                   ppStatusText.textContent = parsed.message;
                 } else if (parsed.type === 'progress') {
                   var pct = Math.round((parsed.current / parsed.total) * 100);
@@ -2152,6 +2155,10 @@
     inner += '<div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button class="sidebar-btn" data-testid="paper-upload-btn" style="flex:0 0 auto" type="button">&#128194; Upload New</button>';
     inner += '<span data-testid="paper-upload-info" style="font-size:12px;color:#6b7280;flex:1"></span></div>';
     inner += '<input type="file" data-testid="paper-file-input" accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.tif,.webp" style="display:none"></div>';
+    inner += '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">';
+    inner += '<input type="checkbox" data-field="fetchResearch" data-testid="paper-fetch-research" style="margin:0;width:16px;height:16px">';
+    inner += '<span><strong style="color:#1d4ed8">Fetch Scholarly Sources</strong> <span style="color:#6b7280;font-weight:400">— search Semantic Scholar, OpenAlex, CrossRef, PubMed for real citations</span></span>';
+    inner += '</label></div>';
     inner += '<div style="display:flex;gap:12px;margin-bottom:12px">';
     inner += '<div style="flex:1"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Words <span style="font-weight:400;color:#9ca3af">(leave blank for auto)</span></label>';
     inner += '<input type="number" class="text-input" data-field="wordcount" placeholder="Auto" min="500" max="100000" data-testid="paper-wordcount"></div>';
@@ -2253,6 +2260,7 @@
       var wcVal = modal.querySelector('[data-field="wordcount"]').value.trim();
       var wordcount = wcVal ? parseInt(wcVal) : 0;
       var doctype = modal.querySelector('[data-field="doctype"]').value;
+      var fetchResearch = modal.querySelector('[data-field="fetchResearch"]').checked;
 
       if (!title && !instructions) {
         notify('Enter at least a title or instructions', 'error');
@@ -2263,12 +2271,14 @@
       selectedDocs = [];
       var docNames = [];
       for (var ci = 0; ci < checkboxes.length; ci++) {
-        selectedDocs.push({
-          id: checkboxes[ci].getAttribute('data-doc-id'),
-          source: checkboxes[ci].getAttribute('data-doc-source'),
-          name: checkboxes[ci].getAttribute('data-doc-name')
-        });
-        docNames.push(checkboxes[ci].getAttribute('data-doc-name'));
+        if (checkboxes[ci].getAttribute('data-doc-id')) {
+          selectedDocs.push({
+            id: checkboxes[ci].getAttribute('data-doc-id'),
+            source: checkboxes[ci].getAttribute('data-doc-source'),
+            name: checkboxes[ci].getAttribute('data-doc-name')
+          });
+          docNames.push(checkboxes[ci].getAttribute('data-doc-name'));
+        }
       }
 
       modal.remove();
@@ -2280,6 +2290,7 @@
         ? 'Generate a ' + wordcount + '-word ' + doctype.replace(/_/g, ' ') + ': "' + (title || 'Untitled') + '"'
         : 'Generate a ' + doctype.replace(/_/g, ' ') + ' (auto length): "' + (title || 'Untitled') + '"';
       if (docNames.length > 0) desc += '\nSource documents: ' + docNames.join(', ');
+      if (fetchResearch) desc += '\n[Scholarly research enabled]';
       addMessage('user', desc);
       scrollBottom();
 
@@ -2288,7 +2299,8 @@
         instructions: instructions,
         wordcount: wordcount,
         doctype: doctype,
-        selectedDocs: selectedDocs
+        selectedDocs: selectedDocs,
+        fetchResearch: fetchResearch
       });
     });
 
