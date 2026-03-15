@@ -2282,16 +2282,31 @@ app.post('/api/projects/documents/:id/copy-to-global', async function(req, res) 
 });
 
 app.post('/api/documents/save-artifact', async function(req, res) {
+  var client = await pool.connect();
   try {
     var text = req.body.text || '';
     var name = req.body.name || 'Document';
-    var result = await pool.query(
+    var projectId = req.body.projectId || null;
+    await client.query('BEGIN');
+    var globalResult = await client.query(
       'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
       [name, text]
     );
-    res.json(result.rows[0]);
+    var projectDocId = null;
+    if (projectId) {
+      var projResult = await client.query(
+        'INSERT INTO project_documents (project_id, name, raw_content) VALUES ($1, $2, $3) RETURNING id',
+        [projectId, name, text]
+      );
+      projectDocId = projResult.rows[0].id;
+    }
+    await client.query('COMMIT');
+    res.json({ id: globalResult.rows[0].id, projectDocId: projectDocId, name: globalResult.rows[0].name, created_at: globalResult.rows[0].created_at });
   } catch (err) {
+    await client.query('ROLLBACK').catch(function() {});
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -2397,19 +2412,34 @@ app.post('/api/artifact/pdf', async function(req, res) {
 });
 
 app.post('/api/documents/save-generated', async function(req, res) {
+  var client = await pool.connect();
   try {
     var jobId = req.body.jobId;
     var name = req.body.name || 'Generated Document';
-    var job = await pool.query('SELECT final_output FROM document_jobs WHERE id = $1', [jobId]);
-    if (!job.rows[0]) return res.status(404).json({ error: 'Job not found' });
+    var projectId = req.body.projectId || null;
+    var job = await client.query('SELECT final_output FROM document_jobs WHERE id = $1', [jobId]);
+    if (!job.rows[0]) { client.release(); return res.status(404).json({ error: 'Job not found' }); }
     var content = job.rows[0].final_output || '';
-    var result = await pool.query(
+    await client.query('BEGIN');
+    var globalResult = await client.query(
       'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
       [name, content]
     );
-    res.json(result.rows[0]);
+    var projectDocId = null;
+    if (projectId) {
+      var projResult = await client.query(
+        'INSERT INTO project_documents (project_id, name, raw_content) VALUES ($1, $2, $3) RETURNING id',
+        [projectId, name, content]
+      );
+      projectDocId = projResult.rows[0].id;
+    }
+    await client.query('COMMIT');
+    res.json({ id: globalResult.rows[0].id, projectDocId: projectDocId, name: globalResult.rows[0].name, created_at: globalResult.rows[0].created_at });
   } catch (err) {
+    await client.query('ROLLBACK').catch(function() {});
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 

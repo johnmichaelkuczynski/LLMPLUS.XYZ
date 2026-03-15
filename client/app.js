@@ -391,11 +391,12 @@
       await api('/api/documents/save-artifact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: currentArtifact.text, name: currentArtifact.title })
+        body: JSON.stringify({ text: currentArtifact.text, name: currentArtifact.title, projectId: state.currentProject ? state.currentProject.id : null })
       });
       els.artifactSave.innerHTML = '&#9989; Saved';
       els.artifactSave.disabled = true;
-      notify('Saved to General Library', 'success');
+      notify(state.currentProject ? 'Saved to Project Library & General Library' : 'Saved to General Library', 'success');
+      if (state.currentProject) loadProjectDocs();
     } catch (err) {
       notify('Save failed: ' + err.message, 'error');
     }
@@ -1366,11 +1367,12 @@
                         await api('/api/documents/save-generated', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ jobId: jid, name: docTitle })
+                          body: JSON.stringify({ jobId: jid, name: docTitle, projectId: state.currentProject ? state.currentProject.id : null })
                         });
                         saveBtn.innerHTML = '&#9989; Saved';
                         saveBtn.disabled = true;
-                        notify('Saved to General Library', 'success');
+                        notify(state.currentProject ? 'Saved to Project Library & General Library' : 'Saved to General Library', 'success');
+                        if (state.currentProject) loadProjectDocs();
                       } catch (err) {
                         notify('Save failed: ' + err.message, 'error');
                       }
@@ -1470,8 +1472,10 @@
                                     saveBtn2.innerHTML = '&#128218; Save to Library';
                                     saveBtn2.onclick = (function(jid2, dt2) { return async function() {
                                       try {
-                                        await api('/api/documents/save-generated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: jid2, name: dt2 }) });
-                                        saveBtn2.innerHTML = '&#9989; Saved'; saveBtn2.disabled = true; notify('Saved to General Library', 'success');
+                                        await api('/api/documents/save-generated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: jid2, name: dt2, projectId: state.currentProject ? state.currentProject.id : null }) });
+                                        saveBtn2.innerHTML = '&#9989; Saved'; saveBtn2.disabled = true;
+                                        notify(state.currentProject ? 'Saved to Project Library & General Library' : 'Saved to General Library', 'success');
+                                        if (state.currentProject) loadProjectDocs();
                                       } catch (err) { notify('Save failed: ' + err.message, 'error'); }
                                     }; })(rp.jobId, paperSpec.title || paperSpec.doctype);
                                     ppDownloads.appendChild(saveBtn2);
