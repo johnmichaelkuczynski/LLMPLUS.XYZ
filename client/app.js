@@ -869,7 +869,7 @@
     div.className = 'message assistant';
     div.innerHTML = '<div class="msg-avatar">C</div>' +
       '<div class="msg-body"><div class="msg-role">Claude</div>' +
-      '<div class="msg-text"><span class="cursor-blink"></span></div></div>';
+      '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
     els.messages.appendChild(div);
     scrollBottom();
     return div.querySelector('.msg-text');
@@ -916,6 +916,8 @@
       reader.read().then(function(result) {
         if (result.done) {
           if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
+          var ti2 = textEl.querySelector('.thinking-indicator');
+          if (ti2) ti2.remove();
           var c = textEl.querySelector('.cursor-blink');
           if (c) c.remove();
           textEl.innerHTML = fmt(fullText);
@@ -941,7 +943,11 @@
             if (data === '[DONE]') continue;
             try {
               var parsed = JSON.parse(data);
-              if (parsed.type === 'text') {
+              if (parsed.type === 'status') {
+                // status events (thinking, etc.) — no action needed, indicator already shown
+              } else if (parsed.type === 'text') {
+                var ti = textEl.querySelector('.thinking-indicator');
+                if (ti) ti.remove();
                 fullText += parsed.text;
                 var c = textEl.querySelector('.cursor-blink');
                 if (c) c.remove();
