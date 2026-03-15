@@ -6,7 +6,8 @@
     currentSession: null,
     streaming: false,
     projectDocs: [],
-    pendingAttachments: []
+    pendingAttachments: [],
+    responseLength: 'concise'
   };
 
   var els = {
@@ -1175,7 +1176,8 @@
         body: JSON.stringify({
           sessionId: state.currentSession.id,
           projectId: state.currentProject.id,
-          message: fullMessage
+          message: fullMessage,
+          responseLength: state.responseLength
         })
       });
 
@@ -2414,6 +2416,14 @@
     }
   });
   els.btnSend.addEventListener('click', sendMessage);
+
+  document.querySelectorAll('.rl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rl-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.responseLength = btn.getAttribute('data-length');
+    });
+  });
 
   els.btnNewProject.addEventListener('click', function() {
     els.projectModal.classList.add('active');

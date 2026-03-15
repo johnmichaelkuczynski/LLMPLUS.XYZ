@@ -213,14 +213,43 @@ function extractSectionOutline(text) {
   return outline.join('\n') || '(no clear section structure detected)';
 }
 
-function buildSystemPrompt(tree, tieredMemory) {
+function buildSystemPrompt(tree, tieredMemory, responseLength) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
-  prompt += '\n\nIMPORTANT WRITING RULES:';
-  prompt += '\n- When the user asks you to write, draft, or compose anything (motions, briefs, letters, essays, papers, code, etc.), write the FULL, COMPLETE document. Do NOT summarize. Do NOT abbreviate. Do NOT use placeholders like "[continue here]" or "[additional arguments]".';
-  prompt += '\n- Write as long as needed. If a legal motion needs 20 pages, write 20 pages. If a letter needs 3 paragraphs, write 3 paragraphs. Match the length to the task.';
-  prompt += '\n- If the user specifies a word count (e.g. "10000 words"), you MUST write that many words. Do not stop early. Fill every section with deep, substantive, original analysis. Use as many tokens as you have available. The system will automatically request continuation if you run out of tokens.';
-  prompt += '\n- Use proper formatting for the document type: legal documents should have proper caption, headings, numbered paragraphs, signature blocks, etc. Letters should have proper salutation and closing. Academic papers should have sections, citations, etc.';
-  prompt += '\n- Never cut yourself short. If you run out of space, the system will automatically continue your response. Use ALL available tokens before stopping.';
+
+  if (responseLength === 'concise') {
+    prompt += '\n\nRESPONSE LENGTH: CONCISE. The user wants SHORT, direct answers.';
+    prompt += '\n- Answer in as few words as possible while being accurate.';
+    prompt += '\n- For factual questions, give the answer directly — no preamble, no elaboration unless asked.';
+    prompt += '\n- For opinions or analysis, keep to 2-4 sentences.';
+    prompt += '\n- Do NOT write essays, lists of considerations, or lengthy explanations unless explicitly asked.';
+    prompt += '\n- If a one-word or one-sentence answer is sufficient, use it.';
+    prompt += '\n- Skip pleasantries like "Great question!" or "That\'s an interesting topic."';
+  } else if (responseLength === 'normal') {
+    prompt += '\n\nRESPONSE LENGTH: NORMAL. Give balanced, well-structured responses.';
+    prompt += '\n- Answer questions with enough detail to be helpful but do not over-explain.';
+    prompt += '\n- A few paragraphs for most questions. Use lists or structure when it aids clarity.';
+    prompt += '\n- When writing documents, produce a complete but moderate-length version.';
+  } else if (responseLength === 'detailed') {
+    prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses.';
+    prompt += '\n- Provide comprehensive coverage of the topic.';
+    prompt += '\n- Include examples, nuances, edge cases, and supporting reasoning.';
+    prompt += '\n- When writing documents, be expansive and thorough.';
+  } else if (responseLength === 'exhaustive') {
+    prompt += '\n\nRESPONSE LENGTH: EXHAUSTIVE. The user wants maximum depth and length.';
+    prompt += '\n- Write as long as needed. Use ALL available tokens.';
+    prompt += '\n- Cover every angle, sub-topic, implication, and nuance.';
+    prompt += '\n- The system will automatically continue your response if you run out of tokens.';
+    prompt += '\n- Never cut yourself short. Never summarize to save space.';
+  }
+
+  if (responseLength === 'detailed' || responseLength === 'exhaustive') {
+    prompt += '\n\nWRITING RULES:';
+    prompt += '\n- When asked to write, draft, or compose anything, write the FULL, COMPLETE document. Do NOT summarize. Do NOT abbreviate. Do NOT use placeholders.';
+    prompt += '\n- If the user specifies a word count, you MUST write that many words. The system will automatically request continuation if you run out of tokens.';
+    prompt += '\n- Use proper formatting for the document type.';
+    prompt += '\n- Never cut yourself short. Use ALL available tokens before stopping.';
+  }
+
   prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
 
   if (tieredMemory && tieredMemory.tiers && tieredMemory.tiers.length > 0) {
@@ -430,6 +459,8 @@ app.post('/api/chat', async function(req, res) {
     var sessionId = req.body.sessionId;
     var projectId = req.body.projectId;
     var message = req.body.message;
+    var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
 
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
@@ -464,7 +495,7 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory);
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength);
     if (crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nThe user has had other conversations in this project. Here are excerpts so you can maintain continuity:\n' + crossSessionContext;
     }
@@ -491,12 +522,21 @@ app.post('/api/chat', async function(req, res) {
 
     var requestedWords = extractRequestedWordCount(userContent);
     var fullText = '';
-    var maxContinuations = 40;
+    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
+                          responseLength === 'normal' ? 4096 :
+                          responseLength === 'detailed' ? 8192 : MAX_TOKENS;
+    var maxContinuations = responseLength === 'concise' ? 0 :
+                           responseLength === 'normal' ? 2 :
+                           responseLength === 'detailed' ? 10 : 40;
+    if (requestedWords > 0) {
+      lengthMaxTokens = MAX_TOKENS;
+      maxContinuations = 40;
+    }
     var continuationCount = 0;
 
     async function streamOneCall(callMsgs) {
       try {
-        var anthropicRes = await callClaude(callMsgs, systemPrompt, true);
+        var anthropicRes = await callClaude(callMsgs, systemPrompt, true, lengthMaxTokens);
         if (!anthropicRes.ok) {
           var errBody = await anthropicRes.text();
           console.error('[streamOneCall] API error: ' + anthropicRes.status + ' ' + errBody.substring(0, 500));
@@ -551,7 +591,7 @@ app.post('/api/chat', async function(req, res) {
       return text.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
     }
 
-    console.log('[Chat] requestedWords=' + requestedWords + ' isLongform=' + isLongformRequest(userContent));
+    console.log('[Chat] responseLength=' + responseLength + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongformRequest(userContent));
     var lastResult = await streamOneCall(msgs);
     fullText = lastResult.segmentText;
     continuationCount = 1;

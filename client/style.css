@@ -508,9 +508,49 @@ html, body {
 }
 
 .input-area {
-  padding: 16px 24px 24px;
+  padding: 12px 24px 24px;
   background: #fff;
   border-top: 1px solid #f3f4f6;
+}
+
+.response-length-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 16px 8px;
+}
+
+.rl-label {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.rl-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.rl-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.rl-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
 }
 
 .attached-files {

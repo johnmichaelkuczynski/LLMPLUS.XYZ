@@ -34,6 +34,8 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **Artifact Panel**: When Claude generates a document-like response (detected by word count + structure: 150+ words with headings, 200+ words with paragraphs, 300+ words with numbered lists, or 800+ words), a formatted side panel auto-opens during streaming — slides in from right with live updates every 300ms. Buttons: Copy to clipboard, Download TXT/DOCX/PDF, Save to Library, Close.
 - **Download**: Export coherence engine output and artifacts as TXT, DOCX, PDF
 - **Collapsed Messages**: Large user messages (200+ words) show collapsed card with expand button
+- **Response Length Control**: Four-mode selector above chat input: Concise (1024 tokens, no continuations), Normal (4096 tokens, 2 continuations), Detailed (8192 tokens, 10 continuations), Exhaustive (16384 tokens, 40 continuations). System prompt adapts per mode. If user specifies a word count in their message, it overrides to full tokens. Default is Concise. Server validates input.
+- **Streaming UX**: All SSE endpoints include `X-Accel-Buffering: no` header. Chat endpoint sends immediate `status: thinking` event. Client shows animated bouncing dots while waiting for first token, then transitions to blinking cursor with streaming text.
 - **Context Management**: Chat messages truncated to 12K chars each, total context capped at 150K chars, cross-session context capped at 15K chars to prevent exceeding API token limits.
 
 ## Database Tables
