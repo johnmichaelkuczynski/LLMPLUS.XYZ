@@ -1,0 +1,55 @@
+Most Common SSE Streaming Failures
+1. Missing res.flush() calls ← #1 suspect
+Node's http.ServerResponse buffers output. With Express, even if you write data: token\n\n, nothing reaches the client until the buffer fills or the connection closes. You need explicit flushes after every write:
+js// After every SSE write:
+res.write(`data: ${JSON.stringify({ token })}\n\n`);
+if (res.flush) res.flush(); // ← CRITICAL for streaming to work
+Check streamClaudeToSSE() — if there's no res.flush() after each chunk, this is your problem.
+
+2. Anthropic SDK buffering the stream internally
+If you're using the Anthropic Node SDK's streaming, you need to iterate the stream correctly:
+js// WRONG — buffers everything:
+const response = await anthropic.messages.create({ stream: true, ... });
+// then awaiting .finalMessage() before writing to SSE
+
+// RIGHT — iterate chunks as they arrive:
+const stream = anthropic.messages.stream({ ... });
+for await (const chunk of stream) {
+  if (chunk.type === 'content_block_delta') {
+    res.write(`data: ${JSON.stringify({ token: chunk.delta.text })}\n\n`);
+    if (res.flush) res.flush();
+  }
+}
+
+3. Reverse proxy / middleware gzip compression
+If you're running behind nginx or have compression middleware (compression npm package), it will buffer SSE until it decides to flush. Fix:
+js// Disable compression for SSE routes
+app.use((req, res, next) => {
+  if (req.path.includes('/api/chat') || req.path.includes('/api/tractatus')) {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no'); // tells nginx not to buffer
+  }
+  next();
+});
+Your doc says you already set X-Accel-Buffering: no — good. But double-check it's set before the first write, not after.
+
+4. Frontend not reading the stream incrementally
+Even if the server streams perfectly, if the client does fetch + await response.json() or await response.text(), it waits for the full response. The client needs ReadableStream processing:
+js// WRONG:
+const data = await fetch('/api/chat', { method: 'POST', ... });
+const json = await data.json(); // waits for everything
+
+// RIGHT:
+const response = await fetch('/api/chat', { method: 'POST', body: ... });
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const chunk = decoder.decode(value);
+  // parse SSE lines and update DOM
+}
+
+My Bet
+Given the architecture (plain vanilla JS, no build tools), the most likely issue is #1 (missing res.flush()) combined with possibly #4 (client using EventSource or fetch incorrectly).
+Post the relevant sections of server/index.js — specifically streamClaudeToSSE() (lines ~201–350) and the POST /api/chat handler (lines ~551–790) — and I'll pinpoint the exact line.
