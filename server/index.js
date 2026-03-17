@@ -4,6 +4,8 @@ import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import session from 'express-session';
+import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +16,102 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'llmplus-dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }
+}));
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
+
+app.post('/api/auth/register', async function(req, res) {
+  try {
+    var username = (req.body.username || '').trim();
+    var password = req.body.password || '';
+    if (!username || username.length < 2 || username.length > 50) return res.status(400).json({ error: 'Username must be 2-50 characters' });
+    if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    var existing = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    if (existing.rows.length > 0) return res.status(409).json({ error: 'Username already taken' });
+    var hash = await bcrypt.hash(password, 10);
+    var result = await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username', [username, hash]);
+    req.session.userId = result.rows[0].id;
+    req.session.username = result.rows[0].username;
+    res.json({ id: result.rows[0].id, username: result.rows[0].username });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', async function(req, res) {
+  try {
+    var username = (req.body.username || '').trim();
+    var password = req.body.password || '';
+    if (!username) return res.status(400).json({ error: 'Username is required' });
+    var result = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid username or password' });
+    var user = result.rows[0];
+    if (user.password_hash === null && user.username.toLowerCase() === 'jmk') {
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      return res.json({ id: user.id, username: user.username });
+    }
+    if (user.password_hash === null) return res.status(401).json({ error: 'Invalid username or password' });
+    var valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.json({ id: user.id, username: user.username });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/logout', function(req, res) {
+  req.session.destroy(function() {
+    res.json({ ok: true });
+  });
+});
+
+app.get('/api/auth/me', function(req, res) {
+  if (req.session && req.session.userId) {
+    res.json({ id: req.session.userId, username: req.session.username });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
+  }
+});
+
+function requireAuth(req, res, next) {
+  if (req.session && req.session.userId) {
+    req.userId = req.session.userId;
+    return next();
+  }
+  res.status(401).json({ error: 'Not authenticated' });
+}
+
+app.use('/api', function(req, res, next) {
+  if (req.path.startsWith('/auth/')) return next();
+  requireAuth(req, res, next);
+});
+
+async function verifyProjectOwnership(projectId, userId) {
+  var r = await pool.query('SELECT id FROM projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
+  return r.rows.length > 0;
+}
+
+async function verifySessionOwnership(sessionId, userId) {
+  var r = await pool.query('SELECT s.id FROM sessions s JOIN projects p ON s.project_id = p.id WHERE s.id = $1 AND p.user_id = $2', [sessionId, userId]);
+  return r.rows.length > 0;
+}
+
+async function verifyProjectDocOwnership(docId, userId) {
+  var r = await pool.query('SELECT pd.id FROM project_documents pd JOIN projects p ON pd.project_id = p.id WHERE pd.id = $1 AND p.user_id = $2', [docId, userId]);
+  return r.rows.length > 0;
+}
+
+async function verifyGlobalDocOwnership(docId, userId) {
+  var r = await pool.query('SELECT id FROM global_documents WHERE id = $1 AND user_id = $2', [docId, userId]);
+  return r.rows.length > 0;
+}
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
@@ -273,7 +370,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength) {
 
 app.get('/api/projects', async function(req, res) {
   try {
-    var result = await pool.query('SELECT * FROM projects WHERE tractatus_tier = 1 OR tractatus_tier IS NULL ORDER BY created_at ASC');
+    var result = await pool.query('SELECT * FROM projects WHERE user_id = $1 AND (tractatus_tier = 1 OR tractatus_tier IS NULL) ORDER BY created_at ASC', [req.userId]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -284,8 +381,8 @@ app.post('/api/projects', async function(req, res) {
   try {
     var name = req.body.name;
     var result = await pool.query(
-      "INSERT INTO projects (name, tractatus_tree) VALUES ($1, '{}') RETURNING *",
-      [name]
+      "INSERT INTO projects (name, tractatus_tree, user_id) VALUES ($1, '{}', $2) RETURNING *",
+      [name, req.userId]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -295,7 +392,7 @@ app.post('/api/projects', async function(req, res) {
 
 app.delete('/api/projects/:id', async function(req, res) {
   try {
-    await pool.query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -304,7 +401,7 @@ app.delete('/api/projects/:id', async function(req, res) {
 
 app.delete('/api/sessions/:id', async function(req, res) {
   try {
-    await pool.query('DELETE FROM sessions WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM sessions WHERE id = $1 AND project_id IN (SELECT id FROM projects WHERE user_id = $2)', [req.params.id, req.userId]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -313,6 +410,7 @@ app.delete('/api/sessions/:id', async function(req, res) {
 
 app.get('/api/projects/:id/tractatus', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [req.params.id]);
     res.json(result.rows[0] ? result.rows[0].tractatus_tree || {} : {});
   } catch (err) {
@@ -322,6 +420,7 @@ app.get('/api/projects/:id/tractatus', async function(req, res) {
 
 app.get('/api/projects/:id/memory-hierarchy', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var memory = await loadTieredMemory(req.params.id);
     res.json(memory);
   } catch (err) {
@@ -331,6 +430,7 @@ app.get('/api/projects/:id/memory-hierarchy', async function(req, res) {
 
 app.get('/api/projects/:id/sessions', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query(
       'SELECT * FROM sessions WHERE project_id = $1 ORDER BY created_at DESC',
       [req.params.id]
@@ -343,6 +443,7 @@ app.get('/api/projects/:id/sessions', async function(req, res) {
 
 app.post('/api/projects/:id/sessions', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var title = req.body.title || 'New Session';
     var result = await pool.query(
       "INSERT INTO sessions (project_id, title, transcript) VALUES ($1, $2, '[]'::jsonb) RETURNING *",
@@ -356,6 +457,7 @@ app.post('/api/projects/:id/sessions', async function(req, res) {
 
 app.post('/api/sessions/:id/title', async function(req, res) {
   try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var title = req.body.title;
     await pool.query('UPDATE sessions SET title = $1 WHERE id = $2', [title, req.params.id]);
     res.json({ ok: true });
@@ -366,6 +468,7 @@ app.post('/api/sessions/:id/title', async function(req, res) {
 
 app.post('/api/projects/:id/name', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var name = req.body.name;
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
     await pool.query('UPDATE projects SET name = $1 WHERE id = $2', [name.trim(), req.params.id]);
@@ -377,6 +480,7 @@ app.post('/api/projects/:id/name', async function(req, res) {
 
 app.post('/api/sessions/:id/auto-title', async function(req, res) {
   try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var userMessage = req.body.userMessage || '';
     var assistantResponse = req.body.assistantResponse || '';
     var userExcerpt = userMessage.length > 500 ? userMessage.substring(0, 500) : userMessage;
@@ -400,6 +504,7 @@ app.post('/api/sessions/:id/auto-title', async function(req, res) {
 
 app.get('/api/sessions/:id/download', async function(req, res) {
   try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var sResult = await pool.query('SELECT s.title, s.transcript, p.name as project_name FROM sessions s LEFT JOIN projects p ON s.project_id = p.id WHERE s.id = $1', [req.params.id]);
     if (!sResult.rows[0]) return res.status(404).json({ error: 'Session not found' });
     var session = sResult.rows[0];
@@ -433,6 +538,7 @@ app.get('/api/sessions/:id/download', async function(req, res) {
 
 app.post('/api/sessions/:id/transcript', async function(req, res) {
   try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var messages = req.body.messages;
     var session = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [req.params.id]);
     var transcript = session.rows[0] ? (session.rows[0].transcript || []) : [];
@@ -461,6 +567,11 @@ app.post('/api/chat', async function(req, res) {
     var message = req.body.message;
     var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
+
+    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+      res.write('data: ' + JSON.stringify({ type: 'error', error: 'Forbidden' }) + '\n\n');
+      return res.end();
+    }
 
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
@@ -681,6 +792,7 @@ app.post('/api/chat', async function(req, res) {
 app.post('/api/report/scopes', async function(req, res) {
   try {
     var projectId = req.body.projectId;
+    if (!await verifyProjectOwnership(projectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var scopes = [{ value: 'project', label: 'Entire Project' }];
 
     var sessions = await pool.query(
@@ -724,6 +836,11 @@ app.post('/api/report/generate', async function(req, res) {
     var projectId = req.body.projectId;
     var scope = req.body.scope || 'project';
     var instructions = req.body.instructions || '';
+
+    if (!await verifyProjectOwnership(projectId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
 
     var projectResult = await pool.query('SELECT name, tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var projectName = projectResult.rows[0] ? projectResult.rows[0].name : 'Project';
@@ -996,6 +1113,11 @@ app.post('/api/tractatus/update', async function(req, res) {
     var userMessage = req.body.userMessage || '';
     var assistantResponse = req.body.assistantResponse || '';
 
+    if (!await verifyProjectOwnership(projectId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
+
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var existingTree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
 
@@ -1101,7 +1223,7 @@ app.post('/api/tractatus/update', async function(req, res) {
     if (nodeCount >= 500) {
       send({ type: 'status', message: 'Tree reached ' + nodeCount + ' nodes. Compressing to higher tier...' });
       try {
-        await compressTractatusTier(projectId, merged, nodeCount, send);
+        await compressTractatusTier(projectId, merged, nodeCount, send, req.userId);
       } catch (compErr) {
         console.error('Tractatus compression error:', compErr.message);
         send({ type: 'status', message: 'Compression deferred: ' + compErr.message });
@@ -1118,7 +1240,7 @@ app.post('/api/tractatus/update', async function(req, res) {
   }
 });
 
-async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn) {
+async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, userId) {
   console.log('[Tractatus] Compressing ' + nodeCount + ' nodes for project ' + projectId);
 
   var projectResult = await pool.query('SELECT name, tractatus_tier FROM projects WHERE id = $1', [projectId]);
@@ -1197,8 +1319,8 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn) {
       var dateStr = new Date().toISOString().split('T')[0];
       var summaryName = projectName + ' — Tier ' + summaryTier + ' Summary (' + dateStr + ')';
       await txClient.query(
-        'INSERT INTO projects (name, tractatus_tree, tractatus_tier, parent_project_id) VALUES ($1, $2, $3, $4)',
-        [summaryName, JSON.stringify(summaryTree), summaryTier, projectId]
+        'INSERT INTO projects (name, tractatus_tree, tractatus_tier, parent_project_id, user_id) VALUES ($1, $2, $3, $4, $5)',
+        [summaryName, JSON.stringify(summaryTree), summaryTier, projectId, userId]
       );
       console.log('[Tractatus] Created new Tier ' + summaryTier + ' summary project');
     }
@@ -1212,7 +1334,7 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn) {
 
     if (recurseTarget) {
       console.log('[Tractatus] Tier ' + summaryTier + ' also hit 500, recursing...');
-      await compressTractatusTier(recurseTarget.id, recurseTarget.tree, recurseTarget.count, sendFn);
+      await compressTractatusTier(recurseTarget.id, recurseTarget.tree, recurseTarget.count, sendFn, userId);
     }
   } catch (txErr) {
     await txClient.query('ROLLBACK');
@@ -1624,6 +1746,11 @@ app.post('/api/coherence', async function(req, res) {
     var doctype = req.body.doctype || 'paper';
     var fetchResearchFlag = req.body.fetchResearch || false;
 
+    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
+
     var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
 
@@ -1673,8 +1800,8 @@ app.post('/api/coherence', async function(req, res) {
     if (instructions) userRequest += '\n\nInstructions: ' + instructions.substring(0, 500);
 
     var jobResult = await pool.query(
-      "INSERT INTO document_jobs (session_id, original_text, status) VALUES ($1, $2, 'outline') RETURNING *",
-      [sessionId, userRequest]
+      "INSERT INTO document_jobs (session_id, original_text, status, user_id) VALUES ($1, $2, 'outline', $3) RETURNING *",
+      [sessionId, userRequest, req.userId]
     );
     var jobId = jobResult.rows[0].id;
 
@@ -2118,6 +2245,11 @@ app.post('/api/coherence/revise', async function(req, res) {
     var title = req.body.title || '';
     var doctype = req.body.doctype || 'paper';
 
+    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
+
     send({ type: 'status', message: 'Revising document...' });
 
     var treeContext = '';
@@ -2149,8 +2281,8 @@ app.post('/api/coherence/revise', async function(req, res) {
     var revWords = revResult.split(/\s+/).length;
 
     var jobResult = await pool.query(
-      "INSERT INTO document_jobs (session_id, original_text, status, final_output, global_skeleton) VALUES ($1, $2, 'complete', $3, $4) RETURNING *",
-      [sessionId, 'Revision: ' + revisionInstructions.substring(0, 200), revResult, 'Revised version']
+      "INSERT INTO document_jobs (session_id, original_text, status, final_output, global_skeleton, user_id) VALUES ($1, $2, 'complete', $3, $4, $5) RETURNING *",
+      [sessionId, 'Revision: ' + revisionInstructions.substring(0, 200), revResult, 'Revised version', req.userId]
     );
 
     send({ type: 'complete', totalWords: revWords, jobId: jobResult.rows[0].id });
@@ -2167,7 +2299,7 @@ app.get('/api/download/:jobId/:format', async function(req, res) {
   try {
     var jobId = req.params.jobId;
     var format = req.params.format;
-    var job = await pool.query('SELECT final_output FROM document_jobs WHERE id = $1', [jobId]);
+    var job = await pool.query('SELECT final_output FROM document_jobs WHERE id = $1 AND user_id = $2', [jobId, req.userId]);
     if (!job.rows[0]) return res.status(404).json({ error: 'Job not found' });
 
     var text = job.rows[0].final_output;
@@ -2213,6 +2345,7 @@ app.get('/api/download/:jobId/:format', async function(req, res) {
 
 app.get('/api/projects/:id/documents', async function(req, res) {
   try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query(
       "SELECT id, name, created_at, array_length(regexp_split_to_array(raw_content, '\\s+'), 1) as word_count FROM project_documents WHERE project_id = $1 ORDER BY created_at DESC",
       [req.params.id]
@@ -2225,7 +2358,7 @@ app.get('/api/projects/:id/documents', async function(req, res) {
 
 app.get('/api/documents/global', async function(req, res) {
   try {
-    var result = await pool.query("SELECT id, name, created_at, array_length(regexp_split_to_array(raw_content, '\\s+'), 1) as word_count FROM global_documents ORDER BY created_at DESC");
+    var result = await pool.query("SELECT id, name, created_at, array_length(regexp_split_to_array(raw_content, '\\s+'), 1) as word_count FROM global_documents WHERE user_id = $1 ORDER BY created_at DESC", [req.userId]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2234,7 +2367,7 @@ app.get('/api/documents/global', async function(req, res) {
 
 app.get('/api/documents/global/:id/download', async function(req, res) {
   try {
-    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [req.params.id]);
+    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     var doc = result.rows[0];
     var filename = doc.name.replace(/\.[^.]+$/, '') + '.txt';
@@ -2249,7 +2382,7 @@ app.get('/api/documents/global/:id/download', async function(req, res) {
 
 app.get('/api/documents/global/:id/content', async function(req, res) {
   try {
-    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [req.params.id]);
+    var result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ name: result.rows[0].name, raw_content: result.rows[0].raw_content || '' });
   } catch (err) {
@@ -2259,7 +2392,7 @@ app.get('/api/documents/global/:id/content', async function(req, res) {
 
 app.delete('/api/documents/global/:id', async function(req, res) {
   try {
-    var result = await pool.query('DELETE FROM global_documents WHERE id = $1 RETURNING id', [req.params.id]);
+    var result = await pool.query('DELETE FROM global_documents WHERE id = $1 AND user_id = $2 RETURNING id', [req.params.id, req.userId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ success: true });
   } catch (err) {
@@ -2269,6 +2402,7 @@ app.delete('/api/documents/global/:id', async function(req, res) {
 
 app.get('/api/projects/documents/:id/content', async function(req, res) {
   try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ name: result.rows[0].name, raw_content: result.rows[0].raw_content || '' });
@@ -2279,6 +2413,7 @@ app.get('/api/projects/documents/:id/content', async function(req, res) {
 
 app.get('/api/projects/documents/:id/download', async function(req, res) {
   try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     var doc = result.rows[0];
@@ -2294,6 +2429,7 @@ app.get('/api/projects/documents/:id/download', async function(req, res) {
 
 app.delete('/api/projects/documents/:id', async function(req, res) {
   try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('DELETE FROM project_documents WHERE id = $1 RETURNING id', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ success: true });
@@ -2304,8 +2440,10 @@ app.delete('/api/projects/documents/:id', async function(req, res) {
 
 app.post('/api/projects/documents/:id/move', async function(req, res) {
   try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var targetProjectId = req.body.targetProjectId;
     if (!targetProjectId) return res.status(400).json({ error: 'targetProjectId required' });
+    if (!await verifyProjectOwnership(targetProjectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('UPDATE project_documents SET project_id = $1 WHERE id = $2 RETURNING id, name', [targetProjectId, req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ success: true, name: result.rows[0].name });
@@ -2316,12 +2454,13 @@ app.post('/api/projects/documents/:id/move', async function(req, res) {
 
 app.post('/api/projects/documents/:id/copy-to-global', async function(req, res) {
   try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     var doc = result.rows[0];
     var gResult = await pool.query(
-      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
-      [doc.name, doc.raw_content]
+      'INSERT INTO global_documents (name, raw_content, user_id) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+      [doc.name, doc.raw_content, req.userId]
     );
     res.json(gResult.rows[0]);
   } catch (err) {
@@ -2335,10 +2474,11 @@ app.post('/api/documents/save-artifact', async function(req, res) {
     var text = req.body.text || '';
     var name = req.body.name || 'Document';
     var projectId = req.body.projectId || null;
+    if (projectId && !await verifyProjectOwnership(projectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     await client.query('BEGIN');
     var globalResult = await client.query(
-      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
-      [name, text]
+      'INSERT INTO global_documents (name, raw_content, user_id) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+      [name, text, req.userId]
     );
     var projectDocId = null;
     if (projectId) {
@@ -2465,13 +2605,14 @@ app.post('/api/documents/save-generated', async function(req, res) {
     var jobId = req.body.jobId;
     var name = req.body.name || 'Generated Document';
     var projectId = req.body.projectId || null;
-    var job = await client.query('SELECT final_output FROM document_jobs WHERE id = $1', [jobId]);
+    if (projectId && !await verifyProjectOwnership(projectId, req.userId)) { client.release(); return res.status(403).json({ error: 'Forbidden' }); }
+    var job = await client.query('SELECT final_output FROM document_jobs WHERE id = $1 AND user_id = $2', [jobId, req.userId]);
     if (!job.rows[0]) { client.release(); return res.status(404).json({ error: 'Job not found' }); }
     var content = job.rows[0].final_output || '';
     await client.query('BEGIN');
     var globalResult = await client.query(
-      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
-      [name, content]
+      'INSERT INTO global_documents (name, raw_content, user_id) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+      [name, content, req.userId]
     );
     var projectDocId = null;
     if (projectId) {
@@ -2496,6 +2637,7 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
     var file = req.file;
     var projectId = req.body.projectId;
     if (!file) return res.status(400).json({ error: 'No file provided' });
+    if (projectId && !await verifyProjectOwnership(projectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
 
     var ext = path.extname(file.originalname).toLowerCase();
     var rawContent = '';
@@ -2572,8 +2714,8 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
       res.json({ id: result.rows[0].id, name: result.rows[0].name, created_at: result.rows[0].created_at, raw_content: rawContent, scope: 'project' });
     } else {
       var gResult = await pool.query(
-        'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
-        [file.originalname, rawContent]
+        'INSERT INTO global_documents (name, raw_content, user_id) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+        [file.originalname, rawContent, req.userId]
       );
       console.log('Upload success: global doc, content length=' + rawContent.length);
       res.json({ id: gResult.rows[0].id, name: gResult.rows[0].name, created_at: gResult.rows[0].created_at, raw_content: rawContent, scope: 'global' });
@@ -2590,8 +2732,10 @@ app.post('/api/documents/insert', async function(req, res) {
     var scope = req.body.scope;
     var result;
     if (scope === 'global') {
+      if (!await verifyGlobalDocOwnership(docId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
       result = await pool.query('SELECT name, raw_content FROM global_documents WHERE id = $1', [docId]);
     } else {
+      if (!await verifyProjectDocOwnership(docId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
       result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [docId]);
     }
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
@@ -2605,6 +2749,8 @@ app.post('/api/sessions/:id/move', async function(req, res) {
   try {
     var sessionId = req.params.id;
     var targetProjectId = req.body.targetProjectId;
+    if (!await verifySessionOwnership(sessionId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    if (!await verifyProjectOwnership(targetProjectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     await pool.query('UPDATE sessions SET project_id = $1 WHERE id = $2', [targetProjectId, sessionId]);
     res.json({ success: true });
   } catch (err) {
@@ -2616,6 +2762,8 @@ app.post('/api/documents/copy-to-project', async function(req, res) {
   try {
     var docId = req.body.docId;
     var targetProjectId = req.body.targetProjectId;
+    if (!await verifyProjectDocOwnership(docId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    if (!await verifyProjectOwnership(targetProjectId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [docId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     var doc = result.rows[0];
@@ -2633,12 +2781,13 @@ app.post('/api/documents/copy-to-global', async function(req, res) {
   try {
     var docId = req.body.docId;
     var projectId = req.body.projectId;
+    if (!await verifyProjectDocOwnership(docId, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var result = await pool.query('SELECT name, raw_content FROM project_documents WHERE id = $1', [docId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     var doc = result.rows[0];
     var gResult = await pool.query(
-      'INSERT INTO global_documents (name, raw_content) VALUES ($1, $2) RETURNING id, name, created_at',
-      [doc.name, doc.raw_content]
+      'INSERT INTO global_documents (name, raw_content, user_id) VALUES ($1, $2, $3) RETURNING id, name, created_at',
+      [doc.name, doc.raw_content, req.userId]
     );
     res.json(gResult.rows[0]);
   } catch (err) {

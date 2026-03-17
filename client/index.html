@@ -11,7 +11,21 @@
   <link rel="stylesheet" href="/style.css?v=2">
 </head>
 <body>
-  <div id="app">
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <h1 class="login-title">LLM Plus</h1>
+      <p class="login-subtitle">Sign in to continue</p>
+      <div class="login-form" id="login-form">
+        <input type="text" id="auth-username" class="login-input" placeholder="Username" autocomplete="username" data-testid="auth-username">
+        <input type="password" id="auth-password" class="login-input" placeholder="Password" autocomplete="current-password" data-testid="auth-password">
+        <div class="login-error hidden" id="auth-error" data-testid="auth-error"></div>
+        <button class="login-btn" id="btn-login" data-testid="btn-login">Sign In</button>
+        <button class="login-btn login-btn-alt" id="btn-register" data-testid="btn-register">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h1 data-testid="app-title">LLM <span class="accent">Plus</span></h1>
@@ -43,6 +57,10 @@
         <div id="cc-status" class="cc-status hidden">
           <div class="cc-label"><strong>Coherence Engine</strong> <span id="cc-status-text">Idle</span></div>
           <div class="cc-bar"><div class="cc-fill" id="cc-fill"></div></div>
+        </div>
+        <div class="user-bar">
+          <span class="user-bar-name" id="user-display" data-testid="user-display"></span>
+          <button class="user-bar-logout" id="btn-logout" data-testid="btn-logout" title="Sign out">Sign Out</button>
         </div>
       </div>
     </aside>

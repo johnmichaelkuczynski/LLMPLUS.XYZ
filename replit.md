@@ -38,13 +38,24 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **Streaming UX**: All SSE endpoints include `X-Accel-Buffering: no` header. Chat endpoint sends immediate `status: thinking` event. Client shows animated bouncing dots while waiting for first token, then transitions to blinking cursor with streaming text.
 - **Context Management**: Chat messages truncated to 12K chars each, total context capped at 150K chars, cross-session context capped at 15K chars to prevent exceeding API token limits.
 
+## Multi-User Authentication
+- Username/password auth (no email), bcryptjs hashing, express-session with 30-day cookie
+- Login screen shown on load; on success, main app loads
+- JMK user: special case, any password works (password_hash is NULL)
+- All data (projects, global_documents, document_jobs) filtered by user_id from session
+- Sessions, project_documents, tractatus_archive scoped through their project FK
+- Auth routes: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/me
+- requireAuth middleware protects all /api/* except /auth/*
+- New users start with empty state; complete data isolation between users
+
 ## Database Tables
-projects (with tractatus_tier, parent_project_id for memory hierarchy), sessions, project_documents, global_documents, document_jobs, document_chunks, tractatus_archive
+users (id UUID, username, password_hash nullable), projects (with user_id FK, tractatus_tier, parent_project_id for memory hierarchy), sessions, project_documents, global_documents (with user_id FK), document_jobs (with user_id FK), document_chunks, tractatus_archive
 
 ## Environment Variables
 - ANTHROPIC_API_KEY: Claude API key
 - DATABASE_URL: Neon PostgreSQL connection string
 - GOOGLE_CLOUD_VISION_API_KEY: Google Cloud Vision API key for image OCR
+- SESSION_SECRET: Express session secret
 - PORT: Server port (default 5000)
 
 ## Critical Rules
