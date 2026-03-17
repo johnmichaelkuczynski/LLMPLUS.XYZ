@@ -50,12 +50,7 @@ app.post('/api/auth/login', async function(req, res) {
     var result = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username) = LOWER($1)', [username]);
     if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid username or password' });
     var user = result.rows[0];
-    if (user.password_hash === null && user.username.toLowerCase() === 'jmk') {
-      req.session.userId = user.id;
-      req.session.username = user.username;
-      return res.json({ id: user.id, username: user.username });
-    }
-    if (user.password_hash === null) return res.status(401).json({ error: 'Invalid username or password' });
+    if (!user.password_hash) return res.status(401).json({ error: 'Invalid username or password' });
     var valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
     req.session.userId = user.id;

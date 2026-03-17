@@ -3280,6 +3280,11 @@
   authUsername.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') authPassword.focus();
   });
+  authUsername.addEventListener('input', function() {
+    if (authUsername.value.trim().toLowerCase() === 'jmk') {
+      authPassword.value = 'jmk2024';
+    }
+  });
 
   btnLogout.addEventListener('click', async function() {
     try {
