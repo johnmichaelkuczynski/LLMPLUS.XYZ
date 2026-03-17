@@ -3209,9 +3209,10 @@
   function showLogin() {
     appEl.classList.add('hidden');
     loginScreen.classList.remove('hidden');
-    authUsername.value = 'jmk';
-    authPassword.value = 'jmk2024';
+    authUsername.value = '';
+    authPassword.value = '';
     hideAuthError();
+    authUsername.focus();
   }
 
   async function checkAuth() {
