@@ -2415,6 +2415,23 @@
       sendMessage();
     }
   });
+  els.chatInput.addEventListener('paste', function(e) {
+    var items = (e.clipboardData || {}).items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image/') === 0) {
+        e.preventDefault();
+        var blob = items[i].getAsFile();
+        if (!blob) continue;
+        var ext = blob.type.split('/')[1] || 'png';
+        if (ext === 'jpeg') ext = 'jpg';
+        var fname = 'pasted-image-' + Date.now() + '.' + ext;
+        var file = new File([blob], fname, { type: blob.type });
+        uploadFile(file);
+        break;
+      }
+    }
+  });
   els.btnSend.addEventListener('click', sendMessage);
 
   document.querySelectorAll('.rl-btn').forEach(function(btn) {
