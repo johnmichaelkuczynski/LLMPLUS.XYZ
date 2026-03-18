@@ -83,11 +83,15 @@
       <div class="input-area">
         <div id="attached-files" class="attached-files" data-testid="attached-files"></div>
         <div class="response-length-bar" data-testid="response-length-bar">
-          <span class="rl-label">Response:</span>
+          <span class="rl-label">Length:</span>
           <button class="rl-btn active" data-length="concise" data-testid="rl-concise" title="Brief, to-the-point answers">Concise</button>
           <button class="rl-btn" data-length="normal" data-testid="rl-normal" title="Balanced responses">Normal</button>
           <button class="rl-btn" data-length="detailed" data-testid="rl-detailed" title="Thorough, in-depth responses">Detailed</button>
           <button class="rl-btn" data-length="exhaustive" data-testid="rl-exhaustive" title="Maximum depth, use all available tokens">Exhaustive</button>
+          <span class="rl-divider"></span>
+          <span class="rl-label">Format:</span>
+          <button class="rf-btn active" data-format="prose" data-testid="rf-prose" title="Full developed prose paragraphs">Prose</button>
+          <button class="rf-btn" data-format="bullets" data-testid="rf-bullets" title="Bullet point lists">Bullets</button>
         </div>
         <div class="input-box" id="input-box">
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>

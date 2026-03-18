@@ -7,7 +7,8 @@
     streaming: false,
     projectDocs: [],
     pendingAttachments: [],
-    responseLength: 'concise'
+    responseLength: 'concise',
+    responseFormat: 'prose'
   };
 
   var els = {
@@ -1177,7 +1178,8 @@
           sessionId: state.currentSession.id,
           projectId: state.currentProject.id,
           message: fullMessage,
-          responseLength: state.responseLength
+          responseLength: state.responseLength,
+          responseFormat: state.responseFormat
         })
       });
 
@@ -2439,6 +2441,14 @@
       document.querySelectorAll('.rl-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.responseLength = btn.getAttribute('data-length');
+    });
+  });
+
+  document.querySelectorAll('.rf-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rf-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.responseFormat = btn.getAttribute('data-format');
     });
   });
 

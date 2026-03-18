@@ -674,6 +674,40 @@ html, body {
   border-color: #2563eb;
 }
 
+.rl-divider {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: #d1d5db;
+  margin: 0 6px;
+  vertical-align: middle;
+}
+
+.rf-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.rf-btn:hover {
+  border-color: #7c3aed;
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.rf-btn.active {
+  background: #7c3aed;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
 .attached-files {
   display: flex;
   flex-wrap: wrap;

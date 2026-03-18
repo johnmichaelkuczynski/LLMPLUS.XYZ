@@ -310,7 +310,7 @@ function extractSectionOutline(text) {
   return outline.join('\n') || '(no clear section structure detected)';
 }
 
-function buildSystemPrompt(tree, tieredMemory, responseLength) {
+function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
 
   if (responseLength === 'concise') {
@@ -345,6 +345,20 @@ function buildSystemPrompt(tree, tieredMemory, responseLength) {
     prompt += '\n- If the user specifies a word count, you MUST write that many words. The system will automatically request continuation if you run out of tokens.';
     prompt += '\n- Use proper formatting for the document type.';
     prompt += '\n- Never cut yourself short. Use ALL available tokens before stopping.';
+  }
+
+  if (responseFormat === 'prose') {
+    prompt += '\n\nRESPONSE FORMAT: PROSE. Write in full, developed paragraphs.';
+    prompt += '\n- Do NOT use bullet points, numbered lists, or dash lists unless the user explicitly asks for a list.';
+    prompt += '\n- Write flowing, connected prose with proper paragraph structure.';
+    prompt += '\n- Use topic sentences, transitions, and developed arguments.';
+    prompt += '\n- Bold or italic emphasis is fine, but structure your response as paragraphs, not lists.';
+    prompt += '\n- Headings/subheadings are acceptable for organizing long responses, but the content under each heading must be prose paragraphs, not bullets.';
+  } else if (responseFormat === 'bullets') {
+    prompt += '\n\nRESPONSE FORMAT: BULLETS. Use bullet points and structured lists.';
+    prompt += '\n- Organize information as bullet points, numbered lists, or hierarchical outlines.';
+    prompt += '\n- Use concise, scannable formatting.';
+    prompt += '\n- Group related points under clear headings.';
   }
 
   prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
@@ -567,6 +581,8 @@ app.post('/api/chat', async function(req, res) {
     var message = req.body.message;
     var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
+    var validFormats = ['prose', 'bullets'];
+    var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
 
     if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
       res.write('data: ' + JSON.stringify({ type: 'error', error: 'Forbidden' }) + '\n\n');
@@ -606,7 +622,7 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength);
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat);
     if (crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nThe user has had other conversations in this project. Here are excerpts so you can maintain continuity:\n' + crossSessionContext;
     }
