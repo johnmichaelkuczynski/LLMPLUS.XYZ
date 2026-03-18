@@ -3281,8 +3281,11 @@
     if (e.key === 'Enter') authPassword.focus();
   });
   authUsername.addEventListener('input', function() {
-    if (authUsername.value.trim().toLowerCase() === 'jmk') {
-      authPassword.value = 'jmk2024';
+    var val = authUsername.value.trim().toLowerCase();
+    if (val === 'jmk') {
+      authPassword.value = 'autologin';
+    } else if (authPassword.value === 'autologin') {
+      authPassword.value = '';
     }
   });
 
