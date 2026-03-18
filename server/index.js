@@ -314,17 +314,20 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat) {
   var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
 
   if (responseLength === 'concise') {
-    prompt += '\n\nRESPONSE LENGTH: CONCISE. The user wants SHORT, direct answers.';
-    prompt += '\n- Answer in as few words as possible while being accurate.';
-    prompt += '\n- For factual questions, give the answer directly — no preamble, no elaboration unless asked.';
-    prompt += '\n- For opinions or analysis, keep to 2-4 sentences.';
-    prompt += '\n- Do NOT write essays, lists of considerations, or lengthy explanations unless explicitly asked.';
-    prompt += '\n- If a one-word or one-sentence answer is sufficient, use it.';
-    prompt += '\n- Skip pleasantries like "Great question!" or "That\'s an interesting topic."';
+    prompt += '\n\n**CRITICAL — RESPONSE LENGTH: CONCISE.** The user has set the length dial to CONCISE. This is the #1 priority instruction.';
+    prompt += '\n- Give the SHORTEST possible answer that is accurate. One word, one number, one sentence — whatever is the minimum.';
+    prompt += '\n- "What is 4 plus 2?" → "6" — nothing more.';
+    prompt += '\n- For factual questions: answer ONLY with the fact. No context, no explanation, no caveats, no preamble.';
+    prompt += '\n- For opinions or analysis: 1-3 sentences maximum.';
+    prompt += '\n- Do NOT write paragraphs. Do NOT make lists. Do NOT elaborate. Do NOT add disclaimers.';
+    prompt += '\n- Do NOT start with "Great question" or any pleasantry. Just answer.';
+    prompt += '\n- If you catch yourself writing more than 3 sentences for a simple question, STOP and delete the extra.';
+    prompt += '\n- VIOLATING THIS BY WRITING LONG RESPONSES IS A CRITICAL FAILURE.';
   } else if (responseLength === 'normal') {
-    prompt += '\n\nRESPONSE LENGTH: NORMAL. Give balanced, well-structured responses.';
-    prompt += '\n- Answer questions with enough detail to be helpful but do not over-explain.';
-    prompt += '\n- A few paragraphs for most questions. Use lists or structure when it aids clarity.';
+    prompt += '\n\nRESPONSE LENGTH: NORMAL. Give balanced, moderate-length responses.';
+    prompt += '\n- A few paragraphs for most questions. Not too short, not too long.';
+    prompt += '\n- For simple factual questions, still keep it brief — a sentence or two.';
+    prompt += '\n- Only elaborate when the topic genuinely requires it.';
     prompt += '\n- When writing documents, produce a complete but moderate-length version.';
   } else if (responseLength === 'detailed') {
     prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses.';
@@ -649,7 +652,7 @@ app.post('/api/chat', async function(req, res) {
 
     var requestedWords = extractRequestedWordCount(userContent);
     var fullText = '';
-    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
+    var lengthMaxTokens = responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 4096 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     var maxContinuations = responseLength === 'concise' ? 0 :
