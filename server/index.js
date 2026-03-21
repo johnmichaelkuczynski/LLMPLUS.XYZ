@@ -650,7 +650,13 @@ app.post('/api/chat', async function(req, res) {
     }
     msgs.push({ role: 'user', content: userContent });
 
-    var requestedWords = extractRequestedWordCount(userContent);
+    var userOwnWords = message;
+    var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
+    if (attachIdx === -1) attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
+    if (attachIdx > 0) userOwnWords = userOwnWords.substring(0, attachIdx);
+    if (userOwnWords.length > 2000) userOwnWords = userOwnWords.substring(0, 2000);
+
+    var requestedWords = extractRequestedWordCount(userOwnWords);
     var fullText = '';
     var lengthMaxTokens = responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 4096 :
@@ -721,7 +727,8 @@ app.post('/api/chat', async function(req, res) {
       return text.split(/\s+/).filter(function(w) { return w.length > 0; }).length;
     }
 
-    console.log('[Chat] responseLength=' + responseLength + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongformRequest(userContent));
+    var isLongform = (responseLength === 'detailed' || responseLength === 'exhaustive') && isLongformRequest(userOwnWords);
+    console.log('[Chat] responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
     var lastResult = await streamOneCall(msgs);
     fullText = lastResult.segmentText;
     continuationCount = 1;
@@ -737,7 +744,7 @@ app.post('/api/chat', async function(req, res) {
       } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.75) {
         needsMore = true;
         console.log('[Chat] continuing: end_turn but only ' + currentWords + '/' + requestedWords + ' words');
-      } else if (lastResult.stopReason === 'end_turn' && requestedWords === 0 && isLongformRequest(userContent) && currentWords < 3000 && continuationCount === 1) {
+      } else if (lastResult.stopReason === 'end_turn' && requestedWords === 0 && isLongform && currentWords < 3000 && continuationCount === 1) {
         needsMore = true;
         console.log('[Chat] continuing: longform request with only ' + currentWords + ' words');
       } else {
