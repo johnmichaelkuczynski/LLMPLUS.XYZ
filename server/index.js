@@ -712,6 +712,12 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
+    var userOwnWords = message || '';
+    var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
+    if (attachIdx === -1) attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
+    if (attachIdx > 0) userOwnWords = userOwnWords.substring(0, attachIdx);
+    if (userOwnWords.length > 2000) userOwnWords = userOwnWords.substring(0, 2000);
+
     var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
     console.log('[Chat] projectSpecific=' + includeProjectContext);
 
@@ -739,12 +745,6 @@ app.post('/api/chat', async function(req, res) {
       userContent = userContent.substring(0, 80000) + '\n\n[...content truncated for context length...]';
     }
     msgs.push({ role: 'user', content: userContent });
-
-    var userOwnWords = message;
-    var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
-    if (attachIdx === -1) attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
-    if (attachIdx > 0) userOwnWords = userOwnWords.substring(0, attachIdx);
-    if (userOwnWords.length > 2000) userOwnWords = userOwnWords.substring(0, 2000);
 
     var requestedWords = extractRequestedWordCount(userOwnWords);
     var fullText = '';
