@@ -637,8 +637,9 @@ html, body {
 .response-length-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 0 16px 8px;
+  padding: 4px 16px 8px;
 }
 
 .rl-label {

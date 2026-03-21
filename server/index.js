@@ -2783,8 +2783,11 @@ app.post('/api/documents/upload', upload.single('file'), async function(req, res
       var mammothResult = await mammoth.extractRawText({ buffer: file.buffer });
       rawContent = mammothResult.value;
     } else if (['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1) {
-      var visionKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
-      if (!visionKey) return res.status(500).json({ error: 'Google Cloud Vision API key not configured' });
+      var visionKey = process.env.GOOGLE_CLOUD_VISION_API_KEY || '';
+      if (!visionKey) {
+        console.error('GOOGLE_CLOUD_VISION_API_KEY not found in env. Available keys:', Object.keys(process.env).filter(k => k.includes('GOOGLE')).join(', '));
+        return res.status(500).json({ error: 'Google Cloud Vision API key not configured' });
+      }
       var base64Image = file.buffer.toString('base64');
       var visionResp = await fetch('https://vision.googleapis.com/v1/images:annotate?key=' + visionKey, {
         method: 'POST',
