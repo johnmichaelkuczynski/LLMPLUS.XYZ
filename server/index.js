@@ -345,8 +345,54 @@ function extractSectionOutline(text) {
   return outline.join('\n') || '(no clear section structure detected)';
 }
 
-function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat) {
-  var prompt = 'You are Claude, an AI assistant in LLM Plus. Be helpful, thorough, and precise.';
+function isProjectSpecificQuery(userMessage, tree, transcript) {
+  var msg = userMessage.toLowerCase();
+
+  if (msg.indexOf('\n\n---\n[attached document:') !== -1 || msg.indexOf('\n\n---\n[document:') !== -1) return true;
+
+  var projectKeywords = [
+    'this project', 'this chat', 'our conversation', 'we discussed', 'you said',
+    'earlier you', 'you mentioned', 'the document', 'the file', 'the case',
+    'the trust', 'the motion', 'the filing', 'the complaint', 'the brief',
+    'the tractatus', 'the tree', 'the memory', 'update the tree',
+    'based on', 'according to', 'referring to', 'as noted', 'as discussed',
+    'summarize the', 'analyze the', 'review the', 'what did we',
+    'my document', 'my file', 'my case', 'our case'
+  ];
+  for (var i = 0; i < projectKeywords.length; i++) {
+    if (msg.indexOf(projectKeywords[i]) !== -1) return true;
+  }
+
+  if (tree && Object.keys(tree).length > 0) {
+    var treeValues = Object.values(tree);
+    for (var t = 0; t < treeValues.length; t++) {
+      var val = (treeValues[t] || '').toLowerCase();
+      if (val.length < 5) continue;
+      var keyTerms = val.split(/\s+/).filter(function(w) { return w.length > 5; }).slice(0, 3);
+      for (var k = 0; k < keyTerms.length; k++) {
+        if (msg.indexOf(keyTerms[k].toLowerCase()) !== -1) return true;
+      }
+    }
+  }
+
+  if (transcript && transcript.length > 0) {
+    var lastFew = transcript.slice(-4);
+    for (var r = 0; r < lastFew.length; r++) {
+      if (lastFew[r].role === 'assistant') {
+        var prev = (lastFew[r].content || '').toLowerCase().substring(0, 500);
+        var followUpPatterns = ['tell me more', 'elaborate', 'expand on', 'what about', 'and the', 'continue', 'go on', 'what else', 'why is that', 'how does that', 'can you explain'];
+        for (var f = 0; f < followUpPatterns.length; f++) {
+          if (msg.indexOf(followUpPatterns[f]) !== -1) return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext) {
+  var prompt = 'You are an AI assistant in LLM Plus, a scholarly research and analysis platform. The user is an academic or professional researcher. Provide expert-level, intellectually rigorous responses. Be helpful, thorough, and precise.';
 
   if (responseLength === 'concise') {
     prompt += '\n\n**CRITICAL — RESPONSE LENGTH: CONCISE.** The user has set the length dial to CONCISE. This is the #1 priority instruction.';
@@ -399,23 +445,27 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat) {
     prompt += '\n- Group related points under clear headings.';
   }
 
-  prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
+  if (includeProjectContext !== false) {
+    prompt += '\n\nTractatus Tree Definition: A numbered hierarchical outline stored per-project. Keys are strings like "1.0", "1.1", "1.1.1", "2.0". Values are summary strings. Tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:. Follow this format strictly whenever updating the tree.';
 
-  if (tieredMemory && tieredMemory.tiers && tieredMemory.tiers.length > 0) {
-    prompt += '\n\n## Project Memory (Tiered Tractatus)';
-    for (var t = 0; t < tieredMemory.tiers.length; t++) {
-      var tier = tieredMemory.tiers[t];
-      var tierLabel = tier.tier === 1 ? 'Tier 1 — recent, high resolution' :
-                      tier.tier === 2 ? 'Tier 2 — summary, medium resolution' :
-                      tier.tier === 3 ? 'Tier 3 — archive, lower resolution' :
-                      'Tier ' + tier.tier + ' — deep archive';
-      prompt += '\n\n### ' + tierLabel + ' (' + tier.nodes + ' nodes):\n';
-      var treeStr = JSON.stringify(tier.tree, null, 1);
-      var maxLen = tier.tier === 1 ? 12000 : tier.tier === 2 ? 6000 : 3000;
-      prompt += treeStr.length > maxLen ? treeStr.substring(0, maxLen) + '\n[...truncated...]' : treeStr;
+    if (tieredMemory && tieredMemory.tiers && tieredMemory.tiers.length > 0) {
+      prompt += '\n\n## Project Memory (Tiered Tractatus)';
+      for (var t = 0; t < tieredMemory.tiers.length; t++) {
+        var tier = tieredMemory.tiers[t];
+        var tierLabel = tier.tier === 1 ? 'Tier 1 — recent, high resolution' :
+                        tier.tier === 2 ? 'Tier 2 — summary, medium resolution' :
+                        tier.tier === 3 ? 'Tier 3 — archive, lower resolution' :
+                        'Tier ' + tier.tier + ' — deep archive';
+        prompt += '\n\n### ' + tierLabel + ' (' + tier.nodes + ' nodes):\n';
+        var treeStr = JSON.stringify(tier.tree, null, 1);
+        var maxLen = tier.tier === 1 ? 12000 : tier.tier === 2 ? 6000 : 3000;
+        prompt += treeStr.length > maxLen ? treeStr.substring(0, maxLen) + '\n[...truncated...]' : treeStr;
+      }
+    } else if (tree && Object.keys(tree).length > 0) {
+      prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
     }
-  } else if (tree && Object.keys(tree).length > 0) {
-    prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
+  } else {
+    prompt += '\n\nThis appears to be a general knowledge question not specific to the current project. Answer from your general knowledge as a scholarly expert. Do NOT reference project-specific context unless the user explicitly asks about it.';
   }
   return prompt;
 }
@@ -662,8 +712,11 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat);
-    if (crossSessionContext) {
+    var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
+    console.log('[Chat] projectSpecific=' + includeProjectContext);
+
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext);
+    if (includeProjectContext && crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nThe user has had other conversations in this project. Here are excerpts so you can maintain continuity:\n' + crossSessionContext;
     }
 
