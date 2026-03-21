@@ -8,7 +8,8 @@
     projectDocs: [],
     pendingAttachments: [],
     responseLength: 'concise',
-    responseFormat: 'prose'
+    responseFormat: 'prose',
+    model: 'claude'
   };
 
   var els = {
@@ -1179,7 +1180,8 @@
           projectId: state.currentProject.id,
           message: fullMessage,
           responseLength: state.responseLength,
-          responseFormat: state.responseFormat
+          responseFormat: state.responseFormat,
+          model: state.model
         })
       });
 
@@ -2449,6 +2451,15 @@
       document.querySelectorAll('.rf-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.responseFormat = btn.getAttribute('data-format');
+    });
+  });
+
+  document.querySelectorAll('.rm-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rm-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.model = btn.getAttribute('data-model');
+      els.chatInput.placeholder = state.model === 'chatgpt' ? 'Message ChatGPT...' : 'Message Claude...';
     });
   });
 

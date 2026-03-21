@@ -114,7 +114,9 @@ async function verifyGlobalDocOwnership(docId, userId) {
 }
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const OPENAI_MODEL = 'gpt-4o';
 const MAX_TOKENS = 16384;
 
 const SCHEMA_SQL = `
@@ -225,6 +227,39 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
   if (streaming) return response;
   var data = await response.json();
   return data.content[0].text;
+}
+
+async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
+  var apiMessages = [];
+  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
+  for (var i = 0; i < messages.length; i++) {
+    apiMessages.push({ role: messages[i].role, content: messages[i].content });
+  }
+
+  var body = {
+    model: OPENAI_MODEL,
+    max_tokens: maxTokens || MAX_TOKENS,
+    messages: apiMessages,
+    stream: !!streaming
+  };
+
+  var response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + OPENAI_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    var errText = await response.text();
+    throw new Error('OpenAI API error ' + response.status + ': ' + errText);
+  }
+
+  if (streaming) return response;
+  var data = await response.json();
+  return data.choices[0].message.content;
 }
 
 function extractRequestedWordCount(text) {
@@ -586,6 +621,8 @@ app.post('/api/chat', async function(req, res) {
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
     var validFormats = ['prose', 'bullets'];
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
+    var validModels = ['claude', 'chatgpt'];
+    var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
     if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
       res.write('data: ' + JSON.stringify({ type: 'error', error: 'Forbidden' }) + '\n\n');
@@ -672,6 +709,9 @@ app.post('/api/chat', async function(req, res) {
 
     async function streamOneCall(callMsgs) {
       try {
+        if (modelChoice === 'chatgpt') {
+          return await streamOpenAICall(callMsgs);
+        }
         var anthropicRes = await callClaude(callMsgs, systemPrompt, true, lengthMaxTokens);
         if (!anthropicRes.ok) {
           var errBody = await anthropicRes.text();
@@ -717,6 +757,57 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
+    async function streamOpenAICall(callMsgs) {
+      try {
+        var openaiRes = await callOpenAI(callMsgs, systemPrompt, true, lengthMaxTokens);
+        if (!openaiRes.ok) {
+          var errBody = await openaiRes.text();
+          console.error('[streamOpenAI] API error: ' + openaiRes.status + ' ' + errBody.substring(0, 500));
+          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error: OpenAI API returned ' + openaiRes.status + ']\n\n' }) + '\n\n');
+          return { segmentText: '', stopReason: 'error' };
+        }
+        var reader = openaiRes.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        var segmentText = '';
+        var stopReason = 'end_turn';
+
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var oLines = buffer.split('\n');
+          buffer = oLines.pop();
+          for (var j = 0; j < oLines.length; j++) {
+            var line = oLines[j];
+            if (line.startsWith('data: ')) {
+              var data = line.slice(6).trim();
+              if (!data || data === '[DONE]') continue;
+              try {
+                var parsed = JSON.parse(data);
+                if (parsed.choices && parsed.choices[0]) {
+                  var delta = parsed.choices[0].delta;
+                  if (delta && delta.content) {
+                    segmentText += delta.content;
+                    res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
+                  }
+                  if (parsed.choices[0].finish_reason === 'length') {
+                    stopReason = 'max_tokens';
+                  } else if (parsed.choices[0].finish_reason === 'stop') {
+                    stopReason = 'end_turn';
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        return { segmentText: segmentText, stopReason: stopReason };
+      } catch (err) {
+        console.error('[streamOpenAI] Exception:', err.message);
+        return { segmentText: '', stopReason: 'error' };
+      }
+    }
+
     function getLastNWords(text, n) {
       var words = text.split(/\s+/);
       if (words.length <= n) return text;
@@ -728,7 +819,7 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var isLongform = (responseLength === 'detailed' || responseLength === 'exhaustive') && isLongformRequest(userOwnWords);
-    console.log('[Chat] responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
+    console.log('[Chat] model=' + modelChoice + ' responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
     var lastResult = await streamOneCall(msgs);
     fullText = lastResult.segmentText;
     continuationCount = 1;

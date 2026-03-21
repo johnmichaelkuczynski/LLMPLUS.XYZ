@@ -708,6 +708,31 @@ html, body {
   border-color: #7c3aed;
 }
 
+.rm-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.rm-btn:hover {
+  border-color: #059669;
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.rm-btn.active {
+  background: #059669;
+  color: #fff;
+  border-color: #059669;
+}
+
 .attached-files {
   display: flex;
   flex-wrap: wrap;
