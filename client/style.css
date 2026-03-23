@@ -923,6 +923,15 @@ html, body {
   cursor: not-allowed;
 }
 
+.send-btn.stop-mode {
+  background: #dc2626;
+  font-size: 12px;
+}
+
+.send-btn.stop-mode:hover {
+  background: #b91c1c;
+}
+
 .file-input {
   display: none;
 }

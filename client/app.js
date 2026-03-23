@@ -997,6 +997,20 @@
         if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
         var c = textEl.querySelector('.cursor-blink');
         if (c) c.remove();
+        var ti2 = textEl.querySelector('.thinking-indicator');
+        if (ti2) ti2.remove();
+        if (err && err.name === 'AbortError') {
+          if (fullText) {
+            textEl.innerHTML = fmt(fullText) + '\n<em style="color:#9ca3af">[Stopped by user]</em>';
+          } else {
+            textEl.innerHTML = '<em style="color:#9ca3af">[Stopped]</em>';
+          }
+          state.streaming = false;
+          state.abortController = null;
+          els.btnSend.innerHTML = '&#9654;';
+          els.btnSend.classList.remove('stop-mode');
+          els.btnSend.disabled = false;
+        }
         if (onDone) onDone(fullText);
       });
     }
@@ -1135,7 +1149,12 @@
   }
 
   async function sendMessage() {
-    if (state.streaming) return;
+    if (state.streaming) {
+      if (state.abortController) {
+        state.abortController.abort();
+      }
+      return;
+    }
     var text = els.chatInput.value.trim();
     var hasAttachments = state.pendingAttachments.length > 0 && state.pendingAttachments.some(function(a) { return !a.uploading; });
     if (!text && !hasAttachments) return;
@@ -1193,7 +1212,10 @@
     state.currentSession.transcript.push({ role: 'user', content: displayText });
 
     state.streaming = true;
-    els.btnSend.disabled = true;
+    state.abortController = new AbortController();
+    els.btnSend.innerHTML = '&#9724;';
+    els.btnSend.classList.add('stop-mode');
+    els.btnSend.disabled = false;
 
     try {
       var textEl = startStreaming();
@@ -1207,7 +1229,8 @@
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
           model: state.model
-        })
+        }),
+        signal: state.abortController.signal
       });
 
       streamSSE(res, textEl, function(fullText) {
@@ -1216,6 +1239,9 @@
           sendingSession.transcript.push({ role: 'assistant', content: fullText });
         }
         state.streaming = false;
+        state.abortController = null;
+        els.btnSend.innerHTML = '&#9654;';
+        els.btnSend.classList.remove('stop-mode');
         els.btnSend.disabled = false;
 
         if (needsAutoTitle && sendingSession) {
@@ -1232,8 +1258,23 @@
         }
       });
     } catch (err) {
-      notify('Message failed: ' + err.message, 'error');
+      if (err.name === 'AbortError') {
+        var c = textEl.querySelector('.cursor-blink');
+        if (c) c.remove();
+        var ti = textEl.querySelector('.thinking-indicator');
+        if (ti) ti.remove();
+        if (textEl.textContent.trim() === '') {
+          textEl.innerHTML = '<em style="color:#9ca3af">[Stopped]</em>';
+        } else {
+          textEl.innerHTML = fmt(textEl.textContent) + '\n<em style="color:#9ca3af">[Stopped by user]</em>';
+        }
+      } else {
+        notify('Message failed: ' + err.message, 'error');
+      }
       state.streaming = false;
+      state.abortController = null;
+      els.btnSend.innerHTML = '&#9654;';
+      els.btnSend.classList.remove('stop-mode');
       els.btnSend.disabled = false;
     }
   }
