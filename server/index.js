@@ -2984,6 +2984,9 @@ var PORT = parseInt(process.env.PORT || '5000', 10);
 initDB().then(function() {
   app.listen(PORT, '0.0.0.0', function() {
     console.log('LLM Plus server running on port ' + PORT);
+    console.log('API Keys: ANTHROPIC=' + (process.env.ANTHROPIC_API_KEY ? 'SET' : 'MISSING') +
+      ' OPENAI=' + (process.env.OPENAI_API_KEY ? 'SET' : 'MISSING') +
+      ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
   });
 }).catch(function(err) {
   console.error('Failed to initialize database:', err);
