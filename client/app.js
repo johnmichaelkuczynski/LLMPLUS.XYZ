@@ -735,8 +735,9 @@
       bodyHtml = '<div class="msg-text">' + fmt(content) + '</div>';
     }
 
+    var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button>' : '';
     div.innerHTML = '<div class="msg-avatar">' + avatar + '</div>' +
-      '<div class="msg-body"><div class="msg-role">' + label + '</div>' + bodyHtml + '</div>';
+      '<div class="msg-body"><div class="msg-role">' + label + copyBtnHtml + '</div>' + bodyHtml + '</div>';
 
     if (isLarge) {
       var btn = div.querySelector('.btn-expand');
@@ -755,6 +756,20 @@
       viewBtn.addEventListener('click', function() { showArtifact(content, artTitle); });
       var textContainer = div.querySelector('.msg-text') || div.querySelector('.msg-body');
       textContainer.appendChild(viewBtn);
+    }
+
+    if (role === 'assistant') {
+      var copyBtn = div.querySelector('.msg-copy-btn');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', function() {
+          var textEl = div.querySelector('.msg-text');
+          var rawText = textEl ? textEl.innerText : content;
+          navigator.clipboard.writeText(rawText).then(function() {
+            copyBtn.textContent = '\u2705';
+            setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
+          });
+        });
+      }
     }
 
     els.messages.appendChild(div);
@@ -870,9 +885,19 @@
     els.welcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message assistant';
+    var modelLabel = state.model === 'chatgpt' ? 'ChatGPT' : 'Claude';
     div.innerHTML = '<div class="msg-avatar">C</div>' +
-      '<div class="msg-body"><div class="msg-role">Claude</div>' +
+      '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button></div>' +
       '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
+    var copyBtn = div.querySelector('.msg-copy-btn');
+    copyBtn.addEventListener('click', function() {
+      var textEl = div.querySelector('.msg-text');
+      var rawText = textEl ? textEl.innerText : '';
+      navigator.clipboard.writeText(rawText).then(function() {
+        copyBtn.textContent = '\u2705';
+        setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
+      });
+    });
     els.messages.appendChild(div);
     scrollBottom();
     return div.querySelector('.msg-text');

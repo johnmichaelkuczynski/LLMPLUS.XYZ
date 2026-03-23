@@ -418,6 +418,27 @@ html, body {
   font-weight: 600;
   margin-bottom: 4px;
   color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msg-copy-btn {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 1px 5px;
+  line-height: 1;
+  color: #9ca3af;
+  transition: all 0.15s;
+}
+
+.msg-copy-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
 }
 
 .msg-text {
