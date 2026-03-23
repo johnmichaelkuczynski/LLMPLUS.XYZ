@@ -357,7 +357,14 @@ function isProjectSpecificQuery(userMessage, tree, transcript) {
     'the tractatus', 'the tree', 'the memory', 'update the tree',
     'based on', 'according to', 'referring to', 'as noted', 'as discussed',
     'summarize the', 'analyze the', 'review the', 'what did we',
-    'my document', 'my file', 'my case', 'our case'
+    'my document', 'my file', 'my case', 'our case',
+    'last session', 'last chat', 'last conversation', 'previous session',
+    'previous chat', 'previous conversation', 'do you remember',
+    'we talked about', 'we spoke about', 'we were discussing',
+    'you told me', 'you explained', 'you wrote', 'you analyzed',
+    'you suggested', 'you recommended', 'your analysis', 'your summary',
+    'remember when', 'recall', 'from before', 'from earlier',
+    'in our last', 'in the last', 'last time'
   ];
   for (var i = 0; i < projectKeywords.length; i++) {
     if (msg.indexOf(projectKeywords[i]) !== -1) return true;
@@ -692,16 +699,16 @@ app.post('/api/chat', async function(req, res) {
       [projectId, sessionId]
     );
     var crossSessionContext = '';
-    var crossContextBudget = 15000;
+    var crossContextBudget = 25000;
     for (var os = 0; os < otherSessions.rows.length; os++) {
       var otherT = otherSessions.rows[os].transcript || [];
       if (otherT.length > 0) {
         var otherTitle = otherSessions.rows[os].title || 'Untitled Chat';
-        var otherRecent = otherT.slice(-6);
+        var otherRecent = otherT.slice(-10);
         var summary = '';
         for (var om = 0; om < otherRecent.length; om++) {
           var role = otherRecent[om].role === 'user' ? 'User' : 'Assistant';
-          var snippet = (otherRecent[om].content || '').substring(0, 300);
+          var snippet = (otherRecent[om].content || '').substring(0, 800);
           summary += role + ': ' + snippet + '\n';
         }
         crossSessionContext += '\n--- Previous chat: "' + otherTitle + '" ---\n' + summary + '\n';
@@ -723,7 +730,7 @@ app.post('/api/chat', async function(req, res) {
 
     var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext);
     if (includeProjectContext && crossSessionContext) {
-      systemPrompt += '\n\n## Context from previous chats in this project\nThe user has had other conversations in this project. Here are excerpts so you can maintain continuity:\n' + crossSessionContext;
+      systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
     }
 
     var msgs = [];
