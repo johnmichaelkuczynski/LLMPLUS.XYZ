@@ -398,6 +398,16 @@ function isProjectSpecificQuery(userMessage, tree, transcript) {
   return false;
 }
 
+function compactTreeString(tree) {
+  var keys = Object.keys(tree);
+  if (keys.length === 0) return '{}';
+  var lines = [];
+  for (var i = 0; i < keys.length; i++) {
+    lines.push(keys[i] + ': ' + tree[keys[i]]);
+  }
+  return lines.join('\n');
+}
+
 function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext) {
   var prompt = 'You are an AI assistant in LLM Plus, a scholarly research and analysis platform. The user is an academic or professional researcher. Provide expert-level, intellectually rigorous responses. Be helpful, thorough, and precise.';
 
@@ -457,19 +467,29 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
 
     if (tieredMemory && tieredMemory.tiers && tieredMemory.tiers.length > 0) {
       prompt += '\n\n## Project Memory (Tiered Tractatus)';
+      var memoryBudget = 15000;
+      var memoryUsed = 0;
       for (var t = 0; t < tieredMemory.tiers.length; t++) {
         var tier = tieredMemory.tiers[t];
         var tierLabel = tier.tier === 1 ? 'Tier 1 — recent, high resolution' :
                         tier.tier === 2 ? 'Tier 2 — summary, medium resolution' :
                         tier.tier === 3 ? 'Tier 3 — archive, lower resolution' :
                         'Tier ' + tier.tier + ' — deep archive';
-        prompt += '\n\n### ' + tierLabel + ' (' + tier.nodes + ' nodes):\n';
-        var treeStr = JSON.stringify(tier.tree, null, 1);
-        var maxLen = tier.tier === 1 ? 12000 : tier.tier === 2 ? 6000 : 3000;
-        prompt += treeStr.length > maxLen ? treeStr.substring(0, maxLen) + '\n[...truncated...]' : treeStr;
+        var tierBudget = tier.tier === 1 ? 8000 : tier.tier === 2 ? 4000 : 2000;
+        var remaining = memoryBudget - memoryUsed;
+        if (remaining < 500) break;
+        tierBudget = Math.min(tierBudget, remaining);
+        var treeStr = compactTreeString(tier.tree);
+        if (treeStr.length > tierBudget) {
+          treeStr = treeStr.substring(0, tierBudget) + '\n[...truncated...]';
+        }
+        prompt += '\n\n### ' + tierLabel + ' (' + tier.nodes + ' nodes):\n' + treeStr;
+        memoryUsed += treeStr.length;
       }
     } else if (tree && Object.keys(tree).length > 0) {
-      prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + JSON.stringify(tree, null, 2);
+      var compactStr = compactTreeString(tree);
+      if (compactStr.length > 8000) compactStr = compactStr.substring(0, 8000) + '\n[...truncated...]';
+      prompt += '\n\nCurrent Tractatus tree for this project (follow format rules strictly):\n' + compactStr;
     }
   } else {
     prompt += '\n\nThis appears to be a general knowledge question not specific to the current project. Answer from your general knowledge as a scholarly expert. Do NOT reference project-specific context unless the user explicitly asks about it.';
@@ -699,16 +719,16 @@ app.post('/api/chat', async function(req, res) {
       [projectId, sessionId]
     );
     var crossSessionContext = '';
-    var crossContextBudget = 25000;
+    var crossContextBudget = 10000;
     for (var os = 0; os < otherSessions.rows.length; os++) {
       var otherT = otherSessions.rows[os].transcript || [];
       if (otherT.length > 0) {
         var otherTitle = otherSessions.rows[os].title || 'Untitled Chat';
-        var otherRecent = otherT.slice(-10);
+        var otherRecent = otherT.slice(-6);
         var summary = '';
         for (var om = 0; om < otherRecent.length; om++) {
           var role = otherRecent[om].role === 'user' ? 'User' : 'Assistant';
-          var snippet = (otherRecent[om].content || '').substring(0, 800);
+          var snippet = (otherRecent[om].content || '').substring(0, 400);
           summary += role + ': ' + snippet + '\n';
         }
         crossSessionContext += '\n--- Previous chat: "' + otherTitle + '" ---\n' + summary + '\n';
@@ -733,11 +753,13 @@ app.post('/api/chat', async function(req, res) {
       systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
     }
 
+    console.log('[Chat] System prompt: ' + systemPrompt.length + ' chars | Tree nodes: ' + Object.keys(tree).length + ' | Tiers: ' + (tieredMemory.tiers ? tieredMemory.tiers.length : 0) + ' | Cross-session: ' + crossSessionContext.length + ' chars');
+
     var msgs = [];
-    var recent = transcript.slice(-20);
-    var maxMsgChars = 12000;
+    var recent = transcript.slice(-16);
+    var maxMsgChars = 8000;
     var totalChars = 0;
-    var charBudget = 150000;
+    var charBudget = 100000;
     for (var i = recent.length - 1; i >= 0; i--) {
       var content = recent[i].content || '';
       if (content.length > maxMsgChars) {
@@ -1304,16 +1326,16 @@ app.post('/api/tractatus/update', async function(req, res) {
     var prompt = 'Based on this conversation exchange, generate a Tractatus tree update in strict JSON format.\n\n';
     prompt += 'User said: "' + userExcerpt + '"\n';
     prompt += 'Assistant said: "' + assistantExcerpt + '"\n\n';
-    var treeStr = JSON.stringify(existingTree);
-    if (treeStr.length > 8000) {
+    var treeStr = compactTreeString(existingTree);
+    if (treeStr.length > 6000) {
       var treeKeys = Object.keys(existingTree);
-      var recentKeys = treeKeys.slice(-30);
+      var recentKeys = treeKeys.slice(-40);
       var recentTree = {};
       for (var rk = 0; rk < recentKeys.length; rk++) {
         recentTree[recentKeys[rk]] = existingTree[recentKeys[rk]];
       }
-      treeStr = JSON.stringify(recentTree);
-      prompt += 'Existing tree (last 30 of ' + treeKeys.length + ' nodes shown):\n' + treeStr + '\n\n';
+      treeStr = compactTreeString(recentTree);
+      prompt += 'Existing tree (last 40 of ' + treeKeys.length + ' nodes shown):\n' + treeStr + '\n\n';
       prompt += 'Total existing node count: ' + treeKeys.length + '. Add new numbered nodes continuing from the highest existing key.\n\n';
     } else {
       prompt += 'Existing tree:\n' + treeStr + '\n\n';
@@ -1397,7 +1419,7 @@ app.post('/api/tractatus/update', async function(req, res) {
     await pool.query('UPDATE projects SET tractatus_tree = $1 WHERE id = $2', [JSON.stringify(merged), projectId]);
     send({ type: 'complete', nodes: nodeCount });
 
-    if (nodeCount >= 500) {
+    if (nodeCount >= 200) {
       send({ type: 'status', message: 'Tree reached ' + nodeCount + ' nodes. Compressing to higher tier...' });
       try {
         await compressTractatusTier(projectId, merged, nodeCount, send, req.userId);
@@ -1489,7 +1511,7 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, use
         [JSON.stringify(mergedSummary), existingSummaries.rows[0].id]
       );
       console.log('[Tractatus] Merged into existing Tier ' + summaryTier + ' summary (' + mergedCount + ' nodes)');
-      if (mergedCount >= 500) {
+      if (mergedCount >= 200) {
         recurseTarget = { id: existingSummaries.rows[0].id, tree: mergedSummary, count: mergedCount };
       }
     } else {
@@ -1502,10 +1524,18 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, use
       console.log('[Tractatus] Created new Tier ' + summaryTier + ' summary project');
     }
 
+    var allKeys = Object.keys(fullTree);
+    var keepCount = Math.min(30, Math.floor(allKeys.length * 0.1));
+    var recentKeys = allKeys.slice(-keepCount);
+    var keptTree = {};
+    for (var rk = 0; rk < recentKeys.length; rk++) {
+      keptTree[recentKeys[rk]] = fullTree[recentKeys[rk]];
+    }
     await txClient.query(
-      "UPDATE projects SET tractatus_tree = '{}' WHERE id = $1",
-      [projectId]
+      'UPDATE projects SET tractatus_tree = $1 WHERE id = $2',
+      [JSON.stringify(keptTree), projectId]
     );
+    console.log('[Tractatus] After compression, kept ' + keepCount + ' most recent nodes in Tier 1');
 
     await txClient.query('COMMIT');
 
