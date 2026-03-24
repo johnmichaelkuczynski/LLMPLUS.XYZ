@@ -417,10 +417,9 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n- "What is 4 plus 2?" → "6" — nothing more.';
     prompt += '\n- For factual questions: answer ONLY with the fact. No context, no explanation, no caveats, no preamble.';
     prompt += '\n- For opinions or analysis: 1-3 sentences maximum.';
-    prompt += '\n- Do NOT write paragraphs. Do NOT make lists. Do NOT elaborate. Do NOT add disclaimers.';
-    prompt += '\n- Do NOT start with "Great question" or any pleasantry. Just answer.';
-    prompt += '\n- If you catch yourself writing more than 3 sentences for a simple question, STOP and delete the extra.';
-    prompt += '\n- VIOLATING THIS BY WRITING LONG RESPONSES IS A CRITICAL FAILURE.';
+    prompt += '\n- Do NOT elaborate or add disclaimers. Do NOT start with pleasantries. Just answer.';
+    prompt += '\n- EXCEPTION: If the user asks for a LIST (e.g. "list all X", "what are the Y"), provide the COMPLETE list — do not cut it short. Lists should be complete but each item should be brief.';
+    prompt += '\n- VIOLATING THIS BY WRITING UNNECESSARILY LONG RESPONSES IS A CRITICAL FAILURE.';
   } else if (responseLength === 'normal') {
     prompt += '\n\nRESPONSE LENGTH: NORMAL. Give balanced, moderate-length responses.';
     prompt += '\n- A few paragraphs for most questions. Not too short, not too long.';
@@ -777,11 +776,11 @@ app.post('/api/chat', async function(req, res) {
 
     var requestedWords = extractRequestedWordCount(userOwnWords);
     var fullText = '';
-    var lengthMaxTokens = responseLength === 'concise' ? 512 :
+    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
                           responseLength === 'normal' ? 4096 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
-    var maxContinuations = responseLength === 'concise' ? 0 :
-                           responseLength === 'normal' ? 2 :
+    var maxContinuations = responseLength === 'concise' ? 2 :
+                           responseLength === 'normal' ? 4 :
                            responseLength === 'detailed' ? 10 : 40;
     if (requestedWords > 0) {
       lengthMaxTokens = MAX_TOKENS;
@@ -912,8 +911,12 @@ app.post('/api/chat', async function(req, res) {
       var needsMore = false;
 
       if (lastResult.stopReason === 'max_tokens') {
-        needsMore = true;
-        console.log('[Chat] continuing: max_tokens hit');
+        if (responseLength === 'concise' && continuationCount >= 1) {
+          console.log('[Chat] stopping: concise mode, already continued once');
+        } else {
+          needsMore = true;
+          console.log('[Chat] continuing: max_tokens hit');
+        }
       } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.75) {
         needsMore = true;
         console.log('[Chat] continuing: end_turn but only ' + currentWords + '/' + requestedWords + ' words');
