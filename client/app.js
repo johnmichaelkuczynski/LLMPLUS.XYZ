@@ -2916,6 +2916,159 @@
     reportGenGoBtn.disabled = false;
   });
 
+  var sumModal = document.getElementById('summarize-modal');
+  var sumModalTitle = document.getElementById('summarize-modal-title');
+  var sumGoBtn = document.getElementById('sum-go');
+  var sumStatus = document.getElementById('sum-status');
+  var sumStatusText = document.getElementById('sum-status-text');
+  var sumHint = document.getElementById('sum-length-hint');
+  var sumCustomRow = document.getElementById('sum-custom-row');
+  var sumCustomWords = document.getElementById('sum-custom-words');
+  var sumScope = 'project';
+  var sumChatId = null;
+  var sumSelectedLen = 'auto';
+
+  var sumLenBtns = document.querySelectorAll('.sum-len-btn');
+  for (var sb = 0; sb < sumLenBtns.length; sb++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        for (var x = 0; x < sumLenBtns.length; x++) sumLenBtns[x].classList.remove('active');
+        btn.classList.add('active');
+        sumSelectedLen = btn.getAttribute('data-len');
+        if (sumSelectedLen === 'auto') {
+          sumCustomRow.style.display = 'none';
+          sumHint.textContent = 'Auto-calculated based on content size';
+        } else if (sumSelectedLen === 'brief') {
+          sumCustomRow.style.display = 'none';
+          sumHint.textContent = '~150-300 words — key points only';
+        } else if (sumSelectedLen === 'moderate') {
+          sumCustomRow.style.display = 'none';
+          sumHint.textContent = '~500-800 words — balanced coverage';
+        } else if (sumSelectedLen === 'detailed') {
+          sumCustomRow.style.display = 'block';
+          sumHint.textContent = '~1000-2000 words, or specify your own target below';
+        }
+      });
+    })(sumLenBtns[sb]);
+  }
+
+  function openSummarizeModal(scope, chatIdVal) {
+    if (!state.currentProject) {
+      notify('Select a project first', 'error');
+      return;
+    }
+    sumScope = scope;
+    sumChatId = chatIdVal || null;
+    sumModalTitle.innerHTML = scope === 'project' ? '&#128221; Summarize Project' : '&#128196; Summarize Chat';
+    sumStatus.style.display = 'none';
+    sumGoBtn.disabled = false;
+    sumCustomWords.value = '';
+    for (var x = 0; x < sumLenBtns.length; x++) {
+      sumLenBtns[x].classList.remove('active');
+      if (sumLenBtns[x].getAttribute('data-len') === 'auto') sumLenBtns[x].classList.add('active');
+    }
+    sumSelectedLen = 'auto';
+    sumCustomRow.style.display = 'none';
+    sumHint.textContent = 'Auto-calculated based on content size';
+    sumModal.classList.add('active');
+  }
+
+  document.getElementById('btn-summarize-project').addEventListener('click', function() {
+    openSummarizeModal('project');
+  });
+
+  document.getElementById('btn-summarize-chat').addEventListener('click', function() {
+    if (!state.currentSession) {
+      notify('Open a chat first', 'error');
+      return;
+    }
+    openSummarizeModal('chat', state.currentSession.id);
+  });
+
+  document.getElementById('close-summarize').addEventListener('click', function() {
+    sumModal.classList.remove('active');
+  });
+  document.getElementById('sum-cancel').addEventListener('click', function() {
+    sumModal.classList.remove('active');
+  });
+  sumModal.addEventListener('mousedown', function(e) {
+    if (e.target === sumModal) sumModal.classList.remove('active');
+  });
+  sumModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+  sumGoBtn.addEventListener('click', async function() {
+    if (!state.currentProject) return;
+    sumGoBtn.disabled = true;
+    sumStatus.style.display = 'block';
+    sumStatusText.textContent = 'Gathering data...';
+
+    var targetWords = 0;
+    if (sumSelectedLen === 'brief') targetWords = 200;
+    else if (sumSelectedLen === 'moderate') targetWords = 600;
+    else if (sumSelectedLen === 'detailed') {
+      var custom = parseInt(sumCustomWords.value);
+      targetWords = custom > 0 ? custom : 1500;
+    }
+
+    var fullSummary = '';
+
+    try {
+      var resp = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: state.currentProject.id,
+          scope: sumScope,
+          chatId: sumChatId,
+          targetWords: targetWords
+        })
+      });
+
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (!line.startsWith('data: ')) continue;
+          var data = line.substring(6);
+          if (data === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'status') {
+              sumStatusText.textContent = parsed.message;
+            } else if (parsed.type === 'meta') {
+              sumStatusText.textContent = 'Generating ~' + parsed.targetWords + ' word summary from ' + parsed.sourceWords + ' words of content...';
+            } else if (parsed.type === 'token') {
+              fullSummary += parsed.text;
+            } else if (parsed.type === 'complete') {
+              if (parsed.cleanedText) fullSummary = parsed.cleanedText;
+              sumStatusText.textContent = 'Complete! (' + (parsed.totalWords || fullSummary.split(/\s+/).length) + ' words)';
+            } else if (parsed.type === 'error') {
+              sumStatusText.textContent = 'Error: ' + parsed.error;
+            }
+          } catch (e) {}
+        }
+      }
+
+      if (fullSummary.trim()) {
+        var scopeLabel = sumScope === 'project' ? 'Project' : 'Chat';
+        var title = scopeLabel + ' Summary — ' + (state.currentProject ? state.currentProject.name : 'Project');
+        sumModal.classList.remove('active');
+        showArtifact(fullSummary, title, { raw: false });
+      }
+    } catch (err) {
+      sumStatusText.textContent = 'Error: ' + err.message;
+    }
+    sumGoBtn.disabled = false;
+  });
+
   var tractatorModal = document.getElementById('tractator-modal');
   var tractatorDepth = 0;
   var tractatorSource = null;

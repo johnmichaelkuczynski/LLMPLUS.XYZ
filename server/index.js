@@ -1175,6 +1175,145 @@ app.post('/api/report/generate', async function(req, res) {
   }
 });
 
+app.post('/api/summarize', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
+  try {
+    var projectId = req.body.projectId;
+    var scope = req.body.scope || 'project';
+    var chatId = req.body.chatId || null;
+    var targetWords = parseInt(req.body.targetWords) || 0;
+
+    if (!await verifyProjectOwnership(projectId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
+
+    var projectResult = await pool.query('SELECT name, tractatus_tree FROM projects WHERE id = $1', [projectId]);
+    var projectName = projectResult.rows[0] ? projectResult.rows[0].name : 'Project';
+
+    send({ type: 'status', message: 'Gathering data for summary...' });
+
+    var contextParts = [];
+    var totalContentWords = 0;
+
+    if (scope === 'project') {
+      var tieredMemory = await loadTieredMemory(projectId);
+      for (var t = 0; t < tieredMemory.tiers.length; t++) {
+        var tier = tieredMemory.tiers[t];
+        var tierStr = compactTreeString(tier.tree);
+        contextParts.push('=== Memory Tier ' + tier.tier + ' (' + tier.nodes + ' nodes) ===\n' + tierStr);
+        totalContentWords += tierStr.split(/\s+/).length;
+      }
+
+      var allSessions = await pool.query(
+        'SELECT title, transcript FROM sessions WHERE project_id = $1 ORDER BY created_at ASC',
+        [projectId]
+      );
+      for (var si = 0; si < allSessions.rows.length; si++) {
+        var sess = allSessions.rows[si];
+        var transcript = sess.transcript || [];
+        if (transcript.length === 0) continue;
+        var sessContent = '\n--- Chat: "' + (sess.title || 'Untitled') + '" (' + transcript.length + ' messages) ---\n';
+        for (var mi = 0; mi < transcript.length; mi++) {
+          var role = transcript[mi].role === 'user' ? 'User' : 'Assistant';
+          var msgText = (transcript[mi].content || '').substring(0, 1500);
+          sessContent += role + ': ' + msgText + '\n';
+          totalContentWords += msgText.split(/\s+/).length;
+        }
+        contextParts.push(sessContent);
+      }
+
+      var docs = await pool.query('SELECT name, raw_content FROM project_documents WHERE project_id = $1', [projectId]);
+      if (docs.rows.length > 0) {
+        var docSummary = 'Project has ' + docs.rows.length + ' documents: ' + docs.rows.map(function(d) { return d.name; }).join(', ');
+        for (var di = 0; di < docs.rows.length; di++) {
+          var docContent = (docs.rows[di].raw_content || '').substring(0, 3000);
+          docSummary += '\n\n--- Document: "' + docs.rows[di].name + '" ---\n' + docContent;
+          totalContentWords += docContent.split(/\s+/).length;
+        }
+        contextParts.push('=== Documents ===\n' + docSummary);
+      }
+
+    } else if (scope === 'chat' && chatId) {
+      var chatResult = await pool.query('SELECT title, transcript FROM sessions WHERE id = $1 AND project_id = $2', [chatId, projectId]);
+      if (chatResult.rows.length > 0) {
+        var chatTitle = chatResult.rows[0].title || 'Untitled';
+        var chatTranscript = chatResult.rows[0].transcript || [];
+        var chatContent = '';
+        for (var ci = 0; ci < chatTranscript.length; ci++) {
+          var cRole = chatTranscript[ci].role === 'user' ? 'User' : 'Assistant';
+          var cMsg = (chatTranscript[ci].content || '').substring(0, 3000);
+          chatContent += cRole + ': ' + cMsg + '\n\n';
+          totalContentWords += cMsg.split(/\s+/).length;
+        }
+        contextParts.push('=== Chat: "' + chatTitle + '" (' + chatTranscript.length + ' messages) ===\n' + chatContent);
+      }
+    }
+
+    var contextText = contextParts.join('\n\n');
+    if (contextText.length > 100000) contextText = contextText.substring(0, 100000) + '\n[...truncated...]';
+
+    if (targetWords <= 0) {
+      if (totalContentWords < 500) targetWords = 150;
+      else if (totalContentWords < 2000) targetWords = 300;
+      else if (totalContentWords < 5000) targetWords = 500;
+      else if (totalContentWords < 15000) targetWords = 800;
+      else if (totalContentWords < 40000) targetWords = 1200;
+      else targetWords = 2000;
+    }
+
+    var maxTokens = Math.min(Math.max(targetWords * 2, 1024), 16384);
+
+    send({ type: 'status', message: 'Generating summary (~' + targetWords + ' words)...' });
+    send({ type: 'meta', targetWords: targetWords, sourceWords: totalContentWords });
+
+    var scopeDesc = scope === 'project' ? 'the entire project "' + projectName + '"' : 'a chat session in "' + projectName + '"';
+
+    var prompt = 'Write a summary of ' + scopeDesc + '.\n\n';
+    prompt += 'TARGET LENGTH: approximately ' + targetWords + ' words.\n\n';
+    prompt += 'Here is the source material:\n\n' + contextText + '\n\n';
+    prompt += 'Write a clear, well-organized summary that captures:\n';
+    prompt += '- The main topics and themes discussed\n';
+    prompt += '- Key findings, decisions, and conclusions\n';
+    prompt += '- Important open questions or unresolved issues\n';
+    prompt += '- Notable facts, evidence, or data points\n\n';
+    prompt += 'FORMATTING RULES:\n';
+    prompt += '- Write in clean plain text. NO markdown (no #, ##, **, *).\n';
+    prompt += '- Use section headings as plain text on their own line if the summary is long enough to warrant sections.\n';
+    prompt += '- Write in flowing prose paragraphs.\n';
+    prompt += '- Target approximately ' + targetWords + ' words. Do not significantly exceed or undershoot this target.\n';
+    prompt += '- Output ONLY the summary.';
+
+    var sysPrompt = 'You produce clear, concise summaries in plain prose. No markdown formatting. No Tractatus-style numbered nodes. Organize with plain-text headings if needed.';
+
+    var summaryText = await streamClaudeToSSE(
+      [{ role: 'user', content: prompt }],
+      sysPrompt,
+      send,
+      maxTokens
+    );
+
+    summaryText = stripMarkdownFromOutput(summaryText);
+    send({ type: 'complete', totalWords: summaryText.split(/\s+/).length, cleanedText: summaryText });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('Summary generation error:', err.message);
+    send({ type: 'error', error: err.message });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
 app.post('/api/tractator/generate', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
