@@ -1106,10 +1106,26 @@
                   tpTitle.innerHTML = '&#9989; Memory Updated (' + p.nodes + ' nodes)';
                   tpClose.classList.remove('hidden');
                   setTimeout(function() { popup.remove(); }, 8000);
+                } else if (p.type === 'status') {
+                  var cursor = tpContent.querySelector('.cursor-blink');
+                  if (cursor) cursor.remove();
+                  tpContent.textContent = p.message || '';
+                  tpContent.innerHTML += '<span class="cursor-blink"></span>';
+                  if (p.message && p.message.indexOf('deferred') >= 0) {
+                    tpTitle.innerHTML = '&#9888;&#65039; ' + p.message;
+                    tpClose.classList.remove('hidden');
+                    setTimeout(function() { popup.remove(); }, 5000);
+                  }
                 } else if (p.type === 'error') {
                   var cursor = tpContent.querySelector('.cursor-blink');
                   if (cursor) cursor.remove();
-                  tpTitle.innerHTML = '&#10060; Update Failed: ' + (p.message || 'Unknown error');
+                  var errMsg = p.message || 'Unknown error';
+                  if (errMsg.indexOf('skipping') >= 0 || errMsg.indexOf('deferred') >= 0) {
+                    tpTitle.innerHTML = '&#9888;&#65039; Memory update skipped';
+                    setTimeout(function() { popup.remove(); }, 4000);
+                  } else {
+                    tpTitle.innerHTML = '&#10060; Update Failed: ' + errMsg;
+                  }
                   tpClose.classList.remove('hidden');
                 }
               } catch (e) {}

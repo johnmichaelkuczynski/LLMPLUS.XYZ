@@ -209,24 +209,36 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
   if (systemPrompt) body.system = systemPrompt;
   if (streaming) body.stream = true;
 
-  var response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify(body)
-  });
+  var maxRetries = 3;
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(body)
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      if (streaming) return response;
+      var data = await response.json();
+      return data.content[0].text;
+    }
+
+    if (response.status === 529 || response.status === 503 || response.status === 500) {
+      var waitSec = Math.pow(2, attempt + 1) + Math.random() * 2;
+      console.log('[callClaude] API overloaded (status ' + response.status + '), retry ' + (attempt + 1) + '/' + maxRetries + ' in ' + waitSec.toFixed(1) + 's');
+      if (attempt < maxRetries - 1) {
+        await new Promise(function(r) { setTimeout(r, waitSec * 1000); });
+        continue;
+      }
+    }
+
     var errText = await response.text();
     throw new Error('Anthropic API error ' + response.status + ': ' + errText);
   }
-
-  if (streaming) return response;
-  var data = await response.json();
-  return data.content[0].text;
 }
 
 async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
@@ -868,7 +880,12 @@ app.post('/api/chat', async function(req, res) {
                 } else if (parsed.type === 'message_delta' && parsed.delta && parsed.delta.stop_reason) {
                   stopReason = parsed.delta.stop_reason;
                 } else if (parsed.type === 'error') {
-                  console.error('[streamOneCall] Stream error:', JSON.stringify(parsed));
+                  var errType = parsed.error ? parsed.error.type : 'unknown';
+                  console.error('[streamOneCall] Stream error:', errType);
+                  if (errType === 'overloaded_error' || errType === 'api_error') {
+                    res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Claude is temporarily overloaded. Please try again in a moment.]\n' }) + '\n\n');
+                    stopReason = 'error';
+                  }
                 }
               } catch (e) {}
             }
@@ -1563,7 +1580,14 @@ app.post('/api/tractatus/update', async function(req, res) {
               fullText += parsed.delta.text;
               send({ type: 'text', text: parsed.delta.text });
             } else if (parsed.type === 'error') {
-              console.error('Anthropic stream error in tractatus:', JSON.stringify(parsed));
+              var errType = parsed.error ? parsed.error.type : 'unknown';
+              console.error('Anthropic stream error in tractatus:', errType);
+              if (errType === 'overloaded_error' || errType === 'api_error') {
+                send({ type: 'status', message: 'API busy — memory update deferred' });
+                res.write('data: [DONE]\n\n');
+                res.end();
+                return;
+              }
             }
           } catch (e) {}
         }
