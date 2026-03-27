@@ -398,6 +398,49 @@ function isProjectSpecificQuery(userMessage, tree, transcript) {
   return false;
 }
 
+function tryParseTractatusJSON(rawText) {
+  if (!rawText || typeof rawText !== 'string') return null;
+  var text = rawText.trim();
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '');
+  }
+  text = text.trim();
+  try {
+    var obj = JSON.parse(text);
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+  } catch (e) {}
+  var jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    var candidate = jsonMatch[0];
+    try {
+      var obj2 = JSON.parse(candidate);
+      if (obj2 && typeof obj2 === 'object') return obj2;
+    } catch (e2) {}
+    var fixed = candidate
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/([{,]\s*)(\d+\.\d+[\d.]*)\s*:/g, '$1"$2":')
+      .replace(/'/g, '"');
+    try {
+      var obj3 = JSON.parse(fixed);
+      if (obj3 && typeof obj3 === 'object') return obj3;
+    } catch (e3) {}
+  }
+  var linePattern = /^["']?([\d.]+)["']?\s*[:=]\s*["'](.+?)["']?\s*[,]?\s*$/gm;
+  var lineMatch;
+  var built = {};
+  var count = 0;
+  while ((lineMatch = linePattern.exec(text)) !== null) {
+    built[lineMatch[1]] = lineMatch[2];
+    count++;
+  }
+  if (count > 0) {
+    console.log('[Tractatus] Recovered ' + count + ' nodes via line-by-line parsing');
+    return built;
+  }
+  return null;
+}
+
 function compactTreeString(tree) {
   var keys = Object.keys(tree);
   if (keys.length === 0) return '{}';
@@ -1527,33 +1570,33 @@ app.post('/api/tractatus/update', async function(req, res) {
       }
     }
 
-    var cleanedText = fullText.trim();
-    if (cleanedText.startsWith('```')) {
-      cleanedText = cleanedText.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-    }
-
-    var newTree;
-    try {
-      newTree = JSON.parse(cleanedText);
-    } catch (e) {
-      var jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          newTree = JSON.parse(jsonMatch[0]);
-        } catch (e2) {
-          console.error('Tractatus JSON parse failed (extracted):', e2.message, 'Text:', jsonMatch[0].substring(0, 200));
-          send({ type: 'error', message: 'Failed to parse tree update' });
-          res.write('data: [DONE]\n\n');
-          res.end();
-          return;
-        }
-      } else {
-        console.error('Tractatus no JSON found in:', cleanedText.substring(0, 200));
-        send({ type: 'error', message: 'Failed to parse tree update' });
-        res.write('data: [DONE]\n\n');
-        res.end();
-        return;
+    var newTree = tryParseTractatusJSON(fullText);
+    if (!newTree) {
+      console.error('Tractatus parse failed, retrying with simpler prompt...');
+      send({ type: 'status', message: 'Retrying tree update...' });
+      try {
+        var retryPrompt = 'Convert this conversation into a JSON object where keys are Tractatus numbers like "1.0", "1.1" and values are summary strings.\n\n';
+        retryPrompt += 'User: "' + userExcerpt.substring(0, 1000) + '"\n';
+        retryPrompt += 'Assistant: "' + assistantExcerpt.substring(0, 2000) + '"\n\n';
+        retryPrompt += 'Return ONLY a valid JSON object. Example: {"1.0": "ASSERTS: main claim here", "1.1": "detail here"}';
+        var retryRes = await callClaude(
+          [{ role: 'user', content: retryPrompt }],
+          'Output only a valid JSON object. Nothing else.',
+          false,
+          2048
+        );
+        var retryText = typeof retryRes === 'string' ? retryRes : (retryRes.content ? retryRes.content.map(function(c) { return c.text || ''; }).join('') : JSON.stringify(retryRes));
+        newTree = tryParseTractatusJSON(retryText);
+      } catch (retryErr) {
+        console.error('Tractatus retry also failed:', retryErr.message);
       }
+    }
+    if (!newTree) {
+      console.error('Tractatus: all parse attempts failed');
+      send({ type: 'error', message: 'Failed to parse tree update — skipping this update' });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
     }
 
     var merged = Object.assign({}, existingTree, newTree);
