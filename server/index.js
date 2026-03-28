@@ -176,6 +176,21 @@ CREATE TABLE IF NOT EXISTS tractatus_archive (
   node_count INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS user_analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  profile_tree JSONB DEFAULT '{}'::jsonb,
+  exchange_count INTEGER DEFAULT 0,
+  last_updated TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+CREATE TABLE IF NOT EXISTS profile_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  profile_text TEXT NOT NULL,
+  word_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 `;
 
 async function initDB() {
@@ -1637,6 +1652,10 @@ app.post('/api/tractatus/update', async function(req, res) {
         send({ type: 'status', message: 'Compression deferred: ' + compErr.message });
       }
     }
+
+    updateUserProfileTree(req.userId, userMessage, assistantResponse).catch(function(e) {
+      console.error('[UserAnalytics] Background profile update failed:', e.message);
+    });
 
     res.write('data: [DONE]\n\n');
     res.end();
@@ -3209,6 +3228,331 @@ app.post('/api/documents/copy-to-global', async function(req, res) {
       [doc.name, doc.raw_content, req.userId]
     );
     res.json(gResult.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function updateUserProfileTree(userId, userMessage, assistantResponse) {
+  try {
+    var upsertResult = await pool.query(
+      'INSERT INTO user_analytics (user_id, profile_tree, exchange_count, last_updated) VALUES ($1, \'{}\'::jsonb, 1, NOW()) ON CONFLICT (user_id) DO UPDATE SET exchange_count = user_analytics.exchange_count + 1, last_updated = NOW() RETURNING profile_tree, exchange_count',
+      [userId]
+    );
+    var profileTree = upsertResult.rows[0].profile_tree || {};
+    var exchangeCount = upsertResult.rows[0].exchange_count;
+
+    if (exchangeCount % 5 !== 0 && exchangeCount > 1) {
+      return;
+    }
+
+    var allTrees = await pool.query(
+      'SELECT name, tractatus_tree FROM projects WHERE user_id = $1 AND tractatus_tree IS NOT NULL AND tractatus_tree != \'{}\'::jsonb ORDER BY created_at DESC LIMIT 10',
+      [userId]
+    );
+    var treeSummary = '';
+    for (var t = 0; t < allTrees.rows.length; t++) {
+      var tree = allTrees.rows[t].tractatus_tree || {};
+      var keys = Object.keys(tree);
+      if (keys.length === 0) continue;
+      treeSummary += '\n[Project: ' + allTrees.rows[t].name + '] ';
+      var sample = keys.slice(-15);
+      for (var sk = 0; sk < sample.length; sk++) {
+        treeSummary += sample[sk] + ': ' + (tree[sample[sk]] || '').substring(0, 120) + ' | ';
+      }
+    }
+    if (treeSummary.length > 6000) treeSummary = treeSummary.substring(0, 6000);
+
+    var existingProfileStr = compactTreeString(profileTree);
+    if (existingProfileStr.length > 4000) existingProfileStr = existingProfileStr.substring(0, 4000);
+
+    var userExcerpt = (userMessage || '').substring(0, 2000);
+    var assistantExcerpt = (assistantResponse || '').substring(0, 2000);
+
+    var prompt = 'You are building a clinical, objective analytical profile of a user based on their conversations with an AI.\n\n';
+    prompt += 'Current profile tree (Tractatus format):\n' + (existingProfileStr || '(empty — first analysis)') + '\n\n';
+    prompt += 'Latest exchange:\nUser: "' + userExcerpt + '"\nAssistant: "' + assistantExcerpt + '"\n\n';
+    prompt += 'Cross-project topic patterns from their Tractatus trees:\n' + (treeSummary || '(none yet)') + '\n\n';
+    prompt += 'Update the profile tree JSON. Categories to track:\n';
+    prompt += '- 1.x: TOPICS — recurring subjects, intellectual interests, domains of expertise\n';
+    prompt += '- 2.x: CONVERSATIONAL_STYLE — tone patterns (assertive, deliberate, chaotic, impetuous, calculating, etc.)\n';
+    prompt += '- 3.x: WRITING_PATTERNS — sentence structure, vocabulary level, rhetorical habits\n';
+    prompt += '- 4.x: COGNITIVE_PATTERNS — reasoning style, how they approach problems, biases\n';
+    prompt += '- 5.x: EMOTIONAL_PATTERNS — emotional undertones, triggers, patterns of frustration/enthusiasm\n';
+    prompt += '- 6.x: EVOLUTION — how patterns have changed over time\n\n';
+    prompt += 'Rules:\n';
+    prompt += '- Be clinical and objective. No flattery, no disparagement.\n';
+    prompt += '- Use tags: PATTERN:, TENDENCY:, PREFERENCE:, SHIFT:, NOTABLE:\n';
+    prompt += '- Merge with existing tree, update existing nodes, add new ones.\n';
+    prompt += '- Return ONLY the JSON object. No markdown, no commentary.\n';
+
+    var profileRaw = await callClaude(
+      [{ role: 'user', content: prompt }],
+      'You output only valid JSON objects. No markdown, no commentary, no fences.',
+      false,
+      4096
+    );
+
+    var newProfileTree = tryParseTractatusJSON(profileRaw);
+    if (newProfileTree) {
+      var merged = Object.assign({}, profileTree, newProfileTree);
+      var nodeCount = Object.keys(merged).length;
+      if (nodeCount > 150) {
+        var keys = Object.keys(merged);
+        var keep = {};
+        var recent = keys.slice(-100);
+        for (var rk = 0; rk < recent.length; rk++) keep[recent[rk]] = merged[recent[rk]];
+        merged = keep;
+      }
+      await pool.query(
+        'UPDATE user_analytics SET profile_tree = $1, last_updated = NOW() WHERE user_id = $2',
+        [JSON.stringify(merged), userId]
+      );
+      console.log('[UserAnalytics] Profile updated for user ' + userId + ': ' + Object.keys(merged).length + ' nodes, exchange #' + exchangeCount);
+    } else {
+      console.log('[UserAnalytics] Profile parse failed at exchange #' + exchangeCount);
+    }
+  } catch (err) {
+    console.error('[UserAnalytics] Error updating profile:', err.message);
+  }
+}
+
+app.post('/api/profile/generate', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  var clientDisconnected = false;
+  req.on('close', function() { clientDisconnected = true; });
+
+  function send(obj) {
+    if (clientDisconnected) return;
+    try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch(e) {}
+  }
+
+  try {
+    var userId = req.userId;
+
+    send({ type: 'status', message: 'Gathering cross-project data...' });
+
+    var analyticsRow = await pool.query('SELECT profile_tree, exchange_count, last_updated FROM user_analytics WHERE user_id = $1', [userId]);
+    var profileTree = {};
+    var exchangeCount = 0;
+    if (analyticsRow.rows.length > 0) {
+      profileTree = analyticsRow.rows[0].profile_tree || {};
+      exchangeCount = analyticsRow.rows[0].exchange_count || 0;
+    }
+
+    var allProjects = await pool.query(
+      'SELECT id, name, tractatus_tree, created_at FROM projects WHERE user_id = $1 AND (tractatus_tier = 1 OR tractatus_tier IS NULL) ORDER BY created_at ASC',
+      [userId]
+    );
+
+    var projectSummaries = '';
+    var totalTreeNodes = 0;
+    for (var p = 0; p < allProjects.rows.length; p++) {
+      var proj = allProjects.rows[p];
+      var tree = proj.tractatus_tree || {};
+      var keys = Object.keys(tree);
+      totalTreeNodes += keys.length;
+      if (keys.length === 0) continue;
+      projectSummaries += '\n\n### Project: "' + proj.name + '" (' + keys.length + ' nodes)\n';
+      var treeStr = compactTreeString(tree);
+      if (treeStr.length > 3000) treeStr = treeStr.substring(0, 3000) + '\n...[truncated]';
+      projectSummaries += treeStr;
+    }
+    if (projectSummaries.length > 20000) projectSummaries = projectSummaries.substring(0, 20000) + '\n...[truncated]';
+
+    send({ type: 'status', message: 'Sampling conversation history...' });
+
+    var recentSessions = await pool.query(
+      'SELECT s.title, s.transcript, p.name as project_name FROM sessions s JOIN projects p ON s.project_id = p.id WHERE p.user_id = $1 ORDER BY s.created_at DESC LIMIT 20',
+      [userId]
+    );
+
+    var conversationSamples = '';
+    var sampleCount = 0;
+    for (var s = 0; s < recentSessions.rows.length; s++) {
+      var sess = recentSessions.rows[s];
+      var transcript = sess.transcript || [];
+      if (transcript.length < 2) continue;
+      conversationSamples += '\n\n--- Chat: "' + (sess.title || 'Untitled') + '" (Project: ' + sess.project_name + ') ---\n';
+      var userMsgs = transcript.filter(function(m) { return m.role === 'user'; });
+      var samples = userMsgs.slice(0, 3).concat(userMsgs.slice(-2));
+      for (var sm = 0; sm < samples.length; sm++) {
+        var content = (samples[sm].content || '').substring(0, 500);
+        conversationSamples += 'User: "' + content + '"\n';
+      }
+      sampleCount++;
+      if (conversationSamples.length > 15000) break;
+    }
+
+    var lastSnapshot = await pool.query(
+      'SELECT profile_text, created_at FROM profile_snapshots WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [userId]
+    );
+    var previousProfile = '';
+    var previousDate = null;
+    if (lastSnapshot.rows.length > 0) {
+      previousProfile = lastSnapshot.rows[0].profile_text || '';
+      previousDate = lastSnapshot.rows[0].created_at;
+    }
+
+    send({ type: 'status', message: 'Generating profile (' + allProjects.rows.length + ' projects, ' + totalTreeNodes + ' tree nodes, ' + sampleCount + ' conversations)...' });
+
+    var prompt = 'You are a clinical analyst producing an objective, thorough profile of a user based on their AI conversations.\n\n';
+    prompt += '## User\'s Profile Tree (accumulated analytics):\n' + (compactTreeString(profileTree) || '(no profile tree yet)') + '\n\n';
+    prompt += '## User\'s Project Knowledge Trees:\n' + (projectSummaries || '(no projects yet)') + '\n\n';
+    prompt += '## Sample Conversations (user messages only):\n' + (conversationSamples || '(no conversations yet)') + '\n\n';
+
+    if (previousProfile) {
+      var daysSince = previousDate ? Math.round((Date.now() - new Date(previousDate).getTime()) / 86400000) : 0;
+      prompt += '## Previous Profile (generated ' + daysSince + ' days ago):\n' + previousProfile.substring(0, 5000) + '\n\n';
+      prompt += 'IMPORTANT: You MUST include a section titled "## Changes Since Last Profile" that analyzes how the user has evolved, shifted interests, or changed patterns since the previous profile was generated ' + daysSince + ' days ago. Be specific about what changed.\n\n';
+    }
+
+    prompt += 'Generate a thorough, clinical profile covering:\n';
+    prompt += '1. **Intellectual Profile** — Primary domains of interest, depth of knowledge, intellectual style\n';
+    prompt += '2. **Conversational Style** — Tone analysis (assertive, deliberate, chaotic, impetuous, calculating, etc.), communication patterns\n';
+    prompt += '3. **Writing Patterns** — Vocabulary level, sentence structure, rhetorical habits, use of emphasis\n';
+    prompt += '4. **Cognitive Patterns** — Reasoning approach, how they handle complexity, tendencies in argumentation\n';
+    prompt += '5. **Emotional Patterns** — Emotional undertones, triggers, enthusiasm patterns, frustration patterns\n';
+    prompt += '6. **Topic Map** — Recurring themes across projects, how topics connect, intellectual trajectory\n';
+    if (previousProfile) {
+      prompt += '7. **Changes Since Last Profile** — Specific shifts in behavior, interests, style, or patterns\n';
+    }
+    prompt += '\nRules:\n';
+    prompt += '- Be objective, clinical, and analytical. No flattery, no disparagement.\n';
+    prompt += '- Support observations with specific evidence: quote the user directly where possible, cite specific projects/topics.\n';
+    prompt += '- Note contradictions, tensions, or unusual patterns.\n';
+    prompt += '- Use Markdown formatting with headers, bullet points, and bold for key observations.\n';
+    prompt += '- Aim for 800-1500 words depending on available data.\n';
+
+    var response = await callClaude(
+      [{ role: 'user', content: prompt }],
+      'You are a clinical analyst. Produce objective, evidence-based user profiles. Use Markdown formatting.',
+      true,
+      8192
+    );
+
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var fullText = '';
+
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        if (line.startsWith('data: ')) {
+          var data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+              fullText += parsed.delta.text;
+              send({ type: 'token', text: parsed.delta.text });
+            } else if (parsed.type === 'error') {
+              var errType = parsed.error ? parsed.error.type : 'unknown';
+              if (errType === 'overloaded_error') {
+                send({ type: 'error', error: 'Claude is temporarily overloaded. Please try again in a moment.' });
+                res.write('data: [DONE]\n\n');
+                res.end();
+                return;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    if (fullText.trim()) {
+      var wordCount = fullText.split(/\s+/).length;
+      await pool.query(
+        'INSERT INTO profile_snapshots (user_id, profile_text, word_count) VALUES ($1, $2, $3)',
+        [userId, fullText, wordCount]
+      );
+
+      if (Object.keys(profileTree).length === 0) {
+        var seedPrompt = 'Based on this user profile, create an initial analytical profile tree in Tractatus JSON format:\n\n';
+        seedPrompt += fullText.substring(0, 6000) + '\n\n';
+        seedPrompt += 'Categories: 1.x TOPICS, 2.x CONVERSATIONAL_STYLE, 3.x WRITING_PATTERNS, 4.x COGNITIVE_PATTERNS, 5.x EMOTIONAL_PATTERNS, 6.x EVOLUTION\n';
+        seedPrompt += 'Use tags: PATTERN:, TENDENCY:, PREFERENCE:, SHIFT:, NOTABLE:\n';
+        seedPrompt += 'Return ONLY the JSON object.';
+        try {
+          var seedRaw = await callClaude(
+            [{ role: 'user', content: seedPrompt }],
+            'Output only a valid JSON object.',
+            false,
+            4096
+          );
+          var seedTree = tryParseTractatusJSON(seedRaw);
+          if (seedTree) {
+            await pool.query(
+              'INSERT INTO user_analytics (user_id, profile_tree, exchange_count, last_updated) VALUES ($1, $2, 0, NOW()) ON CONFLICT (user_id) DO UPDATE SET profile_tree = $2, last_updated = NOW()',
+              [userId, JSON.stringify(seedTree)]
+            );
+          }
+        } catch (seedErr) {
+          console.error('[Profile] Seed tree generation failed:', seedErr.message);
+        }
+      }
+
+      send({ type: 'complete', wordCount: wordCount });
+    } else {
+      send({ type: 'error', error: 'No profile generated. Try again after more conversations.' });
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('[Profile] Generate error:', err.message);
+    try { send({ type: 'error', error: err.message }); } catch(e2) {}
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
+app.get('/api/profile/tree', async function(req, res) {
+  try {
+    var result = await pool.query('SELECT profile_tree, exchange_count, last_updated FROM user_analytics WHERE user_id = $1', [req.userId]);
+    if (result.rows.length === 0) return res.json({ tree: {}, exchangeCount: 0, lastUpdated: null });
+    res.json({
+      tree: result.rows[0].profile_tree || {},
+      exchangeCount: result.rows[0].exchange_count || 0,
+      lastUpdated: result.rows[0].last_updated
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/profile/history', async function(req, res) {
+  try {
+    var result = await pool.query(
+      'SELECT id, word_count, created_at FROM profile_snapshots WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/profile/snapshot/:id', async function(req, res) {
+  try {
+    var result = await pool.query(
+      'SELECT profile_text, word_count, created_at FROM profile_snapshots WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -3562,6 +3562,100 @@
     }
   });
 
+  document.getElementById('btn-profile-me').addEventListener('click', async function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+      var resp = await fetch('/api/profile/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+
+      if (!resp.ok || !resp.body) {
+        notify('Profile generation failed (' + resp.status + ')', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '&#128100; Profile Me';
+        return;
+      }
+
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var fullText = '';
+      var statusEl = null;
+
+      function createStatusToast(msg) {
+        if (statusEl) { var c = statusEl.querySelector('.tp-content'); if (c) c.textContent = msg; return; }
+        statusEl = document.createElement('div');
+        statusEl.className = 'tractatus-popup';
+        statusEl.style.cssText = 'bottom:80px;right:20px;min-width:280px;max-width:400px;';
+        statusEl.innerHTML = '<div class="tp-header"><div class="tp-title">&#128100; Generating Profile</div></div>' +
+          '<div class="tp-body"><div class="tp-content" style="font-size:12px;padding:6px 10px;">' + msg + '</div></div>';
+        document.body.appendChild(statusEl);
+      }
+
+      function pump() {
+        reader.read().then(function(result) {
+          if (result.done) {
+            if (statusEl) statusEl.remove();
+            btn.disabled = false;
+            btn.innerHTML = '&#128100; Profile Me';
+            if (fullText.trim()) {
+              showArtifact(fullText, 'User Profile', { raw: false });
+            }
+            return;
+          }
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line.startsWith('data: ')) continue;
+            var data = line.substring(6);
+            if (data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              if (parsed.type === 'status') {
+                createStatusToast(parsed.message);
+              } else if (parsed.type === 'token') {
+                fullText += parsed.text;
+                if (statusEl) {
+                  var content = statusEl.querySelector('.tp-content');
+                  if (content) content.textContent = 'Writing profile... (' + fullText.split(/\s+/).length + ' words)';
+                }
+              } else if (parsed.type === 'complete') {
+                if (statusEl) {
+                  var content = statusEl.querySelector('.tp-content');
+                  if (content) content.textContent = 'Profile complete! (' + (parsed.wordCount || fullText.split(/\s+/).length) + ' words)';
+                }
+              } else if (parsed.type === 'error') {
+                notify('Profile error: ' + (parsed.error || 'Unknown'), 'error');
+                if (statusEl) statusEl.remove();
+                statusEl = null;
+                btn.disabled = false;
+                btn.innerHTML = '&#128100; Profile Me';
+              }
+            } catch (e) {}
+          }
+          pump();
+        }).catch(function() {
+          if (statusEl) statusEl.remove();
+          btn.disabled = false;
+          btn.innerHTML = '&#128100; Profile Me';
+          notify('Profile generation failed', 'error');
+        });
+      }
+      pump();
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = '&#128100; Profile Me';
+      notify('Profile error: ' + err.message, 'error');
+    }
+  });
+
   btnLogout.addEventListener('click', async function() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
