@@ -116,7 +116,7 @@ async function verifyGlobalDocOwnership(docId, userId) {
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const XAI_API_KEY = process.env.XAI_API_KEY;
+const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const OPENAI_MODEL = 'gpt-4o';
 const DEEPSEEK_MODEL = 'deepseek-chat';
