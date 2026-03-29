@@ -115,8 +115,12 @@ async function verifyGlobalDocOwnership(docId, userId) {
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const XAI_API_KEY = process.env.XAI_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const OPENAI_MODEL = 'gpt-4o';
+const DEEPSEEK_MODEL = 'deepseek-chat';
+const GROK_MODEL = 'grok-3';
 const MAX_TOKENS = 16384;
 
 const SCHEMA_SQL = `
@@ -282,6 +286,74 @@ async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
   if (!response.ok) {
     var errText = await response.text();
     throw new Error('OpenAI API error ' + response.status + ': ' + errText);
+  }
+
+  if (streaming) return response;
+  var data = await response.json();
+  return data.choices[0].message.content;
+}
+
+async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
+  if (!DEEPSEEK_API_KEY) throw new Error('DeepSeek API key not configured');
+  var apiMessages = [];
+  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
+  for (var i = 0; i < messages.length; i++) {
+    apiMessages.push({ role: messages[i].role, content: messages[i].content });
+  }
+
+  var body = {
+    model: DEEPSEEK_MODEL,
+    max_tokens: maxTokens || MAX_TOKENS,
+    messages: apiMessages,
+    stream: !!streaming
+  };
+
+  var response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + DEEPSEEK_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    var errText = await response.text();
+    throw new Error('DeepSeek API error ' + response.status + ': ' + errText);
+  }
+
+  if (streaming) return response;
+  var data = await response.json();
+  return data.choices[0].message.content;
+}
+
+async function callGrok(messages, systemPrompt, streaming, maxTokens) {
+  if (!XAI_API_KEY) throw new Error('Grok API key not configured');
+  var apiMessages = [];
+  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
+  for (var i = 0; i < messages.length; i++) {
+    apiMessages.push({ role: messages[i].role, content: messages[i].content });
+  }
+
+  var body = {
+    model: GROK_MODEL,
+    max_tokens: maxTokens || MAX_TOKENS,
+    messages: apiMessages,
+    stream: !!streaming
+  };
+
+  var response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + XAI_API_KEY
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    var errText = await response.text();
+    throw new Error('Grok API error ' + response.status + ': ' + errText);
   }
 
   if (streaming) return response;
@@ -767,7 +839,7 @@ app.post('/api/chat', async function(req, res) {
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
     var validFormats = ['prose', 'bullets'];
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
-    var validModels = ['claude', 'chatgpt'];
+    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok'];
     var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
     if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
@@ -858,10 +930,67 @@ app.post('/api/chat', async function(req, res) {
     }
     var continuationCount = 0;
 
+    async function streamOpenAICompatibleCall(callMsgs, callFn, label) {
+      try {
+        var apiRes = await callFn(callMsgs, systemPrompt, true, lengthMaxTokens);
+        if (!apiRes.ok) {
+          var errBody = await apiRes.text();
+          console.error('[stream' + label + '] API error: ' + apiRes.status + ' ' + errBody.substring(0, 500));
+          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error: ' + label + ' API returned ' + apiRes.status + ']\n\n' }) + '\n\n');
+          return { segmentText: '', stopReason: 'error' };
+        }
+        var reader = apiRes.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        var segmentText = '';
+        var stopReason = 'end_turn';
+        while (true) {
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var oLines = buffer.split('\n');
+          buffer = oLines.pop();
+          for (var j = 0; j < oLines.length; j++) {
+            var line = oLines[j];
+            if (line.startsWith('data: ')) {
+              var data = line.slice(6).trim();
+              if (!data || data === '[DONE]') continue;
+              try {
+                var parsed = JSON.parse(data);
+                if (parsed.choices && parsed.choices[0]) {
+                  var delta = parsed.choices[0].delta;
+                  if (delta && delta.content) {
+                    segmentText += delta.content;
+                    res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
+                  }
+                  if (parsed.choices[0].finish_reason === 'length') {
+                    stopReason = 'max_tokens';
+                  } else if (parsed.choices[0].finish_reason === 'stop') {
+                    stopReason = 'end_turn';
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        return { segmentText: segmentText, stopReason: stopReason };
+      } catch (err) {
+        console.error('[stream' + label + '] Exception:', err.message);
+        res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[' + label + ' error: ' + err.message + ']\n\n' }) + '\n\n');
+        return { segmentText: '', stopReason: 'error' };
+      }
+    }
+
     async function streamOneCall(callMsgs) {
       try {
         if (modelChoice === 'chatgpt') {
-          return await streamOpenAICall(callMsgs);
+          return await streamOpenAICompatibleCall(callMsgs, callOpenAI, 'OpenAI');
+        }
+        if (modelChoice === 'deepseek') {
+          return await streamOpenAICompatibleCall(callMsgs, callDeepSeek, 'DeepSeek');
+        }
+        if (modelChoice === 'grok') {
+          return await streamOpenAICompatibleCall(callMsgs, callGrok, 'Grok');
         }
         var anthropicRes = await callClaude(callMsgs, systemPrompt, true, lengthMaxTokens);
         if (!anthropicRes.ok) {
@@ -913,56 +1042,6 @@ app.post('/api/chat', async function(req, res) {
       }
     }
 
-    async function streamOpenAICall(callMsgs) {
-      try {
-        var openaiRes = await callOpenAI(callMsgs, systemPrompt, true, lengthMaxTokens);
-        if (!openaiRes.ok) {
-          var errBody = await openaiRes.text();
-          console.error('[streamOpenAI] API error: ' + openaiRes.status + ' ' + errBody.substring(0, 500));
-          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error: OpenAI API returned ' + openaiRes.status + ']\n\n' }) + '\n\n');
-          return { segmentText: '', stopReason: 'error' };
-        }
-        var reader = openaiRes.body.getReader();
-        var decoder = new TextDecoder();
-        var buffer = '';
-        var segmentText = '';
-        var stopReason = 'end_turn';
-
-        while (true) {
-          var chunk = await reader.read();
-          if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
-          var oLines = buffer.split('\n');
-          buffer = oLines.pop();
-          for (var j = 0; j < oLines.length; j++) {
-            var line = oLines[j];
-            if (line.startsWith('data: ')) {
-              var data = line.slice(6).trim();
-              if (!data || data === '[DONE]') continue;
-              try {
-                var parsed = JSON.parse(data);
-                if (parsed.choices && parsed.choices[0]) {
-                  var delta = parsed.choices[0].delta;
-                  if (delta && delta.content) {
-                    segmentText += delta.content;
-                    res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
-                  }
-                  if (parsed.choices[0].finish_reason === 'length') {
-                    stopReason = 'max_tokens';
-                  } else if (parsed.choices[0].finish_reason === 'stop') {
-                    stopReason = 'end_turn';
-                  }
-                }
-              } catch (e) {}
-            }
-          }
-        }
-        return { segmentText: segmentText, stopReason: stopReason };
-      } catch (err) {
-        console.error('[streamOpenAI] Exception:', err.message);
-        return { segmentText: '', stopReason: 'error' };
-      }
-    }
 
     function getLastNWords(text, n) {
       var words = text.split(/\s+/);
@@ -3567,8 +3646,10 @@ var PORT = parseInt(process.env.PORT || '5000', 10);
 initDB().then(function() {
   app.listen(PORT, '0.0.0.0', function() {
     console.log('LLM Plus server running on port ' + PORT);
-    console.log('API Keys: ANTHROPIC=' + (process.env.ANTHROPIC_API_KEY ? 'SET' : 'MISSING') +
-      ' OPENAI=' + (process.env.OPENAI_API_KEY ? 'SET' : 'MISSING') +
+    console.log('API Keys: ANTHROPIC=' + (ANTHROPIC_API_KEY ? 'SET' : 'MISSING') +
+      ' OPENAI=' + (OPENAI_API_KEY ? 'SET' : 'MISSING') +
+      ' DEEPSEEK=' + (DEEPSEEK_API_KEY ? 'SET' : 'MISSING') +
+      ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
   });
 }).catch(function(err) {

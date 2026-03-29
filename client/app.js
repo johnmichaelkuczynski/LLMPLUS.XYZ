@@ -7,7 +7,7 @@
     streaming: false,
     projectDocs: [],
     pendingAttachments: [],
-    responseLength: 'concise',
+    responseLength: 'normal',
     responseFormat: 'prose',
     model: 'claude'
   };
@@ -885,8 +885,10 @@
     els.welcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message assistant';
-    var modelLabel = state.model === 'chatgpt' ? 'ChatGPT' : 'Claude';
-    div.innerHTML = '<div class="msg-avatar">C</div>' +
+    var modelLabels = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+    var modelLabel = modelLabels[state.model] || 'Claude';
+    var avatarLetter = modelLabel.charAt(0);
+    div.innerHTML = '<div class="msg-avatar">' + avatarLetter + '</div>' +
       '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button></div>' +
       '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
     var copyBtn = div.querySelector('.msg-copy-btn');
@@ -2541,7 +2543,8 @@
       document.querySelectorAll('.rm-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.model = btn.getAttribute('data-model');
-      els.chatInput.placeholder = state.model === 'chatgpt' ? 'Message ChatGPT...' : 'Message Claude...';
+      var modelNames = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+      els.chatInput.placeholder = 'Message ' + (modelNames[state.model] || 'Claude') + '...';
     });
   });
 

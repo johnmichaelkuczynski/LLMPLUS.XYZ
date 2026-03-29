@@ -8,7 +8,10 @@ Minimalist web chat app connecting to Anthropic Claude with document management,
 - Node.js + Express backend (ESM due to locked package.json)
 - Raw pg Pool for PostgreSQL (Neon database via NEON_DATABASE_URL)
 - Official Anthropic API (https://api.anthropic.com/v1/messages, x-api-key header)
-- Model: claude-sonnet-4-20250514, max_tokens: 16384
+- OpenAI API (https://api.openai.com/v1/chat/completions)
+- DeepSeek API (https://api.deepseek.com/chat/completions, OpenAI-compatible)
+- xAI/Grok API (https://api.x.ai/v1/chat/completions, OpenAI-compatible)
+- Models: Claude (claude-sonnet-4-20250514), ChatGPT (gpt-4o), DeepSeek (deepseek-chat), Grok (grok-3); max_tokens: 16384
 
 ## File Structure
 ```
@@ -34,7 +37,7 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **Artifact Panel**: When Claude generates a document-like response (detected by word count + structure: 150+ words with headings, 200+ words with paragraphs, 300+ words with numbered lists, or 800+ words), a formatted side panel auto-opens during streaming — slides in from right with live updates every 300ms. Buttons: Copy to clipboard, Download TXT/DOCX/PDF, Save to Library, Close.
 - **Download**: Export coherence engine output and artifacts as TXT, DOCX, PDF
 - **Collapsed Messages**: Large user messages (200+ words) show collapsed card with expand button
-- **Response Length Control**: Four-mode selector above chat input: Concise (1024 tokens, no continuations), Normal (4096 tokens, 2 continuations), Detailed (8192 tokens, 10 continuations), Exhaustive (16384 tokens, 40 continuations). System prompt adapts per mode. If user specifies a word count in their message, it overrides to full tokens. Default is Concise. Server validates input.
+- **Response Length Control**: Four-mode selector above chat input: Concise (1024 tokens, no continuations), Normal (4096 tokens, 2 continuations), Detailed (8192 tokens, 10 continuations), Exhaustive (16384 tokens, 40 continuations). System prompt adapts per mode. If user specifies a word count in their message, it overrides to full tokens. Default is Normal. Server validates input.
 - **Streaming UX**: All SSE endpoints include `X-Accel-Buffering: no` header. Chat endpoint sends immediate `status: thinking` event. Client shows animated bouncing dots while waiting for first token, then transitions to blinking cursor with streaming text.
 - **Summarize Project/Chat**: Two sidebar buttons. Opens a modal with length options: Auto (default, calculated from content size), Brief (~200 words), Moderate (~600 words), Detailed (~1500 words or custom). Auto mode scales: <500 source words → 150, <2K → 300, <5K → 500, <15K → 800, <40K → 1200, 40K+ → 2000. Summary streams via SSE and opens in the artifact panel with copy/download options. Server endpoint: `POST /api/summarize` with `scope` (project/chat), `chatId`, `targetWords`.
 - **User Analytics / Profile Me**: Cross-project user profiling system. Maintains a dedicated Tractatus-style profile tree (`user_analytics` table) that builds incrementally every 5th chat exchange by analyzing all project trees + the latest conversation. Profile tree categories: 1.x Topics, 2.x Conversational Style, 3.x Writing Patterns, 4.x Cognitive Patterns, 5.x Emotional Patterns, 6.x Evolution. "Profile Me" sidebar button (amber) generates a full clinical profile via SSE streaming — gathers all project trees, samples 20 recent conversations, compares against previous profile snapshot, and produces an 800-1500 word analysis with evidence/quotations. Output opens in artifact panel. Profile snapshots saved to `profile_snapshots` table for longitudinal tracking. Includes "Changes Since Last Profile" section comparing against previous generation. API: `POST /api/profile/generate` (SSE), `GET /api/profile/tree`, `GET /api/profile/history`, `GET /api/profile/snapshot/:id`.
@@ -55,6 +58,9 @@ users (id UUID, username, password_hash nullable), projects (with user_id FK, tr
 
 ## Environment Variables
 - ANTHROPIC_API_KEY: Claude API key
+- OPENAI_API_KEY: OpenAI ChatGPT API key
+- DEEPSEEK_API_KEY: DeepSeek API key
+- XAI_API_KEY: xAI/Grok API key
 - DATABASE_URL: Neon PostgreSQL connection string
 - GOOGLE_CLOUD_VISION_API_KEY: Google Cloud Vision API key for image OCR
 - SESSION_SECRET: Express session secret
