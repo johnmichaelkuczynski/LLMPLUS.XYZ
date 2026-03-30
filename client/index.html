@@ -77,6 +77,7 @@
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
       </header>
 
+      <div id="staleness-container" data-testid="staleness-container" style="padding: 0 16px;"></div>
       <div class="messages" id="messages">
         <div class="welcome" id="welcome" data-testid="welcome-screen">
           <h2>Welcome to LLM Plus</h2>
@@ -123,6 +124,16 @@
       </div>
       <div class="doc-panel-list" id="doc-panel-list" data-testid="doc-panel-list"></div>
     </aside>
+  </div>
+
+  <div class="audit-result-panel" id="audit-panel" data-testid="audit-panel">
+    <div class="audit-result-header">
+      <h3>&#128269; Fact-Check Audit</h3>
+      <button class="audit-result-close" id="audit-panel-close" data-testid="audit-panel-close">&times;</button>
+    </div>
+    <div class="audit-result-body" id="audit-result-body" data-testid="audit-result-body">
+      <div class="audit-result-status">Select text and click Audit to fact-check claims.</div>
+    </div>
   </div>
 
   <div class="artifact-panel hidden" id="artifact-panel" data-testid="artifact-panel">

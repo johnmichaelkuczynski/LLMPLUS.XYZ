@@ -217,6 +217,10 @@ async function initDB() {
         await client.query("ALTER TABLE projects ADD CONSTRAINT fk_parent_project FOREIGN KEY (parent_project_id) REFERENCES projects(id) ON DELETE CASCADE");
       } catch (fkErr) { /* constraint may already exist */ }
     } catch (e) { /* columns may already exist */ }
+    try {
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_tree_update TIMESTAMPTZ DEFAULT NOW()");
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS compression_count INTEGER DEFAULT 0");
+    } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
     if (projects.rows.length === 0) {
@@ -559,7 +563,7 @@ function compactTreeString(tree) {
   return lines.join('\n');
 }
 
-function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext) {
+function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo) {
   var prompt = 'You are an AI assistant in LLM Plus, a scholarly research and analysis platform. The user is an academic or professional researcher. Provide expert-level, intellectually rigorous responses. Be helpful, thorough, and precise.';
 
   if (responseLength === 'concise') {
@@ -644,6 +648,17 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   } else {
     prompt += '\n\nThis appears to be a general knowledge question not specific to the current project. Answer from your general knowledge as a scholarly expert. Do NOT reference project-specific context unless the user explicitly asks about it.';
   }
+
+  if (stalenessInfo && stalenessInfo.isStale) {
+    prompt += '\n\n⚠️ MEMORY STALENESS WARNING: This project\'s Tractatus tree has not been updated in ' + stalenessInfo.daysSinceUpdate + ' days';
+    if (stalenessInfo.compressionCount > 0) prompt += ' and has been compressed ' + stalenessInfo.compressionCount + ' time(s)';
+    prompt += '. Some details (especially specific dates, numbers, names) may have degraded during compression or may be outdated. When citing specific facts from memory:';
+    prompt += '\n- ALWAYS qualify uncertain specifics: "According to project records..." or "The tree records this as..."';
+    prompt += '\n- NEVER fabricate details that are not explicitly present in the tree nodes';
+    prompt += '\n- If a date/number/name is not in the tree, say "I don\'t have that specific detail in the current project memory" rather than guessing';
+    prompt += '\n- Recommend the user run an Audit if accuracy of specific claims is critical';
+  }
+
   return prompt;
 }
 
@@ -898,7 +913,24 @@ app.post('/api/chat', async function(req, res) {
     var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
     console.log('[Chat] projectSpecific=' + includeProjectContext);
 
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext);
+    var stalenessInfo = null;
+    if (includeProjectContext) {
+      var stalenessResult = await pool.query(
+        'SELECT last_tree_update, compression_count FROM projects WHERE id = $1',
+        [projectId]
+      );
+      if (stalenessResult.rows[0] && stalenessResult.rows[0].last_tree_update) {
+        var lastUpdate = new Date(stalenessResult.rows[0].last_tree_update);
+        var daysSince = Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+        var compCount = stalenessResult.rows[0].compression_count || 0;
+        if (daysSince >= 3 || compCount >= 2) {
+          stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
+          console.log('[Chat] Staleness warning: ' + daysSince + ' days since update, ' + compCount + ' compressions');
+        }
+      }
+    }
+
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo);
     if (includeProjectContext && crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
     }
@@ -1728,7 +1760,7 @@ app.post('/api/tractatus/update', async function(req, res) {
 
     var merged = Object.assign({}, existingTree, newTree);
     var nodeCount = Object.keys(merged).length;
-    await pool.query('UPDATE projects SET tractatus_tree = $1 WHERE id = $2', [JSON.stringify(merged), projectId]);
+    await pool.query('UPDATE projects SET tractatus_tree = $1, last_tree_update = NOW() WHERE id = $2', [JSON.stringify(merged), projectId]);
     send({ type: 'complete', nodes: nodeCount });
 
     if (nodeCount >= 200) {
@@ -1823,7 +1855,7 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, use
       var mergedSummary = Object.assign({}, existingSummary, summaryTree);
       var mergedCount = Object.keys(mergedSummary).length;
       await txClient.query(
-        'UPDATE projects SET tractatus_tree = $1 WHERE id = $2',
+        'UPDATE projects SET tractatus_tree = $1, last_tree_update = NOW() WHERE id = $2',
         [JSON.stringify(mergedSummary), existingSummaries.rows[0].id]
       );
       console.log('[Tractatus] Merged into existing Tier ' + summaryTier + ' summary (' + mergedCount + ' nodes)');
@@ -1848,7 +1880,7 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, use
       keptTree[recentKeys[rk]] = fullTree[recentKeys[rk]];
     }
     await txClient.query(
-      'UPDATE projects SET tractatus_tree = $1 WHERE id = $2',
+      'UPDATE projects SET tractatus_tree = $1, last_tree_update = NOW(), compression_count = COALESCE(compression_count, 0) + 1 WHERE id = $2',
       [JSON.stringify(keptTree), projectId]
     );
     console.log('[Tractatus] After compression, kept ' + keepCount + ' most recent nodes in Tier 1');
@@ -3641,6 +3673,198 @@ app.get('/api/profile/snapshot/:id', async function(req, res) {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/audit', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  var clientDisconnected = false;
+  req.on('close', function() { clientDisconnected = true; });
+
+  function send(obj) {
+    if (clientDisconnected) return;
+    try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch(e) {}
+  }
+
+  try {
+    var projectId = req.body.projectId;
+    var textToAudit = (req.body.text || '').trim();
+    if (!textToAudit) {
+      send({ type: 'error', error: 'No text provided to audit' });
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+    if (!await verifyProjectOwnership(projectId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+
+    send({ type: 'status', message: 'Loading project memory...' });
+
+    var projectResult = await pool.query('SELECT name, tractatus_tree FROM projects WHERE id = $1', [projectId]);
+    var projectName = projectResult.rows[0] ? projectResult.rows[0].name : 'Unknown';
+    var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
+    var treeStr = compactTreeString(tree);
+    if (treeStr.length > 12000) treeStr = treeStr.substring(0, 12000) + '\n...[truncated]';
+
+    var tierTrees = await pool.query(
+      'SELECT name, tractatus_tree, tractatus_tier FROM projects WHERE parent_project_id = $1 ORDER BY tractatus_tier ASC',
+      [projectId]
+    );
+    var tierContext = '';
+    for (var ti = 0; ti < tierTrees.rows.length; ti++) {
+      var tt = tierTrees.rows[ti].tractatus_tree || {};
+      var ttStr = compactTreeString(tt);
+      if (ttStr.length > 4000) ttStr = ttStr.substring(0, 4000) + '\n...[truncated]';
+      tierContext += '\n\n### Tier ' + (tierTrees.rows[ti].tractatus_tier || 2) + ' Memory:\n' + ttStr;
+    }
+
+    send({ type: 'status', message: 'Loading source documents...' });
+
+    var docs = await pool.query(
+      'SELECT name, raw_content FROM project_documents WHERE project_id = $1 ORDER BY created_at DESC LIMIT 10',
+      [projectId]
+    );
+    var docContext = '';
+    for (var d = 0; d < docs.rows.length; d++) {
+      var docContent = (docs.rows[d].raw_content || '').substring(0, 5000);
+      docContext += '\n\n### Document: "' + docs.rows[d].name + '"\n' + docContent;
+      if (docContext.length > 25000) break;
+    }
+
+    var recentSessions = await pool.query(
+      'SELECT title, transcript FROM sessions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 5',
+      [projectId]
+    );
+    var chatContext = '';
+    for (var s = 0; s < recentSessions.rows.length; s++) {
+      var transcript = recentSessions.rows[s].transcript || [];
+      var userMsgs = transcript.filter(function(m) { return m.role === 'user'; });
+      var recentUser = userMsgs.slice(-5);
+      chatContext += '\n--- Chat: "' + (recentSessions.rows[s].title || 'Untitled') + '" ---\n';
+      for (var um = 0; um < recentUser.length; um++) {
+        chatContext += 'User: "' + (recentUser[um].content || '').substring(0, 800) + '"\n';
+      }
+      if (chatContext.length > 10000) break;
+    }
+
+    send({ type: 'status', message: 'Auditing claims against sources...' });
+
+    var prompt = 'You are a rigorous fact-checker and auditor. Your job is to audit the following text against the available evidence.\n\n';
+    prompt += '## TEXT TO AUDIT:\n"' + textToAudit.substring(0, 8000) + '"\n\n';
+    prompt += '## PRIMARY EVIDENCE — Tractatus Tree (Project: "' + projectName + '"):\n' + (treeStr || '(empty)') + '\n\n';
+    if (tierContext) prompt += '## COMPRESSED MEMORY TIERS:\n' + tierContext + '\n\n';
+    if (docContext) prompt += '## SOURCE DOCUMENTS:\n' + docContext + '\n\n';
+    if (chatContext) prompt += '## RECENT USER STATEMENTS (treated as claims to cross-reference):\n' + chatContext + '\n\n';
+    prompt += '## YOUR TASK:\n';
+    prompt += 'Audit every factual claim in the text above. For EACH claim:\n';
+    prompt += '1. State the specific claim\n';
+    prompt += '2. Mark it: ✅ VERIFIED (found supporting evidence), ⚠️ UNVERIFIABLE (no evidence found, could be hallucinated), or ❌ CONTRADICTED (evidence contradicts this)\n';
+    prompt += '3. Cite the specific evidence source (Tractatus node, document name, user statement)\n';
+    prompt += '4. For dates, numbers, names, and specific facts: be EXTREMELY strict. If the source says "December 2024" and the text says "December 2025", that is a ❌ CONTRADICTION.\n\n';
+    prompt += 'CRITICAL RULES:\n';
+    prompt += '- Dates are the #1 source of fabrication. Check EVERY date against sources.\n';
+    prompt += '- If you cannot find evidence for a claim in the provided sources, mark it ⚠️ UNVERIFIABLE. Do NOT assume it is correct.\n';
+    prompt += '- Be blunt and direct. This is an audit, not a review.\n';
+    prompt += '- End with a SUMMARY: total claims checked, verified count, unverifiable count, contradicted count.\n';
+    prompt += '- If the text references specific documents or exhibits, check if those documents exist in the source documents section.\n';
+    prompt += '- Use Markdown formatting.\n';
+
+    var response = await callClaude(
+      [{ role: 'user', content: prompt }],
+      'You are a ruthless fact-checker. Never give the benefit of the doubt. If evidence is missing, say so. Check every date, name, and number.',
+      true,
+      8192
+    );
+
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var fullText = '';
+
+    while (true) {
+      if (clientDisconnected) break;
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        if (line.startsWith('data: ')) {
+          var data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+              fullText += parsed.delta.text;
+              send({ type: 'token', text: parsed.delta.text });
+            } else if (parsed.type === 'error') {
+              var errType = parsed.error ? parsed.error.type : 'unknown';
+              if (errType === 'overloaded_error') {
+                send({ type: 'error', error: 'Claude is temporarily overloaded.' });
+                res.write('data: [DONE]\n\n');
+                res.end();
+                return;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    if (fullText.trim()) {
+      send({ type: 'complete', wordCount: fullText.split(/\s+/).length });
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('[Audit] Error:', err.message);
+    try { send({ type: 'error', error: 'An error occurred during the audit. Please try again.' }); } catch(e2) {}
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
+app.get('/api/projects/:id/staleness', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    var result = await pool.query(
+      'SELECT last_tree_update, compression_count, tractatus_tree FROM projects WHERE id = $1',
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+    var row = result.rows[0];
+    var lastUpdate = row.last_tree_update ? new Date(row.last_tree_update) : null;
+    var daysSince = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    var compCount = row.compression_count || 0;
+    var nodeCount = row.tractatus_tree ? Object.keys(row.tractatus_tree).length : 0;
+    var isStale = (daysSince !== null && daysSince >= 3) || compCount >= 2;
+    var severity = 'fresh';
+    if (isStale) {
+      if (daysSince >= 14 || compCount >= 5) severity = 'critical';
+      else if (daysSince >= 7 || compCount >= 3) severity = 'warning';
+      else severity = 'mild';
+    }
+    res.json({
+      isStale: isStale,
+      severity: severity,
+      daysSinceUpdate: daysSince,
+      compressionCount: compCount,
+      nodeCount: nodeCount,
+      lastUpdate: lastUpdate ? lastUpdate.toISOString() : null
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

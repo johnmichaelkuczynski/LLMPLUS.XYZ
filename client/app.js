@@ -551,6 +551,7 @@
     state.sessions = await api('/api/projects/' + p.id + '/sessions');
     renderSessions();
     loadProjectDocs();
+    checkStaleness();
     if (state.sessions.length > 0) {
       selectSession(state.sessions[0]);
     } else {
@@ -735,7 +736,7 @@
       bodyHtml = '<div class="msg-text">' + fmt(content) + '</div>';
     }
 
-    var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button>' : '';
+    var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button>' : '';
     div.innerHTML = '<div class="msg-avatar">' + avatar + '</div>' +
       '<div class="msg-body"><div class="msg-role">' + label + copyBtnHtml + '</div>' + bodyHtml + '</div>';
 
@@ -768,6 +769,15 @@
             copyBtn.textContent = '\u2705';
             setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
           });
+        });
+      }
+      var auditBtn = div.querySelector('.msg-audit-btn');
+      if (auditBtn) {
+        auditBtn.addEventListener('click', function() {
+          var textEl = div.querySelector('.msg-text');
+          var selected = window.getSelection().toString().trim();
+          var textToAudit = selected || (textEl ? textEl.innerText : content);
+          if (textToAudit) runAudit(textToAudit, auditBtn);
         });
       }
     }
@@ -889,7 +899,7 @@
     var modelLabel = modelLabels[state.model] || 'Claude';
     var avatarLetter = modelLabel.charAt(0);
     div.innerHTML = '<div class="msg-avatar">' + avatarLetter + '</div>' +
-      '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button></div>' +
+      '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button></div>' +
       '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
     var copyBtn = div.querySelector('.msg-copy-btn');
     copyBtn.addEventListener('click', function() {
@@ -899,6 +909,13 @@
         copyBtn.textContent = '\u2705';
         setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
       });
+    });
+    var auditBtn = div.querySelector('.msg-audit-btn');
+    auditBtn.addEventListener('click', function() {
+      var textEl = div.querySelector('.msg-text');
+      var selected = window.getSelection().toString().trim();
+      var textToAudit = selected || (textEl ? textEl.innerText : '');
+      if (textToAudit) runAudit(textToAudit, auditBtn);
     });
     els.messages.appendChild(div);
     scrollBottom();
@@ -3473,6 +3490,113 @@
 
   function hideAuthError() {
     authError.classList.add('hidden');
+  }
+
+  var auditPanel = document.getElementById('audit-panel');
+  var auditBody = document.getElementById('audit-result-body');
+  var stalenessContainer = document.getElementById('staleness-container');
+
+  document.getElementById('audit-panel-close').addEventListener('click', function() {
+    auditPanel.classList.remove('active');
+  });
+
+  async function runAudit(text, triggerBtn) {
+    if (!state.currentProject) return;
+    auditPanel.classList.add('active');
+    auditBody.innerHTML = '<div class="audit-result-status">Auditing claims against project memory...</div>';
+    if (triggerBtn) {
+      triggerBtn.classList.add('auditing');
+      triggerBtn.textContent = 'Auditing...';
+    }
+
+    try {
+      var response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: state.currentProject.id,
+          text: text.substring(0, 8000)
+        })
+      });
+
+      if (!response.ok || !response.body) {
+        auditBody.innerHTML = '<div class="audit-result-status" style="color:#dc2626;">Audit request failed. Please try again.</div>';
+        if (triggerBtn) { triggerBtn.classList.remove('auditing'); triggerBtn.textContent = 'Audit'; }
+        return;
+      }
+
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var fullText = '';
+      auditBody.innerHTML = '';
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          var data = line.slice(6).trim();
+          if (data === '[DONE]') break;
+          try {
+            var parsed = JSON.parse(data);
+            if (parsed.type === 'token') {
+              fullText += parsed.text;
+              auditBody.innerHTML = fmt(fullText);
+            } else if (parsed.type === 'status') {
+              if (!fullText) {
+                auditBody.innerHTML = '<div class="audit-result-status">' + esc(parsed.message) + '</div>';
+              }
+            } else if (parsed.type === 'error') {
+              auditBody.innerHTML = '<div class="audit-result-status" style="color:#dc2626;">' + esc(parsed.error) + '</div>';
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      auditBody.innerHTML = '<div class="audit-result-status" style="color:#dc2626;">Audit failed: ' + esc(err.message) + '</div>';
+    }
+
+    if (triggerBtn) {
+      triggerBtn.classList.remove('auditing');
+      triggerBtn.textContent = 'Audit';
+    }
+  }
+
+  async function checkStaleness() {
+    if (!state.currentProject) {
+      stalenessContainer.innerHTML = '';
+      return;
+    }
+    try {
+      var r = await fetch('/api/projects/' + state.currentProject.id + '/staleness');
+      if (!r.ok) return;
+      var data = await r.json();
+      if (!data.isStale) {
+        stalenessContainer.innerHTML = '';
+        return;
+      }
+      var icon = data.severity === 'critical' ? '\u26A0\uFE0F' : data.severity === 'warning' ? '\u26A0\uFE0F' : '\u2139\uFE0F';
+      var msg = 'Project memory';
+      if (data.daysSinceUpdate !== null && data.daysSinceUpdate > 0) msg += ' last updated ' + data.daysSinceUpdate + ' day' + (data.daysSinceUpdate !== 1 ? 's' : '') + ' ago';
+      if (data.compressionCount > 0) msg += ', compressed ' + data.compressionCount + ' time' + (data.compressionCount !== 1 ? 's' : '');
+      msg += '. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.';
+      stalenessContainer.innerHTML = '<div class="staleness-banner severity-' + data.severity + '" data-testid="staleness-banner">' +
+        '<span class="staleness-icon">' + icon + '</span>' +
+        '<span class="staleness-text">' + msg + '</span>' +
+        '<button class="btn-dismiss-staleness" data-testid="btn-dismiss-staleness">&times;</button>' +
+        '</div>';
+      var dismissBtn = stalenessContainer.querySelector('.btn-dismiss-staleness');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', function() {
+          stalenessContainer.innerHTML = '';
+        });
+      }
+    } catch (e) {}
   }
 
   var reminderDot = document.getElementById('reminder-dot');
