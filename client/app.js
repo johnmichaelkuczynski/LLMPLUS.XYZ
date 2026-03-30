@@ -3475,11 +3475,153 @@
     authError.classList.add('hidden');
   }
 
+  var reminderDot = document.getElementById('reminder-dot');
+  var remindersModal = document.getElementById('reminders-modal');
+  var remindersList = document.getElementById('reminders-list');
+  var reminderInput = document.getElementById('reminder-input');
+
+  async function updateReminderDot() {
+    try {
+      var r = await fetch('/api/reminders/count');
+      if (r.ok) {
+        var data = await r.json();
+        reminderDot.classList.toggle('hidden', data.count === 0);
+      }
+    } catch (e) {}
+  }
+
+  async function loadReminders() {
+    try {
+      var r = await fetch('/api/reminders');
+      if (!r.ok) return;
+      var reminders = await r.json();
+      renderReminders(reminders);
+    } catch (e) {}
+  }
+
+  function renderReminders(reminders) {
+    if (reminders.length === 0) {
+      remindersList.innerHTML = '<div class="reminders-empty">No reminders yet. Add one above.</div>';
+      return;
+    }
+    remindersList.innerHTML = '';
+    for (var i = 0; i < reminders.length; i++) {
+      (function(rem) {
+        var div = document.createElement('div');
+        div.className = 'reminder-item' + (rem.completed ? ' completed' : '');
+        div.setAttribute('data-testid', 'reminder-item-' + rem.id);
+
+        var check = document.createElement('div');
+        check.className = 'reminder-check';
+        check.innerHTML = rem.completed ? '&#10003;' : '';
+        check.addEventListener('click', async function() {
+          try {
+            await fetch('/api/reminders/' + rem.id, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ completed: !rem.completed })
+            });
+            loadReminders();
+            updateReminderDot();
+          } catch (e) {}
+        });
+
+        var textWrap = document.createElement('div');
+        textWrap.style.flex = '1';
+        var textEl = document.createElement('div');
+        textEl.className = 'reminder-text';
+        textEl.textContent = rem.text;
+        var metaEl = document.createElement('div');
+        metaEl.className = 'reminder-meta';
+        var d = new Date(rem.created_at);
+        var dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        metaEl.textContent = dateStr;
+        if (rem.completed && rem.completed_at) {
+          var cd = new Date(rem.completed_at);
+          metaEl.textContent += ' — done ' + cd.toLocaleDateString();
+        }
+        textWrap.appendChild(textEl);
+        textWrap.appendChild(metaEl);
+
+        var del = document.createElement('button');
+        del.className = 'reminder-delete';
+        del.innerHTML = '&times;';
+        del.title = 'Delete';
+        del.addEventListener('click', async function() {
+          try {
+            await fetch('/api/reminders/' + rem.id, { method: 'DELETE' });
+            loadReminders();
+            updateReminderDot();
+          } catch (e) {}
+        });
+
+        div.appendChild(check);
+        div.appendChild(textWrap);
+        div.appendChild(del);
+        remindersList.appendChild(div);
+      })(reminders[i]);
+    }
+  }
+
+  document.getElementById('btn-reminders').addEventListener('click', function() {
+    remindersModal.classList.add('active');
+    loadReminders();
+    reminderInput.focus();
+  });
+
+  document.getElementById('close-reminders').addEventListener('click', function() {
+    remindersModal.classList.remove('active');
+  });
+  document.getElementById('reminders-close').addEventListener('click', function() {
+    remindersModal.classList.remove('active');
+  });
+  remindersModal.addEventListener('mousedown', function(e) {
+    if (e.target === remindersModal) remindersModal.classList.remove('active');
+  });
+  remindersModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+  document.getElementById('btn-add-reminder').addEventListener('click', async function() {
+    var text = reminderInput.value.trim();
+    if (!text) return;
+    try {
+      await fetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, projectId: state.currentProject ? state.currentProject.id : null })
+      });
+      reminderInput.value = '';
+      loadReminders();
+      updateReminderDot();
+    } catch (e) {}
+  });
+
+  reminderInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btn-add-reminder').click();
+    }
+  });
+
+  document.getElementById('btn-clear-completed').addEventListener('click', async function() {
+    try {
+      var r = await fetch('/api/reminders');
+      if (!r.ok) return;
+      var reminders = await r.json();
+      var completed = reminders.filter(function(rem) { return rem.completed; });
+      for (var i = 0; i < completed.length; i++) {
+        await fetch('/api/reminders/' + completed[i].id, { method: 'DELETE' });
+      }
+      loadReminders();
+      updateReminderDot();
+    } catch (e) {}
+  });
+
   function showApp(user) {
     loginScreen.classList.add('hidden');
     appEl.classList.remove('hidden');
     userDisplay.textContent = user.username;
     loadProjects();
+    updateReminderDot();
   }
 
   function showLogin() {

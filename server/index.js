@@ -180,6 +180,15 @@ CREATE TABLE IF NOT EXISTS tractatus_archive (
   node_count INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS reminders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  text TEXT NOT NULL,
+  completed BOOLEAN DEFAULT false,
+  project_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
 CREATE TABLE IF NOT EXISTS user_analytics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -3632,6 +3641,90 @@ app.get('/api/profile/snapshot/:id', async function(req, res) {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/reminders', async function(req, res) {
+  try {
+    var result = await pool.query(
+      'SELECT id, text, completed, project_id, created_at, completed_at FROM reminders WHERE user_id = $1 ORDER BY completed ASC, created_at DESC',
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/reminders/count', async function(req, res) {
+  try {
+    var result = await pool.query(
+      'SELECT COUNT(*) as count FROM reminders WHERE user_id = $1 AND completed = false',
+      [req.userId]
+    );
+    res.json({ count: parseInt(result.rows[0].count) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/reminders', async function(req, res) {
+  try {
+    var text = (req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Reminder text required' });
+    var projectId = req.body.projectId || null;
+    var result = await pool.query(
+      'INSERT INTO reminders (user_id, text, project_id) VALUES ($1, $2, $3) RETURNING *',
+      [req.userId, text, projectId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/reminders/:id', async function(req, res) {
+  try {
+    var id = req.params.id;
+    var completed = req.body.completed;
+    var completedAt = completed ? 'NOW()' : 'NULL';
+    var result = await pool.query(
+      'UPDATE reminders SET completed = $1, completed_at = ' + completedAt + ' WHERE id = $2 AND user_id = $3 RETURNING *',
+      [completed, id, req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/reminders/:id', async function(req, res) {
+  try {
+    var id = req.params.id;
+    var text = (req.body.text || '').trim();
+    if (!text) return res.status(400).json({ error: 'Reminder text required' });
+    var result = await pool.query(
+      'UPDATE reminders SET text = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
+      [text, id, req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/reminders/:id', async function(req, res) {
+  try {
+    var result = await pool.query(
+      'DELETE FROM reminders WHERE id = $1 AND user_id = $2 RETURNING id',
+      [req.params.id, req.userId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ deleted: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
