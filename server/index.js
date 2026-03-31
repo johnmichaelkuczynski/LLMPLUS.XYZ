@@ -274,6 +274,7 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
 }
 
 async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
+  if (!OPENAI_API_KEY) throw new Error('OpenAI API key not configured. Set OPENAI_API_KEY in environment.');
   var apiMessages = [];
   if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
   for (var i = 0; i < messages.length; i++) {
@@ -287,27 +288,47 @@ async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
     stream: !!streaming
   };
 
-  var response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + OPENAI_API_KEY
-    },
-    body: JSON.stringify(body)
-  });
+  var lastErr = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      var delay = Math.pow(2, attempt) * 1000;
+      console.log('[OpenAI] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
+      await new Promise(function(r) { setTimeout(r, delay); });
+    }
+    try {
+      var response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + OPENAI_API_KEY
+        },
+        body: JSON.stringify(body)
+      });
 
-  if (!response.ok) {
-    var errText = await response.text();
-    throw new Error('OpenAI API error ' + response.status + ': ' + errText);
+      if (response.ok) {
+        if (streaming) return response;
+        var data = await response.json();
+        return data.choices[0].message.content;
+      }
+
+      var errText = await response.text();
+      lastErr = 'OpenAI API error ' + response.status + ': ' + errText.substring(0, 300);
+      if (response.status === 429 || response.status >= 500) {
+        console.log('[OpenAI] Retryable error ' + response.status);
+        continue;
+      }
+      throw new Error(lastErr);
+    } catch (fetchErr) {
+      if (fetchErr.message && fetchErr.message.startsWith('OpenAI API error')) throw fetchErr;
+      lastErr = fetchErr.message;
+      console.log('[OpenAI] Fetch error: ' + lastErr);
+    }
   }
-
-  if (streaming) return response;
-  var data = await response.json();
-  return data.choices[0].message.content;
+  throw new Error(lastErr || 'OpenAI API failed after 3 attempts');
 }
 
 async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
-  if (!DEEPSEEK_API_KEY) throw new Error('DeepSeek API key not configured');
+  if (!DEEPSEEK_API_KEY) throw new Error('DeepSeek API key not configured. Set DEEPSEEK_API_KEY in environment.');
   var apiMessages = [];
   if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
   for (var i = 0; i < messages.length; i++) {
@@ -321,27 +342,47 @@ async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
     stream: !!streaming
   };
 
-  var response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + DEEPSEEK_API_KEY
-    },
-    body: JSON.stringify(body)
-  });
+  var lastErr = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      var delay = Math.pow(2, attempt) * 1000;
+      console.log('[DeepSeek] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
+      await new Promise(function(r) { setTimeout(r, delay); });
+    }
+    try {
+      var response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + DEEPSEEK_API_KEY
+        },
+        body: JSON.stringify(body)
+      });
 
-  if (!response.ok) {
-    var errText = await response.text();
-    throw new Error('DeepSeek API error ' + response.status + ': ' + errText);
+      if (response.ok) {
+        if (streaming) return response;
+        var data = await response.json();
+        return data.choices[0].message.content;
+      }
+
+      var errText = await response.text();
+      lastErr = 'DeepSeek API error ' + response.status + ': ' + errText.substring(0, 300);
+      if (response.status === 429 || response.status >= 500) {
+        console.log('[DeepSeek] Retryable error ' + response.status);
+        continue;
+      }
+      throw new Error(lastErr);
+    } catch (fetchErr) {
+      if (fetchErr.message && fetchErr.message.startsWith('DeepSeek API error')) throw fetchErr;
+      lastErr = fetchErr.message;
+      console.log('[DeepSeek] Fetch error: ' + lastErr);
+    }
   }
-
-  if (streaming) return response;
-  var data = await response.json();
-  return data.choices[0].message.content;
+  throw new Error(lastErr || 'DeepSeek API failed after 3 attempts');
 }
 
 async function callGrok(messages, systemPrompt, streaming, maxTokens) {
-  if (!XAI_API_KEY) throw new Error('Grok API key not configured');
+  if (!XAI_API_KEY) throw new Error('Grok API key not configured. Set XAI_API_KEY or GROK_API_KEY in environment.');
   var apiMessages = [];
   if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
   for (var i = 0; i < messages.length; i++) {
@@ -355,23 +396,43 @@ async function callGrok(messages, systemPrompt, streaming, maxTokens) {
     stream: !!streaming
   };
 
-  var response = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + XAI_API_KEY
-    },
-    body: JSON.stringify(body)
-  });
+  var lastErr = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      var delay = Math.pow(2, attempt) * 1000;
+      console.log('[Grok] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
+      await new Promise(function(r) { setTimeout(r, delay); });
+    }
+    try {
+      var response = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + XAI_API_KEY
+        },
+        body: JSON.stringify(body)
+      });
 
-  if (!response.ok) {
-    var errText = await response.text();
-    throw new Error('Grok API error ' + response.status + ': ' + errText);
+      if (response.ok) {
+        if (streaming) return response;
+        var data = await response.json();
+        return data.choices[0].message.content;
+      }
+
+      var errText = await response.text();
+      lastErr = 'Grok API error ' + response.status + ': ' + errText.substring(0, 300);
+      if (response.status === 429 || response.status >= 500) {
+        console.log('[Grok] Retryable error ' + response.status);
+        continue;
+      }
+      throw new Error(lastErr);
+    } catch (fetchErr) {
+      if (fetchErr.message && fetchErr.message.startsWith('Grok API error')) throw fetchErr;
+      lastErr = fetchErr.message;
+      console.log('[Grok] Fetch error: ' + lastErr);
+    }
   }
-
-  if (streaming) return response;
-  var data = await response.json();
-  return data.choices[0].message.content;
+  throw new Error(lastErr || 'Grok API failed after 3 attempts');
 }
 
 function extractRequestedWordCount(text) {
