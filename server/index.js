@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import bcrypt from 'bcryptjs';
 import { pool } from './db.js';
 
@@ -16,7 +17,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
+var PgSession = connectPgSimple(session);
 app.use(session({
+  store: new PgSession({
+    pool: pool,
+    tableName: 'user_sessions',
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || 'llmplus-dev-secret',
   resave: false,
   saveUninitialized: false,
