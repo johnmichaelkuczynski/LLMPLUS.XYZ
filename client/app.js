@@ -736,9 +736,10 @@
       bodyHtml = '<div class="msg-text">' + fmt(content) + '</div>';
     }
 
-    var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button>' : '';
+    var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button>' : '';
+    var auditRowHtml = role === 'assistant' ? '<div class="msg-actions-row"><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button></div>' : '';
     div.innerHTML = '<div class="msg-avatar">' + avatar + '</div>' +
-      '<div class="msg-body"><div class="msg-role">' + label + copyBtnHtml + '</div>' + bodyHtml + '</div>';
+      '<div class="msg-body"><div class="msg-role">' + label + copyBtnHtml + '</div>' + bodyHtml + auditRowHtml + '</div>';
 
     if (isLarge) {
       var btn = div.querySelector('.btn-expand');
@@ -899,8 +900,9 @@
     var modelLabel = modelLabels[state.model] || 'Claude';
     var avatarLetter = modelLabel.charAt(0);
     div.innerHTML = '<div class="msg-avatar">' + avatarLetter + '</div>' +
-      '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button></div>' +
-      '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
+      '<div class="msg-body"><div class="msg-role">' + modelLabel + '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button></div>' +
+      '<div class="msg-text"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div>' +
+      '<div class="msg-actions-row"><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button></div></div>';
     var copyBtn = div.querySelector('.msg-copy-btn');
     copyBtn.addEventListener('click', function() {
       var textEl = div.querySelector('.msg-text');
@@ -3505,6 +3507,9 @@
     auditPanel.classList.add('active');
     auditBody.innerHTML = '<div class="audit-result-status">Auditing claims against project memory...</div>';
     if (triggerBtn) {
+      if (!triggerBtn.getAttribute('data-original-label')) {
+        triggerBtn.setAttribute('data-original-label', triggerBtn.textContent);
+      }
       triggerBtn.classList.add('auditing');
       triggerBtn.textContent = 'Auditing...';
     }
@@ -3521,7 +3526,7 @@
 
       if (!response.ok || !response.body) {
         auditBody.innerHTML = '<div class="audit-result-status" style="color:#dc2626;">Audit request failed. Please try again.</div>';
-        if (triggerBtn) { triggerBtn.classList.remove('auditing'); triggerBtn.textContent = 'Audit'; }
+        if (triggerBtn) { triggerBtn.classList.remove('auditing'); triggerBtn.textContent = triggerBtn.getAttribute('data-original-label') || 'Audit'; }
         return;
       }
 
@@ -3563,7 +3568,7 @@
 
     if (triggerBtn) {
       triggerBtn.classList.remove('auditing');
-      triggerBtn.textContent = 'Audit';
+      triggerBtn.textContent = triggerBtn.getAttribute('data-original-label') || 'Audit';
     }
   }
 
@@ -3588,8 +3593,21 @@
       stalenessContainer.innerHTML = '<div class="staleness-banner severity-' + data.severity + '" data-testid="staleness-banner">' +
         '<span class="staleness-icon">' + icon + '</span>' +
         '<span class="staleness-text">' + msg + '</span>' +
+        '<button class="btn-run-audit-banner" data-testid="btn-run-audit-banner">Run Audit</button>' +
         '<button class="btn-dismiss-staleness" data-testid="btn-dismiss-staleness">&times;</button>' +
         '</div>';
+      var runAuditBannerBtn = stalenessContainer.querySelector('.btn-run-audit-banner');
+      if (runAuditBannerBtn) {
+        runAuditBannerBtn.addEventListener('click', function() {
+          var allMsgs = els.messages.querySelectorAll('.message.assistant');
+          if (allMsgs.length === 0) { notify('No assistant messages to audit', 'info'); return; }
+          var lastMsg = allMsgs[allMsgs.length - 1];
+          var textEl = lastMsg.querySelector('.msg-text');
+          var textToAudit = textEl ? textEl.innerText : '';
+          if (textToAudit) runAudit(textToAudit, runAuditBannerBtn);
+          else notify('No text found to audit', 'info');
+        });
+      }
       var dismissBtn = stalenessContainer.querySelector('.btn-dismiss-staleness');
       if (dismissBtn) {
         dismissBtn.addEventListener('click', function() {

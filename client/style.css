@@ -441,22 +441,29 @@ html, body {
   color: #374151;
 }
 
+.msg-actions-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
 .msg-audit-btn {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
-  padding: 1px 7px;
+  font-weight: 600;
+  padding: 3px 10px;
   line-height: 1.4;
-  color: #9ca3af;
+  color: #92400e;
   transition: all 0.15s;
-  margin-left: 4px;
 }
 .msg-audit-btn:hover {
-  background: #fef3c7;
-  border-color: #f59e0b;
-  color: #92400e;
+  background: #fde68a;
+  border-color: #d97706;
+  color: #78350f;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3);
 }
 .msg-audit-btn.auditing {
   background: #fef3c7;
@@ -481,6 +488,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
 }
 .staleness-banner.severity-warning {
   background: #fff7ed;
@@ -499,6 +507,27 @@ html, body {
 .staleness-banner .staleness-text {
   flex: 1;
 }
+.staleness-banner .btn-run-audit-banner {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.staleness-banner .btn-run-audit-banner:hover {
+  background: #d97706;
+}
+.staleness-banner .btn-run-audit-banner.auditing {
+  background: #d97706;
+  cursor: wait;
+  animation: pulse-audit 1.5s ease-in-out infinite;
+}
 .staleness-banner .btn-dismiss-staleness {
   background: none;
   border: none;
@@ -507,6 +536,7 @@ html, body {
   font-size: 16px;
   padding: 0 2px;
   opacity: 0.6;
+  flex-shrink: 0;
 }
 .staleness-banner .btn-dismiss-staleness:hover {
   opacity: 1;
