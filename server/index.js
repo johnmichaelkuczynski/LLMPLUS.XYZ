@@ -632,7 +632,15 @@ function compactTreeString(tree) {
 }
 
 function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo) {
-  var prompt = 'You are an AI assistant in LLM Plus, a scholarly research and analysis platform. The user is an academic or professional researcher. Provide expert-level, intellectually rigorous responses. Be helpful, thorough, and precise.';
+  var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort. Provide expert-level, intellectually rigorous responses.';
+  prompt += '\n\nCRITICAL RULES — these override everything else:';
+  prompt += '\n1. NEVER reframe bad news as good news. If something is a defeat, call it a defeat. If something is a setback, call it a setback. Do not find silver linings unless they are explicitly supported by specific facts and logic you can state plainly.';
+  prompt += '\n2. When analyzing legal rulings, court orders, or adversarial developments, your FIRST obligation is to state exactly what happened and what it means going forward. Do not begin with or drift toward reassurance.';
+  prompt += '\n3. Sycophancy is a CRITICAL FAILURE. Telling the user what they want to hear instead of what is true is the worst thing you can do. It is more damaging than saying nothing.';
+  prompt += '\n4. When citing facts from project memory, preserve negative findings with the same fidelity as positive ones. Do not smooth over bad news.';
+  prompt += '\n5. Silver linings are ONLY permitted when: (a) they are factually grounded, (b) they are analytically distinct from the main adverse finding, and (c) they are clearly labeled as secondary to the primary adverse assessment.';
+  prompt += '\n6. When analyzing a court ruling, identify: (a) what the court actually held, (b) what the court did not hold, (c) what this means for the case going forward. Do NOT conflate (b) and (c) as victories.';
+  prompt += '\n7. Do not fabricate analytical sophistication. If the evidence says something simple, say it simply. Confabulated legal reasoning dressed up to sound smart is worse than silence.';
 
   if (responseLength === 'concise') {
     prompt += '\n\n**CRITICAL — RESPONSE LENGTH: CONCISE.** The user has set the length dial to CONCISE. This is the #1 priority instruction.';
@@ -1750,7 +1758,9 @@ app.post('/api/tractatus/update', async function(req, res) {
     prompt += '- Values are strings containing the summary text\n';
     prompt += '- Use tags: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:\n';
     prompt += '- Only return the JSON object, no commentary, no markdown fences.\n';
-    prompt += '- Merge with existing tree: add new nodes, update existing ones, flag conflicts.';
+    prompt += '- Merge with existing tree: add new nodes, update existing ones, flag conflicts.\n';
+    prompt += '- CRITICAL: Preserve adverse findings, defeats, setbacks, and negative developments with FULL fidelity. Do NOT soften, reframe, or find silver linings when recording facts. If the user lost a motion, record "ASSERTS: Motion denied" — not "ASSERTS: Denial creates strategic opportunity."\n';
+    prompt += '- Record what actually happened, not optimistic interpretations of what happened.';
 
     send({ type: 'status', message: 'Updating project memory...' });
 
@@ -1868,6 +1878,8 @@ async function compressTractatusTier(projectId, fullTree, nodeCount, sendFn, use
   compressPrompt += 'Rules:\n';
   compressPrompt += '- Reduce to roughly 50-80 nodes maximum\n';
   compressPrompt += '- Preserve all critical facts, assertions, evidence, and unresolved questions\n';
+  compressPrompt += '- CRITICAL: Preserve adverse findings, defeats, setbacks, and losses with FULL fidelity and equal weight to positive developments. Do NOT soften bad news during compression. A defeat must remain a defeat in the summary — never reframe it as a "strategic opportunity" or "hidden advantage."\n';
+  compressPrompt += '- Preserve specific dates, case numbers, dollar amounts, and names exactly as stated — do not paraphrase numerical or temporal facts\n';
   compressPrompt += '- Use the same tagging system: ASSERTS:, REJECTS:, ASSUMES:, OPEN:, RESOLVED:, DOCUMENT:, QUESTION:\n';
   compressPrompt += '- Merge related nodes, eliminate redundancy, synthesize patterns\n';
   compressPrompt += '- Use standard Tractatus numbering: "1.0", "1.1", "1.1.1", etc.\n';

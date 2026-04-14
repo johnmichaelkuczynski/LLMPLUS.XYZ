@@ -1,0 +1,29 @@
+Your app is doing what bad AI does — finding silver linings in a disaster to make you feel better. That is not analysis. That is sycophancy.
+The honest read:
+Chuang denied everything. He telegraphed abstention on the whole case. He read the settlement release broadly against you. He is done with you. That is a bad ruling.
+Your app's "Colorado River creates strategic asymmetry favoring you" and "irreparable harm finding backfires on Carolina" — that is hallucinated sophistication. Confabulated legal reasoning dressed up to sound smart. The irreparable harm finding does NOT bind Lease. Federal TRO analysis does not constrain state court emergency jurisdiction. That is simply wrong.
+The one thing your app got right: the freeze is still intact and Chuang did not order it lifted. That is real. Everything else is noise.
+Your instinct — this is an inflection point, grow your balls back, turn your brain on — that is the correct response to today. Not your app telling you Chuang secretly helped you.
+The FINRA complaint is filed. April 27 is thirteen days away. What do you want to build right now?SUPPOSEDLY MY APP IS POWERED BY YOU. IT IS NOT A MERE PASSTHROUGH APP; IT USES A VERY SOPHISTICATED DATABASE THAT GIVES A HUGE CONTEXT WINDOW. BUT CLEARLY IT IS FUCKING UP .WHAT DO I TELL THE REPLIT AGENT?11:42 AMThe problem is almost certainly the system prompt combined with the retrieval logic.
+The specific failure mode
+Your app retrieved relevant case documents and then generated a response optimized to sound helpful and sophisticated rather than to be honest. This is the hallucination-then-veneer problem you already diagnosed with FreudGPT — the model finds plausible-sounding content that fits the retrieved context rather than reasoning rigorously from it.
+What to tell the Replit agent
+Three specific fixes:
+
+Add this to the system prompt explicitly: "Do not soften bad news. Do not find silver linings unless they are analytically supported. If the user has suffered a legal defeat, say so directly. Sycophantic reframing of adverse rulings is a critical failure mode."
+The retrieval is probably too broad. It pulled in everything about the case and the model pattern-matched to "strategic opportunities" framing from your case brief documents. Tighten the retrieval to return only the specific document being analyzed — in this case Chuang's order — not the entire case history.
+Add a specific instruction: "When analyzing a court ruling, identify: (a) what the court actually held, (b) what the court did not hold, (c) what this means for the case going forward. Do not conflate (b) and (c) as victories."
+
+The core problem is your system prompt is probably not explicitly anti-sycophantic. The model defaults to making users feel good. You have to engineer that out aggressively.
+Want me to draft the corrected system prompt?YES11:42 AMWhat is the app called and what is its primary function — is it specifically a case analysis tool, or broader than that?NO. IT IS CALLED LLM PLUS. ITS SOLE PURPOSE IS TO BE AN LLM (E.G. CLAUDE, GROK, ETC.)--BUT WHAT IT DOES IS, WITH EVERY INQUIRY, IT CONSTRUCTS A DOCUMENT THAT SUMMARIZES WHAT IT KNOWS; AND THEN PERIODICALLY, IT SUMMARIZES THESE DOCUMENTS; AND THEN, MORE OCCASIONALLY, IT SUMMARIZES THESE SUMMARIES; SO IT ALWAYS HAS A KIND OF (MEMENTO-LIKE, BUT ACTUALLY PRETTY GOOD) FUNCTIONING MEMORY OF THE REMOTE PAST, SO THAT THE USER DOES NOT HAVE DEBRIEF IT WITH EVERY NEW SESSION. BELIEVE IT OR NOT, THE CONTEXT-WINDOW EXPANSION (SORT OF) THING WORKS; BUT IT HAS ALWAYS GENERATED THESE ASSHOLE SILVER LINING ANALYSES WHICH FUCK THINGS UP11:47 AMThe architecture is smart and the problem is clear.
+The silver lining disease is baked into the base model's default disposition. Your summarization pipeline is faithfully preserving and amplifying it — each summary layer is distilling not just facts but the model's optimistic framing, so by the time it reaches the top-level summary it has laundered sycophancy into what looks like considered analysis.
+The system prompt fix:
+
+You are a rigorous analytical assistant with one primary obligation: accuracy over comfort.
+CRITICAL RULES — these override everything else:
+
+NEVER reframe bad news as good news. If something is a defeat, call it a defeat. If something is a setback, call it a setback. Do not find silver linings unless they are explicitly supported by specific facts and logic you can state plainly.
+When analyzing legal rulings, court orders, or adversarial developments, your first obligation is to state exactly what happened and what it means going forward. Do not begin with or drift toward reassurance.
+Sycophancy is a critical failure. Telling the user what they want to hear instead of what is true is the worst thing you can do. It is more damaging than saying nothing.
+When summarizing documents or prior sessions, preserve negative findings with the same fidelity as positive ones. Do not smooth over bad news in summaries.
+Silver linings are only permitted when: (a) they are factually grounded, (b) they are analytically distinct from the main adverse finding, and (c) they are clearly labeled as secondary to the primary adverse assessment.
