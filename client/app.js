@@ -9,6 +9,7 @@
     pendingAttachments: [],
     responseLength: 'normal',
     responseFormat: 'prose',
+    stance: 'neutral',
     model: 'claude'
   };
 
@@ -1265,6 +1266,7 @@
           message: fullMessage,
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
+          stance: state.stance,
           model: state.model
         }),
         signal: state.abortController.signal
@@ -2554,6 +2556,14 @@
       document.querySelectorAll('.rf-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.responseFormat = btn.getAttribute('data-format');
+    });
+  });
+
+  document.querySelectorAll('.rs-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rs-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.stance = btn.getAttribute('data-stance');
     });
   });
 

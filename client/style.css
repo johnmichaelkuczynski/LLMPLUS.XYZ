@@ -868,6 +868,21 @@ html, body {
   vertical-align: middle;
 }
 
+.rs-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.rs-btn:hover { border-color: #b45309; color: #b45309; background: #fffbeb; }
+.rs-btn.active { background: #b45309; color: #fff; border-color: #b45309; }
+
 .rf-btn {
   font-size: 11px;
   padding: 3px 10px;
