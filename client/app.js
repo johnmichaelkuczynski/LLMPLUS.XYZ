@@ -2199,9 +2199,7 @@
     await ensureSession();
     if (!state.currentSession) return;
 
-    var allContent = '';
-    var docNames = [];
-
+    var attached = 0;
     for (var i = 0; i < ids.length; i++) {
       try {
         var result = await api('/api/documents/insert', {
@@ -2211,8 +2209,15 @@
         });
         if (result && result.raw_content && result.raw_content.trim().length > 0) {
           var wc = result.raw_content.split(/\s+/).length;
-          docNames.push('"' + result.name + '" (' + wc + ' words)');
-          allContent += '\n\n=== DOCUMENT: ' + result.name + ' (' + wc + ' words) ===\n\n' + result.raw_content;
+          state.pendingAttachments.push({
+            docName: result.name,
+            name: result.name,
+            wordCount: wc,
+            content: result.raw_content,
+            docId: result.id || ids[i],
+            uploading: false
+          });
+          attached++;
         } else if (result) {
           notify('"' + result.name + '" has no content — skipped', 'error');
         }
@@ -2221,34 +2226,16 @@
       }
     }
 
-    if (docNames.length === 0) {
-      notify('No documents with content to send', 'error');
+    if (attached === 0) {
+      notify('No documents with content to attach', 'error');
       return;
     }
 
-    addMessage('user', 'Loading ' + docNames.length + ' document' + (docNames.length > 1 ? 's' : '') + ' from library:\n' + docNames.join('\n'));
-    scrollBottom();
-
-    state.streaming = true;
-    els.btnSend.disabled = true;
-
-    var claudeMsg = 'The user has loaded ' + docNames.length + ' documents from the general library:\n' + docNames.join('\n') + '\n\nHere are the full contents:' + allContent + '\n\nPlease acknowledge all documents loaded, provide a brief summary of each, and let the user know you are ready for questions or instructions about them.';
-
-    var textEl = startStreaming();
-    var chatResp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: state.currentSession.id,
-        projectId: state.currentProject.id,
-        message: claudeMsg
-      })
-    });
-
-    streamSSE(chatResp, textEl, function() {
-      state.streaming = false;
-      els.btnSend.disabled = false;
-    });
+    renderAttachmentChips();
+    notify(attached + ' document' + (attached > 1 ? 's' : '') + ' attached. Type your question and press Send.', 'success');
+    if (els.chatInput) {
+      els.chatInput.focus();
+    }
   }
 
   function showWritePaperModal() {
@@ -2764,8 +2751,7 @@
     await ensureSession();
     if (!state.currentSession) return;
 
-    var allContent = '';
-    var docNames = [];
+    var attached = 0;
     for (var i = 0; i < ids.length; i++) {
       try {
         var result = await api('/api/documents/insert', {
@@ -2775,25 +2761,23 @@
         });
         if (result && result.raw_content && result.raw_content.trim().length > 0) {
           var wc = result.raw_content.split(/\s+/).length;
-          docNames.push('"' + result.name + '" (' + wc + ' words)');
-          allContent += '\n\n=== DOCUMENT: ' + result.name + ' (' + wc + ' words) ===\n\n' + result.raw_content;
+          state.pendingAttachments.push({
+            docName: result.name,
+            name: result.name,
+            wordCount: wc,
+            content: result.raw_content,
+            docId: result.id || ids[i],
+            uploading: false
+          });
+          attached++;
         }
       } catch (err) { notify('Failed to load doc: ' + err.message, 'error'); }
     }
-    if (docNames.length === 0) { notify('No documents with content to send', 'error'); return; }
+    if (attached === 0) { notify('No documents with content to attach', 'error'); return; }
 
-    addMessage('user', 'Loading ' + docNames.length + ' document' + (docNames.length > 1 ? 's' : '') + ' from project library:\n' + docNames.join('\n'));
-    scrollBottom();
-    state.streaming = true;
-    els.btnSend.disabled = true;
-    var claudeMsg = 'The user has loaded ' + docNames.length + ' documents from the project library:\n' + docNames.join('\n') + '\n\nHere are the full contents:' + allContent + '\n\nPlease acknowledge all documents loaded, provide a brief summary of each, and let the user know you are ready for questions or instructions about them.';
-    var textEl = startStreaming();
-    var chatResp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: state.currentSession.id, projectId: state.currentProject.id, message: claudeMsg })
-    });
-    streamSSE(chatResp, textEl, function() { state.streaming = false; els.btnSend.disabled = false; });
+    renderAttachmentChips();
+    notify(attached + ' document' + (attached > 1 ? 's' : '') + ' attached. Type your question and press Send.', 'success');
+    if (els.chatInput) { els.chatInput.focus(); }
   });
 
   document.getElementById('btn-copy-to-global').addEventListener('click', async function() {
