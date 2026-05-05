@@ -1,0 +1,37 @@
+🎓 FreudGPT
+The Thinker's Workshop — Executable Philosophical Reasoning
+
+🧩 Overview
+FreudGPT is a full-service conversational AI platform that lets you consult the great thinkers of psychoanalysis, philosophy, and critical theory in their own voices, grounded in their actual writings.
+
+It performs end-to-end philosophical dialogue, source-anchored reasoning, and long-form composition — from rapid Q&A and rubric-faithful argumentation to coherent book-length essays, dialogues, and lectures.
+
+Designed for scholars, researchers, students, and serious readers, it merges semantic retrieval over a curated corpus of ~24,500 philosophical positions with rigorous prompt engineering, producing answers that cite, paraphrase, and extend the thinker's actual work — never glib summaries.
+
+🧠 What It Does
+Multi-Thinker Consultation — Converse with Freud, Kuczynski (ZHI), Jung, Hume, Nietzsche, and Bergler. Each thinker draws on their own dedicated database of positions, examples, and rhetorical patterns.
+Source-Anchored Answers — Every major claim is traceable to a specific position from the thinker's corpus. Retrieved passages stream into "The Archive" panel in real time, so you can verify the textual grounding of every response.
+Argument Synthesis (not Quote-Stitching) — The AI understands the retrieved positions and weaves them into coherent thesis-supporting-conclusion structures, preserving the thinker's exact examples, rhetorical questions, and step-by-step argumentative moves.
+Memory Mode (Tractatus Trees) — Persistent project memory built as Wittgenstein-style numbered knowledge graphs (ASSERTS / REJECTS / ASSUMES / OPEN / RESOLVED). Trees compress, archive, and synthesize into meta-trees over time, giving the AI long-horizon recall across thousands of exchanges.
+Long-Form Coherent Generation — Produces essays, dialogues, and lectures up to ~50,000 words with a single sustained argumentative arc. A two-tier skeleton + persistent state engine prevents the "pile of mini-essays" failure mode by tracking every claim, example, and open thread across sections.
+Dialogue Mode — Switches the thinker into conversational mode: short answers when warranted, clarifying questions, and intellectual pushback against your premises.
+Live Document Ingestion — Drop .txt, .json, .pdf, or .docx files into the ingest/ folder and the watcher automatically extracts, chunks, embeds, and adds them to the searchable corpus.
+⚙️ Technical Features
+Semantic Retrieval Engine: OpenAI text-embedding-3-small with cached pre-computed embeddings over a PostgreSQL position database, plus full-text RAG over 4,489 source-text chunks from the original works.
+Multi-Provider AI Backbone: Pluggable across Anthropic Claude, OpenAI, DeepSeek, Perplexity, and Grok (xAI) — switch providers per query.
+Coherence Skeleton Engine: Adapted from NeuroText. Builds a macro plan (thesis + arc + sectional roles) and per-section micro plans (claims, positions, examples, bridges, anti-repetition lists), then drives a READ → GENERATE → EXTRACT → MERGE → WRITE loop with atomic transactional state commits.
+Job Leasing & Resume: Long-form jobs persist in PostgreSQL with worker leases and heartbeats; interrupted jobs can be resumed without state drift, and concurrent runners are refused at the database level.
+Streaming Architecture: Token-by-token SSE streaming for chat responses; per-section SSE for long-form jobs with live skeleton, word count, and state events.
+Inference Engines: Forward-chaining rule engines for select thinkers deduce theoretical principles before LLM prose generation, so answers reflect the thinker's reasoning machinery rather than surface mimicry.
+Self-Contradiction Detection: Conversation memory flags when the AI's current answer conflicts with prior statements in the same session.
+🎓 Designed For
+Researchers & Scholars: Source-anchored consultation with traceable citations to specific positions in each thinker's corpus.
+Graduate Students: Long-form essay and dialogue generation that maintains a single coherent argument across tens of thousands of words.
+Educators & Lecturers: Lecture-mode generation produces sequenced teaching units with explicit anti-repetition and bridging between segments.
+Serious Readers: In-app reader for full philosophical works, synchronized source highlighting, and Memory Mode for sustained project-based study.
+💡 Core Idea
+FreudGPT redefines AI consultation as a grounded interpretive process.
+
+It doesn't just impersonate — it retrieves, reasons, and writes from the thinker's actual textual evidence. The result: philosophical dialogue that is faithful, traceable, and capable of sustained argument at any length.
+
+FreudGPT — where the great thinkers speak again, in their own words.
