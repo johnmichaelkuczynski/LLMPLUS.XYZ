@@ -75,7 +75,24 @@
         <span class="topbar-project" id="topbar-project" data-testid="topbar-project"></span>
         <button class="topbar-btn" id="btn-download-session" data-testid="btn-download-session" title="Download this chat session">&#11015; Download chat</button>
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
+        <button class="topbar-btn topbar-btn-diagnostic" id="btn-diagnostic" data-testid="btn-diagnostic" title="Run a full system check">&#129514; Diagnostic</button>
       </header>
+
+      <div id="diagnostic-modal" class="modal hidden" data-testid="diagnostic-modal">
+        <div class="modal-content diagnostic-modal-content">
+          <div class="modal-header">
+            <h3>&#129514; System Diagnostic</h3>
+            <button class="modal-close" id="close-diagnostic" data-testid="close-diagnostic">&times;</button>
+          </div>
+          <div class="diagnostic-controls">
+            <button class="diagnostic-run-btn" id="btn-run-diagnostic" data-testid="btn-run-diagnostic">Run Full System Check</button>
+            <span class="diagnostic-summary" id="diagnostic-summary" data-testid="diagnostic-summary"></span>
+          </div>
+          <div class="diagnostic-body" id="diagnostic-body" data-testid="diagnostic-body">
+            <p class="diagnostic-intro">This check verifies that environment variables, the database, all four model APIs, and core CRUD round-trips (project / session / document / reminder / Tractatus tree) are working. It does not evaluate the content quality of model answers — only whether the formal plumbing functions end-to-end. A test project is created and deleted automatically; your data is not touched.</p>
+          </div>
+        </div>
+      </div>
 
       <div id="staleness-container" data-testid="staleness-container" style="padding: 0 16px;"></div>
       <div class="messages" id="messages">

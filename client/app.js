@@ -3705,6 +3705,116 @@
     reminderInput.focus();
   });
 
+  // === Diagnostic ===
+  var diagModal = document.getElementById('diagnostic-modal');
+  document.getElementById('btn-diagnostic').addEventListener('click', function() {
+    diagModal.classList.remove('hidden');
+    diagModal.classList.add('active');
+  });
+  document.getElementById('close-diagnostic').addEventListener('click', function() {
+    diagModal.classList.remove('active');
+    diagModal.classList.add('hidden');
+  });
+  diagModal.addEventListener('mousedown', function(e) {
+    if (e.target === diagModal) {
+      diagModal.classList.remove('active');
+      diagModal.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btn-run-diagnostic').addEventListener('click', async function() {
+    var runBtn = document.getElementById('btn-run-diagnostic');
+    var body = document.getElementById('diagnostic-body');
+    var summary = document.getElementById('diagnostic-summary');
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running...';
+    summary.textContent = '';
+    body.innerHTML = '';
+
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryEls = {};
+    var rows = {};
+    var passCount = 0, failCount = 0, totalCount = 0;
+
+    function ensureCategory(cat) {
+      if (categoryEls[cat]) return categoryEls[cat];
+      var h = document.createElement('div');
+      h.className = 'diag-category';
+      h.textContent = categoryLabels[cat] || cat;
+      body.appendChild(h);
+      var container = document.createElement('div');
+      body.appendChild(container);
+      categoryEls[cat] = container;
+      return container;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function updateSummary() {
+      summary.textContent = passCount + ' passed, ' + failCount + ' failed of ' + totalCount;
+      summary.style.color = failCount > 0 ? '#991b1b' : '#065f46';
+    }
+
+    try {
+      var resp = await fetch('/api/diagnostic/run', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line.startsWith('data:')) continue;
+          var payload;
+          try { payload = JSON.parse(line.slice(5).trim()); } catch (e) { continue; }
+          if (payload.type === 'start') {
+            var container = ensureCategory(payload.category);
+            var row = document.createElement('div');
+            row.className = 'diag-row';
+            row.innerHTML = '<span class="diag-status running">RUN</span><span class="diag-name">' + escapeHtml(payload.name) + '</span><span class="diag-msg"></span><span class="diag-ms"></span>';
+            container.appendChild(row);
+            rows[payload.category + '|' + payload.name] = row;
+            totalCount++;
+            updateSummary();
+            body.scrollTop = body.scrollHeight;
+          } else if (payload.type === 'result') {
+            var key = payload.category + '|' + payload.name;
+            var row2 = rows[key];
+            if (!row2) continue;
+            var status = payload.status;
+            row2.querySelector('.diag-status').className = 'diag-status ' + status;
+            row2.querySelector('.diag-status').textContent = status.toUpperCase();
+            row2.querySelector('.diag-msg').textContent = payload.message || '';
+            row2.querySelector('.diag-ms').textContent = (payload.ms || 0) + 'ms';
+            if (status === 'pass') passCount++; else failCount++;
+            updateSummary();
+          } else if (payload.type === 'fatal') {
+            var fatal = document.createElement('div');
+            fatal.className = 'diag-row';
+            fatal.style.color = '#991b1b';
+            fatal.textContent = 'FATAL: ' + payload.error;
+            body.appendChild(fatal);
+          }
+        }
+      }
+    } catch (err) {
+      var errEl = document.createElement('div');
+      errEl.className = 'diag-row';
+      errEl.style.color = '#991b1b';
+      errEl.textContent = 'Diagnostic request failed: ' + err.message;
+      body.appendChild(errEl);
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run Full System Check';
+    }
+  });
+
   document.getElementById('close-reminders').addEventListener('click', function() {
     remindersModal.classList.remove('active');
   });

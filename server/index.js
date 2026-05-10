@@ -4045,6 +4045,244 @@ app.delete('/api/reminders/:id', async function(req, res) {
   }
 });
 
+app.post('/api/diagnostic/run', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  function send(obj) {
+    res.write('data: ' + JSON.stringify(obj) + '\n\n');
+  }
+
+  async function runStep(name, category, fn) {
+    var t0 = Date.now();
+    send({ type: 'start', name: name, category: category });
+    try {
+      var msg = await fn();
+      send({ type: 'result', name: name, category: category, status: 'pass', message: msg || 'OK', ms: Date.now() - t0 });
+      return true;
+    } catch (err) {
+      send({ type: 'result', name: name, category: category, status: 'fail', message: err.message || String(err), ms: Date.now() - t0 });
+      return false;
+    }
+  }
+
+  try {
+    // === Category 1: Environment ===
+    await runStep('ANTHROPIC_API_KEY present', 'env', async function() {
+      if (!ANTHROPIC_API_KEY) throw new Error('Not set');
+      return 'set (' + ANTHROPIC_API_KEY.length + ' chars)';
+    });
+    await runStep('OPENAI_API_KEY present', 'env', async function() {
+      if (!OPENAI_API_KEY) throw new Error('Not set');
+      return 'set (' + OPENAI_API_KEY.length + ' chars)';
+    });
+    await runStep('DEEPSEEK_API_KEY present', 'env', async function() {
+      if (!DEEPSEEK_API_KEY) throw new Error('Not set');
+      return 'set (' + DEEPSEEK_API_KEY.length + ' chars)';
+    });
+    await runStep('XAI/GROK_API_KEY present', 'env', async function() {
+      if (!XAI_API_KEY) throw new Error('Not set');
+      return 'set (' + XAI_API_KEY.length + ' chars)';
+    });
+    await runStep('GOOGLE_CLOUD_VISION_API_KEY present', 'env', async function() {
+      if (!process.env.GOOGLE_CLOUD_VISION_API_KEY) throw new Error('Not set');
+      return 'set';
+    });
+    await runStep('SESSION_SECRET present', 'env', async function() {
+      if (!process.env.SESSION_SECRET) throw new Error('Not set');
+      return 'set';
+    });
+
+    // === Category 2: Database ===
+    await runStep('Database connection', 'db', async function() {
+      var r = await pool.query('SELECT 1 AS ok');
+      if (r.rows[0].ok !== 1) throw new Error('Unexpected result');
+      return 'connected';
+    });
+    var requiredTables = ['users', 'projects', 'sessions', 'project_documents', 'global_documents',
+      'tractatus_archive', 'user_analytics', 'profile_snapshots', 'reminders', 'user_sessions'];
+    for (var t = 0; t < requiredTables.length; t++) {
+      (function(tableName) {
+        // wrap to capture
+      })(requiredTables[t]);
+    }
+    for (var ti = 0; ti < requiredTables.length; ti++) {
+      var tName = requiredTables[ti];
+      await runStep('Table: ' + tName, 'db', (function(tn) { return async function() {
+        var r = await pool.query("SELECT to_regclass($1) AS exists", ['public.' + tn]);
+        if (!r.rows[0].exists) throw new Error('Table missing');
+        return 'exists';
+      }; })(tName));
+    }
+
+    // === Category 3: External LLM APIs (1-token ping) ===
+    await runStep('Anthropic Claude API reachable', 'llm', async function() {
+      var r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return 'HTTP 200 from ' + CLAUDE_MODEL;
+    });
+    await runStep('OpenAI ChatGPT API reachable', 'llm', async function() {
+      var r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_API_KEY },
+        body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return 'HTTP 200 from ' + OPENAI_MODEL;
+    });
+    await runStep('DeepSeek API reachable', 'llm', async function() {
+      var r = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY },
+        body: JSON.stringify({ model: DEEPSEEK_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return 'HTTP 200 from ' + DEEPSEEK_MODEL;
+    });
+    await runStep('xAI Grok API reachable', 'llm', async function() {
+      var r = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + XAI_API_KEY },
+        body: JSON.stringify({ model: GROK_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return 'HTTP 200 from ' + GROK_MODEL;
+    });
+
+    // === Category 4: Functional (CRUD round-trip) ===
+    var testProjectId = null;
+    var testSessionId = null;
+    var testReminderId = null;
+    var testDocId = null;
+    var diagMarker = '__DIAGNOSTIC_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+
+    await runStep('Create project', 'func', async function() {
+      var r = await pool.query(
+        'INSERT INTO projects (user_id, name) VALUES ($1, $2) RETURNING id',
+        [req.userId, diagMarker + '_proj']
+      );
+      testProjectId = r.rows[0].id;
+      return 'id=' + testProjectId.substring(0, 8);
+    });
+
+    await runStep('List projects (ownership filter)', 'func', async function() {
+      var r = await pool.query('SELECT id FROM projects WHERE user_id = $1 AND id = $2', [req.userId, testProjectId]);
+      if (r.rows.length !== 1) throw new Error('Test project not found in user list');
+      return 'visible';
+    });
+
+    await runStep('Create session', 'func', async function() {
+      if (!testProjectId) throw new Error('No test project');
+      var r = await pool.query(
+        'INSERT INTO sessions (project_id, title) VALUES ($1, $2) RETURNING id',
+        [testProjectId, diagMarker + '_sess']
+      );
+      testSessionId = r.rows[0].id;
+      return 'id=' + testSessionId.substring(0, 8);
+    });
+
+    await runStep('Verify session ownership', 'func', async function() {
+      var ok = await verifySessionOwnership(testSessionId, req.userId);
+      if (!ok) throw new Error('Ownership check failed');
+      return 'verified';
+    });
+
+    await runStep('Create global document', 'func', async function() {
+      var r = await pool.query(
+        'INSERT INTO global_documents (user_id, name, content, raw_content) VALUES ($1, $2, $3, $4) RETURNING id',
+        [req.userId, diagMarker + '_doc', 'test content', 'test content']
+      );
+      testDocId = r.rows[0].id;
+      return 'id=' + testDocId.substring(0, 8);
+    });
+
+    await runStep('Read global document content', 'func', async function() {
+      if (!testDocId) throw new Error('No test doc');
+      var r = await pool.query('SELECT raw_content FROM global_documents WHERE id = $1 AND user_id = $2', [testDocId, req.userId]);
+      if (r.rows.length === 0) throw new Error('Doc not retrievable');
+      if (r.rows[0].raw_content !== 'test content') throw new Error('Content mismatch');
+      return 'matches';
+    });
+
+    await runStep('Create reminder', 'func', async function() {
+      var r = await pool.query(
+        'INSERT INTO reminders (user_id, project_id, text) VALUES ($1, $2, $3) RETURNING id',
+        [req.userId, testProjectId, diagMarker + '_rem']
+      );
+      testReminderId = r.rows[0].id;
+      return 'id=' + testReminderId.substring(0, 8);
+    });
+
+    await runStep('Toggle reminder complete', 'func', async function() {
+      if (!testReminderId) throw new Error('No test reminder');
+      var r = await pool.query('UPDATE reminders SET completed = TRUE WHERE id = $1 AND user_id = $2 RETURNING completed', [testReminderId, req.userId]);
+      if (!r.rows[0] || !r.rows[0].completed) throw new Error('Toggle failed');
+      return 'toggled';
+    });
+
+    await runStep('Reminder count endpoint', 'func', async function() {
+      var r = await pool.query('SELECT COUNT(*)::int AS c FROM reminders WHERE user_id = $1 AND completed = FALSE', [req.userId]);
+      if (typeof r.rows[0].c !== 'number') throw new Error('Count not numeric');
+      return r.rows[0].c + ' active';
+    });
+
+    await runStep('Tractatus tree storage round-trip', 'func', async function() {
+      if (!testProjectId) throw new Error('No test project');
+      var sample = { '1.0': 'ASSERTS: diagnostic test node', '1.1': 'OPEN: smoke test' };
+      await pool.query('UPDATE projects SET tractatus_tree = $1 WHERE id = $2', [JSON.stringify(sample), testProjectId]);
+      var r = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [testProjectId]);
+      var tree = r.rows[0].tractatus_tree || {};
+      if (tree['1.0'] !== sample['1.0']) throw new Error('Round-trip mismatch');
+      return '2 nodes round-tripped';
+    });
+
+    await runStep('Staleness query', 'func', async function() {
+      if (!testProjectId) throw new Error('No test project');
+      var r = await pool.query('SELECT last_tree_update, compression_count FROM projects WHERE id = $1', [testProjectId]);
+      if (r.rows.length === 0) throw new Error('Project not found');
+      return 'reachable';
+    });
+
+    await runStep('Session prompt builder', 'func', async function() {
+      var sp = buildSystemPrompt({}, [], 'normal', 'prose', false, null, 'neutral');
+      if (typeof sp !== 'string' || sp.length < 50) throw new Error('Prompt too short');
+      if (sp.indexOf('STANCE') === -1) throw new Error('Stance directive missing');
+      return sp.length + ' chars';
+    });
+
+    // === Cleanup ===
+    await runStep('Cleanup: delete reminder', 'cleanup', async function() {
+      if (testReminderId) await pool.query('DELETE FROM reminders WHERE id = $1', [testReminderId]);
+      return 'deleted';
+    });
+    await runStep('Cleanup: delete document', 'cleanup', async function() {
+      if (testDocId) await pool.query('DELETE FROM global_documents WHERE id = $1', [testDocId]);
+      return 'deleted';
+    });
+    await runStep('Cleanup: delete session', 'cleanup', async function() {
+      if (testSessionId) await pool.query('DELETE FROM sessions WHERE id = $1', [testSessionId]);
+      return 'deleted';
+    });
+    await runStep('Cleanup: delete project', 'cleanup', async function() {
+      if (testProjectId) await pool.query('DELETE FROM projects WHERE id = $1', [testProjectId]);
+      return 'deleted';
+    });
+
+    send({ type: 'done' });
+    res.end();
+  } catch (err) {
+    console.error('[Diagnostic] Fatal:', err);
+    send({ type: 'fatal', error: err.message });
+    res.end();
+  }
+});
+
 app.get('/{*splat}', function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
