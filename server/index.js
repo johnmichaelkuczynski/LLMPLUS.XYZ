@@ -4151,7 +4151,10 @@ app.post('/api/diagnostic/run', async function(req, res) {
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + XAI_API_KEY },
         body: JSON.stringify({ model: GROK_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
       });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) {
+        var note = (r.status === 429) ? ' (rate-limited upstream — key OK)' : (r.status >= 500 ? ' (xAI server error — key OK)' : '');
+        throw new Error('HTTP ' + r.status + note);
+      }
       return 'HTTP 200 from ' + GROK_MODEL;
     });
 
@@ -4195,8 +4198,8 @@ app.post('/api/diagnostic/run', async function(req, res) {
 
     await runStep('Create global document', 'func', async function() {
       var r = await pool.query(
-        'INSERT INTO global_documents (user_id, name, content, raw_content) VALUES ($1, $2, $3, $4) RETURNING id',
-        [req.userId, diagMarker + '_doc', 'test content', 'test content']
+        'INSERT INTO global_documents (user_id, name, raw_content) VALUES ($1, $2, $3) RETURNING id',
+        [req.userId, diagMarker + '_doc', 'test content']
       );
       testDocId = r.rows[0].id;
       return 'id=' + testDocId.substring(0, 8);
