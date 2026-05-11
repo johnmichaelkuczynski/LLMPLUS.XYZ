@@ -6,3 +6,9 @@ id = "KiRX5OoVzLvPZU2goGmVp"
 uri = "file://LLM_Plus_Technical_Reference.md"
 type = "text"
 title = "LLM Plus — Complete Technical Reference"
+
+[[outputs]]
+id = "1lokL9FknBuWUmTAzgbai"
+uri = "file://LLM_PLUS_FILE_TREE.txt"
+type = "text"
+title = "LLM Plus — Complete File Tree & Tractatus Memory System"

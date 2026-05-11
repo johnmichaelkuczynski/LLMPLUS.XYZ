@@ -1,0 +1,669 @@
+================================================================================
+        LLM PLUS - COMPLETE PROJECT FILE TREE & TRACTATUS MEMORY SYSTEM
+        Multi-Model Scholarly Chat with Persistent Per-Project Memory
+        and Recursive Compression for Enlarged Effective Context Window
+================================================================================
+
+================================================================================
+FOLDER STRUCTURE OVERVIEW
+================================================================================
+
+llm-plus/
+|
++-- server/                     BACKEND (Express + Node.js, ESM)
++-- client/                     FRONTEND (Plain HTML / CSS / vanilla JS)
++-- attached_assets/            USER-UPLOADED ASSETS (not web-served)
++-- replit.md                   Project overview & user preferences
++-- README.md                   Public-facing description
++-- package.json                Locked dependencies (ESM)
+|
++-- DELIBERATE NON-DEPENDENCIES:
+    NO React, NO Vite, NO Tailwind, NO TypeScript, NO Drizzle,
+    NO shadcn, NO Prisma, NO ORM. Only raw `pg` + official LLM APIs.
+
+
+================================================================================
+SERVER FOLDER - BACKEND
+================================================================================
+
+server/
+|
++-- index.js   (~4,300 lines - monolithic by design)
+|   The entire backend lives here. Sections in source order:
+|     1. Auth (register, login, logout, me) + requireAuth middleware
+|     2. Ownership verifiers (project / session / project-doc / global-doc)
+|     3. SCHEMA_SQL constant + initDB() with idempotent ALTER TABLEs
+|     4. Four LLM client functions (callClaude, callOpenAI, callDeepSeek, callGrok)
+|     5. Tractatus helpers (compactTreeString, tryParseTractatusJSON,
+|        buildSystemPrompt, isProjectSpecificQuery, extractRequestedWordCount)
+|     6. Project / session / chat routes (incl. SSE /api/chat)
+|     7. Tractatus update + compression routes & helpers
+|     8. Three-pass coherence engine for long-form generation
+|     9. Document upload / library / artifact routes
+|    10. Scholarly research helpers (Semantic Scholar / OpenAlex / CrossRef / PubMed)
+|    11. User analytics (profile tree, profile snapshots)
+|    12. Audit (fact-check), Staleness, Reminders, Diagnostic
+|
++-- db.js
+    Tiny module exporting a single raw pg.Pool connected to NEON_DATABASE_URL.
+    SSL { rejectUnauthorized: false }. NO ORM. Every query is hand-written SQL.
+
+
+================================================================================
+CLIENT FOLDER - FRONTEND
+================================================================================
+
+client/
+|
++-- index.html   (~400 lines)
+|   Single-page shell. Contains: login screen, sidebar (projects + chats),
+|   topbar (Diagnostic / Move session / Download), chat area with bottom input
+|   bar (length toggle, stance toggle, model picker), and every modal
+|   (Reminders, Reports, Paper writer, Memory hierarchy, Diagnostic, etc.).
+|
++-- style.css    (~2,400 lines)
+|   White theme, no dark mode. Inter for UI, JetBrains Mono for diagnostic.
+|   Hand-written CSS — no framework, no preprocessor.
+|
++-- app.js       (~4,000 lines)
+|   All frontend logic in vanilla JS, no build step.
+|     - state object: projects, sessions, current ids, model, length, stance,
+|       pendingAttachments, etc.
+|     - SSE consumers for /api/chat, /api/tractatus/update, /api/coherence,
+|       /api/report/generate, /api/summarize, /api/audit, /api/profile/generate,
+|       /api/diagnostic/run.
+|     - Background draggable popup for tractatus updates so chat is not blocked.
+|     - Artifact panel that opens when assistant produces document-like output.
+
+
+================================================================================
+DATABASE SCHEMA - POSTGRES (NEON)
+================================================================================
+
+All tables created at boot via SCHEMA_SQL + idempotent ALTER TABLEs.
+Multi-user data isolation is enforced at the query level via user_id filters
+plus ownership-verifier helpers (verifyProjectOwnership etc.) called in routes.
+
+TABLE: users
++--------------+-------------------------+-----------------------------------+
+| id           | UUID PRIMARY KEY        | gen_random_uuid()                 |
+| username     | TEXT UNIQUE             | added via ALTER (case-insensitive)|
+| password_hash| TEXT NULLABLE           | NULL = passwordless (JMK admin)   |
+| created_at   | TIMESTAMPTZ             |                                   |
++--------------+-------------------------+-----------------------------------+
+
+TABLE: projects                              <-- HOLDS THE TRACTATUS TREE
++--------------------+----------------------+-----------------------------------+
+| id                 | UUID PRIMARY KEY     |                                   |
+| name               | TEXT NOT NULL        |                                   |
+| tractatus_tree     | JSONB                | { "1.0": "ASSERTS: ...", ... }    |
+| user_id            | UUID                 | added via ALTER                   |
+| tractatus_tier     | INTEGER DEFAULT 1    | 1 = live, 2+ = compressed summary |
+| parent_project_id  | UUID FK projects(id) | links summary tier to its source  |
+| last_tree_update   | TIMESTAMPTZ          | for staleness detection           |
+| compression_count  | INTEGER DEFAULT 0    | how many times tree was compressed|
+| created_at         | TIMESTAMPTZ          |                                   |
++--------------------+----------------------+-----------------------------------+
+
+TABLE: sessions                              <-- one per chat, transcript inline
++-------------+----------------------+-------------------------------------+
+| id          | UUID PRIMARY KEY     |                                     |
+| project_id  | UUID FK projects     | ON DELETE CASCADE                   |
+| title       | TEXT                 | auto-generated by Claude            |
+| transcript  | JSONB DEFAULT '[]'   | [{role, content, ts}, ...]          |
+| created_at  | TIMESTAMPTZ          |                                     |
++-------------+----------------------+-------------------------------------+
+
+TABLE: project_documents                     <-- per-project library
++-------------+----------------------+-------------------------------------+
+| id          | UUID PRIMARY KEY     |                                     |
+| project_id  | UUID FK projects     | ON DELETE CASCADE                   |
+| name        | TEXT                 |                                     |
+| raw_content | TEXT                 | extracted plain text                |
+| created_at  | TIMESTAMPTZ          |                                     |
++-------------+----------------------+-------------------------------------+
+
+TABLE: global_documents                      <-- cross-project library
+| id, name, raw_content, user_id (ALTER), created_at
+
+TABLE: tractatus_archive                     <-- snapshots before compression
++-------------+----------------------+-------------------------------------+
+| id          | UUID PRIMARY KEY     |                                     |
+| project_id  | UUID FK projects     | ON DELETE CASCADE                   |
+| tier        | INTEGER NOT NULL     | tier of the snapshotted tree        |
+| tree        | JSONB NOT NULL       | full pre-compression tree           |
+| node_count  | INTEGER              |                                     |
+| created_at  | TIMESTAMPTZ          | acts as a temporal checkpoint       |
++-------------+----------------------+-------------------------------------+
+
+TABLE: user_analytics                        <-- cross-project profile tree
+| id, user_id UNIQUE, profile_tree JSONB, exchange_count, last_updated
+
+TABLE: profile_snapshots                     <-- longitudinal profile history
+| id, user_id, profile_text TEXT, word_count, created_at
+
+TABLE: reminders
+| id, user_id, text, completed BOOL, project_id NULLABLE, created_at, completed_at
+
+TABLE: document_jobs / document_chunks       <-- coherence engine persistence
+| (job_id, chunk_index, chunk_text, chunk_output, chunk_delta JSONB)
+
+TABLE: user_sessions                         <-- created by connect-pg-simple
+
+
+================================================================================
+*** CORE INNOVATION: THE TRACTATUS TREE MEMORY SYSTEM ***
+================================================================================
+
+This is the feature that effectively ENLARGES the model's context window
+beyond its native limit. It is the system that should be ported to other apps.
+
+WHAT IT IS
+----------
+A per-project Tractatus tree is a flat JSON object stored in JSONB:
+
+    {
+      "1.0":   "ASSERTS: User is litigating UBS arbitration over advisor fees.",
+      "1.1":   "DOCUMENT: UBS_settlement_offer.pdf, dated 2024-03-15.",
+      "1.1.1": "ASSERTS: Settlement offered $42,000 against $78,000 claim.",
+      "1.2":   "REJECTS: User declines mediation.",
+      "2.0":   "OPEN: Statute of limitations question for 2019 transfers.",
+      "2.0.1": "QUESTION: Does NY CPLR 213(2) or FINRA 6-year rule control?",
+      "3.0":   "RESOLVED: Discovery deadline set for 2025-09-01."
+    }
+
+Keys are Wittgenstein-style numbered outlines ("1.0", "1.1", "1.1.1", "2.0").
+Values are tagged summaries using a fixed vocabulary:
+
+    ASSERTS:    a positive claim now in the record
+    REJECTS:    a claim explicitly denied
+    ASSUMES:    a working assumption not yet verified
+    OPEN:       an unresolved question or thread
+    RESOLVED:   a previously open item now closed
+    DOCUMENT:   a reference to an uploaded source
+    QUESTION:   a question the project is trying to answer
+
+WHY IT EXPANDS THE CONTEXT WINDOW
+---------------------------------
+Every chat exchange is summarised into 1-5 new nodes appended to the tree.
+On the NEXT message, the tree (not the raw transcript) is injected into the
+system prompt. So a 200-message conversation that would never fit in a
+200K-token window is represented by ~200 nodes (~10-15 KB), and the model
+behaves as if it remembers everything.
+
+The tree is rendered in a compact `key: value\n` format, NOT JSON, to save
+tokens — 30-40% smaller than JSON.stringify with no semantic loss.
+
+THREE LAYERS OF CONTEXT FED TO EVERY CHAT REQUEST
+-------------------------------------------------
+    1. Tiered tractatus memory   <-- the "long memory"     (~15K char budget)
+    2. Last 16 messages of CURRENT session                 (~8K chars each, capped)
+    3. 6 messages x 400 chars from OTHER sessions          (~10K total, cross-session)
+
+Total system+context cap: ~100K chars. Logged to console for monitoring.
+
+
+================================================================================
+RECURSIVE COMPRESSION - THE TIERED MEMORY HIERARCHY
+================================================================================
+
+When a project's Tier 1 tree reaches 200 nodes, it is automatically compressed
+into a higher-tier summary. This is what allows the system to retain memory
+of arbitrarily long projects.
+
+TIER STRUCTURE
+--------------
+    Tier 1   "recent, high resolution"        live tree, current project row
+    Tier 2   "summary, medium resolution"     compression of old Tier 1 nodes
+    Tier 3   "archive, lower resolution"      compression of Tier 2 (rare)
+    Tier 4+  "deep archive"                   recursive, theoretically unbounded
+
+Each tier is stored as its own row in `projects` with `tractatus_tier > 1`
+and `parent_project_id` pointing back at the live project. These summary
+projects are HIDDEN from the main project list (the SELECT in /api/projects
+filters `tractatus_tier = 1 OR IS NULL`).
+
+PER-TIER CHARACTER BUDGETS injected into the system prompt:
+    Tier 1:  8,000 chars
+    Tier 2:  4,000 chars
+    Tier 3+: 2,000 chars
+    Total:  15,000 chars
+
+COMPRESSION TRIGGER & ALGORITHM (server/index.js compressTractatusTier)
+-----------------------------------------------------------------------
+Runs INSIDE a database transaction (BEGIN/COMMIT/ROLLBACK).
+
+Step 1  Snapshot the full pre-compression tree into tractatus_archive
+        with its tier number and node count. (PRESERVES history.)
+
+Step 2  Send the full tree to Claude with a strict prompt:
+          - Reduce to roughly 50-80 nodes
+          - PRESERVE adverse findings, defeats, dates, dollar amounts EXACTLY
+          - Never reframe a defeat as an "opportunity" (anti-sycophancy)
+          - Use the same tag vocabulary
+          - Return ONLY valid JSON
+        max_tokens = 8192. Bare-string + JSON-fence cleanup, then JSON.parse.
+
+Step 3  Either MERGE the new summary into an existing Tier (currentTier+1)
+        summary project, OR CREATE a new summary project if none exists.
+
+Step 4  Trim the live Tier 1 tree: keep the 30 most recent nodes
+        (no cliff — the model still has very-recent detail at high resolution).
+        UPDATE projects SET tractatus_tree = kept, compression_count += 1.
+
+Step 5  If the merged Tier 2 itself now has >= 200 nodes, RECURSE into the
+        same function with the next tier up. This is how Tier 3+ are born.
+
+The chat-side helper loadTieredMemory(projectId) walks
+parent_project_id links breadth-first and assembles all tiers in
+ascending order for injection into buildSystemPrompt().
+
+
+================================================================================
+HOW THE TRACTATUS LIFECYCLE WORKS - END-TO-END FLOW
+================================================================================
+
+                    +-------------------------------------+
+                    |     USER SENDS A CHAT MESSAGE       |
+                    +------------------+------------------+
+                                       |
+                                       v
++------------------------------------------------------------------------------+
+|  STEP 1: BUILD SYSTEM PROMPT  (server/index.js: buildSystemPrompt)          |
+|                                                                              |
+|  - Universal anti-sycophancy rules (never lie, never reframe defeats)       |
+|  - Stance directive (Agreeable / Neutral / Mildly Critical / Strongly Crit) |
+|  - Response length directive (Concise / Normal / Detailed / Exhaustive)     |
+|  - Response format (Prose vs Bullets)                                        |
+|  - Tractatus Tree definition                                                 |
+|  - For each tier in tieredMemory.tiers:                                      |
+|       inject "### Tier N - <label> (<nodes> nodes):\n<compactTreeString>"   |
+|  - Staleness warning (if tree not updated >= 3 days, or compressed >= 2x)   |
++------------------------------------------------------------------------------+
+                                       |
+                                       v
++------------------------------------------------------------------------------+
+|  STEP 2: STREAM CHAT  (POST /api/chat - SSE)                                |
+|                                                                              |
+|  - Pick model: claude / chatgpt / deepseek / grok                           |
+|  - Send last 16 messages + cross-session context + system prompt            |
+|  - Stream tokens to the client via SSE                                       |
+|  - extractRequestedWordCount() detects "write 10000 words" -> auto-continue |
+|    chains up to 40 calls with rolling 500-word context window               |
++------------------------------------------------------------------------------+
+                                       |
+                                       v
++------------------------------------------------------------------------------+
+|  STEP 3: BACKGROUND TRACTATUS UPDATE  (POST /api/tractatus/update - SSE)    |
+|                                                                              |
+|  Triggered by client AFTER the chat response completes. Runs in a draggable |
+|  green popup so chat input is not blocked.                                   |
+|                                                                              |
+|  3a. Read existing tree from projects.tractatus_tree                        |
+|  3b. Build prompt: existing tree + user excerpt + assistant excerpt         |
+|      (excerpts capped at 4K and 8K chars)                                   |
+|  3c. Call Claude with system "You output only valid JSON objects."          |
+|      max_tokens = 4096, streaming = true                                    |
+|  3d. Stream the JSON live to the popup so the user can see the update form |
+|  3e. tryParseTractatusJSON() with a retry pass on simpler prompt if parsing |
+|      fails. Skip the update if both attempts fail (better than corrupting). |
+|  3f. Object.assign(existingTree, newTree) -> merged                         |
+|      UPDATE projects SET tractatus_tree=$1, last_tree_update=NOW()          |
+|  3g. If nodeCount >= 200: call compressTractatusTier(...)                   |
+|  3h. Fire-and-forget updateUserProfileTree() every 5th exchange             |
++------------------------------------------------------------------------------+
+                                       |
+                                       v
++------------------------------------------------------------------------------+
+|  STEP 4 (CONDITIONAL): COMPRESSION  (compressTractatusTier - txn)           |
+|                                                                              |
+|  See "RECURSIVE COMPRESSION" section above. Runs entirely in a transaction. |
+|  On commit, sendFn emits {type:'compressed', tier, originalNodes,           |
+|  summaryNodes} so the popup can display "Memory compressed: 200 -> 67       |
+|  nodes (Tier 2)".                                                            |
++------------------------------------------------------------------------------+
+
+
+================================================================================
+ANTI-SYCOPHANCY: PROTECTED ACROSS THE WHOLE MEMORY PIPELINE
+================================================================================
+
+A critical design requirement is that NEGATIVE FINDINGS survive the full
+memory lifecycle without being softened into "opportunities" or "lessons."
+
+Three places enforce this with matching language:
+
+  1. buildSystemPrompt()           "NEVER reframe a defeat as a victory"
+                                   "preserve negative findings with the same
+                                    fidelity as positive ones"
+
+  2. /api/tractatus/update prompt  "If the user lost a motion, record
+                                    'ASSERTS: Motion denied' - not
+                                    'ASSERTS: Denial creates strategic
+                                    opportunity.'"
+
+  3. compressTractatusTier prompt  "Preserve adverse findings, defeats,
+                                    setbacks, and losses with FULL fidelity
+                                    and equal weight to positive developments.
+                                    Do NOT soften bad news during compression."
+
+Stance toggle is orthogonal to truthfulness: Agreeable steel-mans the user's
+position, Strongly Critical steel-mans the contrary, but ALL FOUR stances are
+bound by the universal rules and CANNOT invent supporting or counter-evidence.
+
+
+================================================================================
+KEY FUNCTIONS - SERVER/INDEX.JS REFERENCE TABLE
+================================================================================
+
+LINE   NAME                              ROLE
+----   --------------------------------  --------------------------------------
+ 90    requireAuth                       middleware - blocks unauth /api/* calls
+103    verifyProjectOwnership            ownership gate before any project op
+108    verifySessionOwnership            same, by session
+113    verifyProjectDocOwnership         same, by per-project doc
+118    verifyGlobalDocOwnership          same, by user-scoped global doc
+216    initDB                            runs SCHEMA_SQL + idempotent ALTERs
+242    callClaude                        official Anthropic /v1/messages
+283    callOpenAI                        OpenAI chat/completions, OAI format
+337    callDeepSeek                      DeepSeek (OAI-compatible)
+391    callGrok                          xAI (OAI-compatible)
+445    extractRequestedWordCount         parses "write 10000 words" / "20k words"
+468    isLongformRequest                 heuristic for auto-continuation
+485    extractSectionOutline             pulls section list from outline output
+528    isProjectSpecificQuery            decides whether to inject project tree
+581    tryParseTractatusJSON             tolerant JSON.parse for the tree update
+624    compactTreeString                 renders tree as `key: value` lines
+634    buildSystemPrompt(tree, tieredMem,  *** central system-prompt builder ***
+                         length, format,
+                         includeProjCtx,
+                         stalenessInfo,
+                         stance)
+1599   /api/tractator/generate           standalone Tractator artifact generator
+1723   /api/tractatus/update             *** SSE - the per-exchange tree update ***
+1879   compressTractatusTier             *** recursive compression ***
+1998   loadTieredMemory                  walks parent_project_id BFS, returns tiers
+2053   streamClaudeToSSE                 generic Claude->SSE pipe
+2084   streamClaudeWithContinuation      auto-chains calls to hit a word target
+2127   stripMarkdownFromOutput           safety net for prose modes
+2180   searchSemanticScholar             scholarly research helper
+2205   searchOpenAlex                    scholarly research helper
+2242   searchCrossRef                    scholarly research helper
+2284   searchPubMed                      scholarly research helper
+2321   fetchScholarlyResearch            queries 4 APIs in parallel, dedupes
+2353   formatResearchForPrompt           formats results for section prompts
+2373   /api/coherence                    *** three-pass coherence engine ***
+2875   /api/coherence/revise             iterative revision of coherence output
+3447   updateUserProfileTree             fires every 5th exchange in background
+3531   /api/profile/generate             SSE - longitudinal user profile
+3772   /api/audit                        SSE - claim-by-claim fact check
+3929   /api/projects/:id/staleness       returns daysSinceUpdate, severity
+4048   /api/diagnostic/run               SSE - 5-phase system self-check
+
+
+================================================================================
+COMPLETE API ROUTE INVENTORY
+================================================================================
+
+AUTH
+  POST   /api/auth/register
+  POST   /api/auth/login
+  POST   /api/auth/logout
+  GET    /api/auth/me
+
+PROJECTS / SESSIONS
+  GET    /api/projects                            list user projects (Tier 1 only)
+  POST   /api/projects                            create project
+  DELETE /api/projects/:id
+  POST   /api/projects/:id/name                   rename
+  GET    /api/projects/:id/sessions
+  POST   /api/projects/:id/sessions               create chat
+  DELETE /api/sessions/:id
+  POST   /api/sessions/:id/title                  rename chat
+  POST   /api/sessions/:id/auto-title             Claude generates a title
+  POST   /api/sessions/:id/move                   move chat to another project
+  GET    /api/sessions/:id/download               TXT/DOCX/PDF transcript
+  POST   /api/sessions/:id/transcript             append message to transcript
+
+CHAT  (the streaming heart of the app)
+  POST   /api/chat                                SSE - main chat endpoint
+
+TRACTATUS / MEMORY
+  GET    /api/projects/:id/tractatus              fetch raw tree
+  GET    /api/projects/:id/memory-hierarchy       all tiers + archives
+  POST   /api/tractatus/update                    SSE - per-exchange tree update
+  POST   /api/tractator/generate                  SSE - standalone Tractator tool
+  GET    /api/projects/:id/staleness              staleness severity report
+
+LONG-FORM GENERATION
+  POST   /api/coherence                           SSE - three-pass paper writer
+  POST   /api/coherence/revise                    SSE - revise existing output
+  GET    /api/download/:jobId/:format             TXT/DOCX/PDF coherence output
+
+REPORTS / SUMMARIES
+  POST   /api/report/scopes                       list available scopes
+  POST   /api/report/generate                     SSE - prose report
+  POST   /api/summarize                           SSE - project/chat summary
+
+DOCUMENT LIBRARY
+  GET    /api/projects/:id/documents              list per-project docs
+  GET    /api/documents/global                    list user's global docs
+  GET    /api/documents/global/:id/content
+  GET    /api/documents/global/:id/download
+  DELETE /api/documents/global/:id
+  GET    /api/projects/documents/:id/content
+  GET    /api/projects/documents/:id/download
+  DELETE /api/projects/documents/:id
+  POST   /api/projects/documents/:id/move         move to another project
+  POST   /api/projects/documents/:id/copy-to-global
+  POST   /api/documents/upload                    multer file upload (PDF/DOCX/TXT/IMG)
+  POST   /api/documents/insert                    insert doc text into chat
+  POST   /api/documents/copy-to-project
+  POST   /api/documents/copy-to-global
+  POST   /api/documents/save-artifact
+  POST   /api/documents/save-generated
+  POST   /api/artifact/docx                       export to DOCX
+  POST   /api/artifact/pdf                        export to PDF
+
+USER ANALYTICS / PROFILE
+  POST   /api/profile/generate                    SSE - longitudinal profile
+  GET    /api/profile/tree                        raw profile tree
+  GET    /api/profile/history                     list snapshots
+  GET    /api/profile/snapshot/:id                fetch one snapshot
+
+AUDIT (FACT-CHECK)
+  POST   /api/audit                               SSE - claim-by-claim audit
+
+REMINDERS
+  GET    /api/reminders
+  GET    /api/reminders/count
+  POST   /api/reminders
+  PATCH  /api/reminders/:id                       toggle complete
+  PUT    /api/reminders/:id                       edit text
+  DELETE /api/reminders/:id
+
+SELF-CHECK
+  POST   /api/diagnostic/run                      SSE - 5-phase health check
+
+CATCH-ALL
+  GET    /{*splat}                                serves client/index.html
+
+
+================================================================================
+THE THREE-PASS COHERENCE ENGINE (LONG-FORM GENERATION)
+================================================================================
+
+For documents up to 150,000 words. Lives at POST /api/coherence.
+Streams progress to a "paper popup" on the frontend.
+
+PASS 1 - OUTLINE
+  - Claude produces a numbered section outline keyed to the user's instructions
+  - Section sizes scale with target length:
+      < 10K words   -> 1500 words/section
+      10K - 20K     -> 2000 words/section
+      20K+          -> 3000 words/section
+  - extractSectionOutline() parses the outline into structured sections
+
+PASS 2 - SECTION WRITING WITH CONTINUATION
+  - For each section:
+      - Source material is keyword-matched against selected docs (50K char budget)
+        - NOT generic truncation; grep-style relevance
+      - If "Fetch Scholarly Sources" is checked:
+          - 3-5 search queries generated per section
+          - Semantic Scholar + OpenAlex + CrossRef + PubMed hit IN PARALLEL
+          - Results deduplicated by title, formatted with author/year/abstract/DOI
+          - Injected into section prompt with citation instructions
+          - Auto-rephrase + retry if zero results
+      - streamClaudeWithContinuation chains up to 6 calls per section
+      - Each token streamed live into the paper popup
+  - 15-second mandatory pause between sections (rate-limit protection)
+
+PASS 3 - GLOBAL STITCH & REPAIR
+  - Final coherence pass over the assembled document
+  - User can "Revise" the completed output without restarting
+
+DB-BACKED for reliability:
+  - document_jobs row tracks the run
+  - document_chunks rows store each section's input/output/delta
+  - The engine queries the DB every chunk - never trusts in-memory state
+
+
+================================================================================
+USER ANALYTICS - CROSS-PROJECT PROFILE TREE
+================================================================================
+
+A SECOND tractatus tree, scoped per USER instead of per project. Builds
+incrementally by analyzing all project trees + the latest conversation.
+
+Profile tree categories:
+    1.x  Topics
+    2.x  Conversational Style
+    3.x  Writing Patterns
+    4.x  Cognitive Patterns
+    5.x  Emotional Patterns
+    6.x  Evolution
+
+Built by:
+    updateUserProfileTree()   fires every 5th chat exchange in background
+    /api/profile/generate     produces a clinical 800-1500 word profile via SSE
+                              with a "Changes Since Last Profile" diff section
+
+Snapshots saved to profile_snapshots for longitudinal tracking.
+
+
+================================================================================
+SYSTEM DIAGNOSTIC - 5-PHASE SELF-CHECK
+================================================================================
+
+POST /api/diagnostic/run (SSE). Streams PASS/FAIL + timing for each step.
+
+  1. ENVIRONMENT       6 env vars (4 LLM keys + Vision + session secret)
+  2. DATABASE          ping + verify all 10 required tables
+  3. EXTERNAL LLM APIS 1-token ping to Anthropic / OpenAI / DeepSeek / xAI
+                       HTTP 429 / 5xx are reported as "upstream — key OK"
+  4. FUNCTIONAL CRUD   creates throwaway project + session + global doc +
+                       reminder; exercises ownership verification, tractatus
+                       tree round-trip, staleness query, system-prompt builder
+  5. CLEANUP           deletes everything created during the test
+
+
+================================================================================
+PORTING THE TRACTATUS SYSTEM TO ANOTHER APP - CHECKLIST
+================================================================================
+
+This is the minimum surface area you need to replicate to get the
+"enlarged context window" behavior in any chat app.
+
+1. DATABASE
+   - Add a JSONB column `tractatus_tree` to your project/conversation table
+   - Add INTEGER `tractatus_tier DEFAULT 1`
+   - Add UUID `parent_project_id` FK back to the same table
+   - Add TIMESTAMPTZ `last_tree_update`
+   - Add INTEGER `compression_count DEFAULT 0`
+   - Create `tractatus_archive` table: (project_id, tier, tree JSONB, node_count, created_at)
+
+2. PROMPT-BUILDER MODULE
+   - compactTreeString(tree)               // render as `key: value\n` not JSON
+   - buildSystemPrompt(tree, tieredMemory) // inject all tiers under labeled
+                                           // headings with per-tier char budgets
+                                           // (8K / 4K / 2K, total 15K)
+   - loadTieredMemory(projectId)           // BFS walk parent_project_id chain
+
+3. UPDATE PIPELINE  (run AFTER each assistant response)
+   - tryParseTractatusJSON(text)           // tolerant JSON parser w/ fence cleanup
+   - POST /tractatus/update endpoint
+   - Stream the LLM call to the client so the user sees the tree forming
+   - On parse fail, retry once with a simpler prompt; skip if both fail
+   - Object.assign(existingTree, newTree) and UPDATE the row
+   - Trigger compression when nodeCount >= 200
+
+4. COMPRESSION  (transactional)
+   - compressTractatusTier(projectId, fullTree, nodeCount, sendFn, userId)
+   - INSERT pre-compression snapshot into tractatus_archive FIRST
+   - Send tree to LLM with strict JSON-only system prompt and explicit
+     anti-sycophancy rules (preserve defeats / dates / amounts exactly)
+   - max_tokens 8192; reduce to 50-80 nodes
+   - Either MERGE into existing tier+1 summary row OR INSERT a new one
+     (same table, different `tractatus_tier` value, parent_project_id set)
+   - Trim the live tree to its 30 most recent nodes
+   - Increment compression_count
+   - Recurse if the merged higher tier itself crosses the threshold
+
+5. ANTI-SYCOPHANCY  (must appear in THREE places, identically worded)
+   - buildSystemPrompt
+   - /tractatus/update prompt
+   - compressTractatusTier prompt
+   This is what stops the model from softening defeats during memory
+   updates and compressions, which is otherwise a silent failure mode.
+
+6. STALENESS DETECTION
+   - GET /projects/:id/staleness returns daysSinceUpdate + severity
+     (mild >= 3 days/2 compressions; warning >= 7/3; critical >= 14/5)
+   - When stale, inject anti-hallucination clauses into system prompt:
+     "ALWAYS qualify uncertain specifics", "NEVER fabricate details",
+     "Recommend Audit if accuracy is critical"
+
+7. AUDIT (FACT-CHECK)  (highly recommended companion)
+   - POST /audit takes assistant text + project id
+   - Cross-references claims against ALL tiers + source documents
+   - Marks each claim VERIFIED / UNVERIFIABLE / CONTRADICTED
+   - Dates, numbers, names checked with extra strictness
+   This closes the loop on compression-induced drift.
+
+8. UI
+   - Background draggable popup for tree updates so chat is not blocked
+   - Memory hierarchy viewer with collapsible tiers
+   - Color-coded tag badges (ASSERTS green, REJECTS red, OPEN purple, etc.)
+
+
+================================================================================
+ENVIRONMENT VARIABLES (SECRETS)
+================================================================================
+
+ANTHROPIC_API_KEY              Claude (claude-sonnet-4-20250514)
+OPENAI_API_KEY                 ChatGPT (gpt-4o)
+DEEPSEEK_API_KEY               DeepSeek (deepseek-chat, OAI-compatible)
+XAI_API_KEY  (or GROK_API_KEY) Grok (grok-3, OAI-compatible)
+GOOGLE_CLOUD_VISION_API_KEY    image OCR for uploaded photos
+NEON_DATABASE_URL              Neon Postgres connection string
+SESSION_SECRET                 express-session signing secret
+PORT                           default 5000
+
+
+================================================================================
+CRITICAL ARCHITECTURAL CONSTRAINTS
+================================================================================
+
+- NO React, Vite, Tailwind, TypeScript, Drizzle, shadcn, Prisma, ORM
+- ONLY raw `pg` and the official Anthropic/OpenAI/DeepSeek/xAI APIs
+- Coherence engine queries skeleton/deltas from DB EVERY chunk - never memory
+- 15-second mandatory pauses between coherence chunks
+- Summary projects (tractatus_tier > 1) are HIDDEN from the main project list
+- Tree is rendered in `key: value` format NOT JSON to save tokens
+- All SSE endpoints set `X-Accel-Buffering: no` to bypass proxy buffering
+- System prompt size is logged on every chat for monitoring
+
+
+================================================================================
+END OF FILE
+================================================================================
