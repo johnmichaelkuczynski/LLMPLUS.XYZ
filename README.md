@@ -1,68 +1,77 @@
-🧠 LLM Plus
-The Scholar's Workbench — Multi-Model Reasoning with Persistent Project Memory
+# 🧠 LLM PLUS
 
-🧩 Overview
-LLM Plus is a full-service conversational AI platform that gives a single researcher access to four frontier language models — Anthropic Claude, OpenAI ChatGPT, DeepSeek, and xAI Grok — under a unified interface engineered for serious intellectual work.
+**Multi-Model Scholarly Chat with Persistent Per-Project Memory and Recursive Compression**
 
-It performs end-to-end research dialogue, document-grounded analysis, persistent project memory, cross-project user profiling, fact-checking, and long-form composition — from rapid Q&A to multi-thousand-word coherent essays — all without ever throwing away what you've discussed before.
+---
 
-Designed for academics, lawyers, analysts, writers, and serious researchers, it solves the three pathologies that cripple ordinary chat tools: amnesia between sessions, sycophantic agreement with whatever the user says, and the silent erosion of factual fidelity over long projects.
+## 🧩 Overview
 
-🧠 What It Does
+LLM Plus is a multi-model AI chat platform built for serious, long-running intellectual work — legal cases, dissertations, research programs, philosophical investigations, multi-month projects where the conversation outlives any single context window. It plugs into four top-tier LLMs (Claude, ChatGPT, DeepSeek, Grok) and lets the user route any turn to the model best suited for it.
 
-Multi-Model Consultation — Switch live between Claude (Sonnet 4), GPT-4o, DeepSeek-Chat, and Grok-3 on a per-query basis. The same project context, document library, and Tractatus tree are visible to whichever model you choose, so you can cross-check one model's reasoning against another's.
+Unlike consumer chatbots that forget everything between sessions and flatter the user with hedged, watered-down output, LLM Plus is built around two strict operating principles: **memory must persist** and **truth must survive compression.** Every project maintains its own Tractatus tree — a numbered, tagged, machine-managed record of what has been asserted, rejected, assumed, resolved, and left open — that is injected into every system prompt and recursively compressed when it grows beyond the context window. Defeats stay defeats. Numbers stay numbers. Dates stay dates.
 
-Persistent Project Memory (Tractatus Trees) — Every project maintains a Wittgenstein-style numbered knowledge graph (1.0, 1.1, 1.1.1, 2.0…) tagged with ASSERTS / REJECTS / ASSUMES / OPEN / RESOLVED / DOCUMENT / QUESTION. After every exchange, Claude updates the tree with what was discussed, what was claimed, what was disputed, and what remains open. The tree survives across sessions, restarts, and weeks of work — giving the model long-horizon recall across thousands of exchanges in the same project.
+---
 
-Recursive Compression with Tier Promotion — When a project's tree exceeds 200 nodes, it is automatically compressed into a higher-tier summary tree (50–80 nodes) that preserves all critical facts, evidence, and unresolved questions. Compression is iterative: a project can have multiple tiers of summary, with the model still able to draw on the densest archived layer when reasoning about old material.
+## 👥 Who It's For
 
-Stance Toggle (Anti-Sycophancy Engine) — A four-position dial governs the analytical posture of every response: **Agreeable** (steel-man the user's view), **Neutral** (weigh both sides), **Mildly Critical** (probe weaknesses), **Strongly Critical** (steel-man the contrary). Stance is a content directive, not a tonal one; the manner of delivery stays measured in every mode. All four stances are bound by hard truthfulness rules — none may invent supporting or counter-evidence, and Agreeable mode must still correct factual errors plainly. This is the antidote to the "brilliant! do it!" failure mode of ordinary chat.
+- **Lawyers and litigators** — need to maintain perfect recall across years of case material, motions, rulings, and discovery without the model softening adverse outcomes
+- **Academics, graduate students, and researchers** — need to write dissertations and journal articles where claims must remain consistent across hundreds of pages
+- **Philosophers and theorists** — need a system that tracks distinctions, open questions, and dialectical commitments across months of investigation
+- **Analysts and consultants** — need persistent project memory across dozens of documents and hundreds of conversations
+- **Anyone** — who has ever had a long conversation with an AI, asked it three weeks later what was decided, and gotten a confident hallucination
 
-Audit (Fact-Check) — Every assistant message has an "Audit" button. Click it to fact-check the entire response, or highlight specific text first to audit just that passage. The audit cross-references each claim against the project's full Tractatus tree (all tiers), uploaded source documents, and recent chat history, returning a claim-by-claim verdict (VERIFIED / UNVERIFIABLE / CONTRADICTED) with evidence citations. Dates, numbers, and proper names are checked with extra strictness.
+---
 
-Staleness Detection — Projects track when their tree was last updated and how many times it has been compressed. When memory begins to age (3+ days unrefreshed, 2+ compressions), a dismissible banner appears with a severity gradient (mild / warning / critical), and the system prompt is silently injected with anti-hallucination rules that force the model to qualify uncertain claims and recommend auditing. Click the banner to trigger an immediate audit of the most recent response.
+## ⚙️ Core Capabilities
 
-Cross-Project User Analytics ("Profile Me") — A dedicated Tractatus-style profile tree builds incrementally every fifth chat exchange by analyzing all project trees plus the latest conversation. Categories include Topics, Conversational Style, Writing Patterns, Cognitive Patterns, Emotional Patterns, and Evolution. The "Profile Me" sidebar button generates a full clinical profile (800–1500 words) comparing the present moment against previous snapshots stored in the database — a longitudinal record of how the user's thinking has changed over time.
+- **Tractatus Tree Memory** — Every project maintains a persistent JSONB tree of numbered, tagged claims (`ASSERTS`, `REJECTS`, `ASSUMES`, `OPEN`, `RESOLVED`, `DOCUMENT`, `QUESTION`). The tree is injected into every system prompt, giving the model effective recall across the entire history of a project — not just the visible conversation window.
 
-Document Library (General + Per-Project) — Upload PDFs, DOCX, plaintext, and images (with OCR via Google Cloud Vision). Documents live in either a global library (shared across all your projects) or a project library (scoped to one project). Selecting documents from a library attaches them as pending content in the input box — you type your query first, then send the documents and your question together as a single message.
+- **Recursive Memory Compression** — When a project's tree reaches 200 nodes, it is automatically compressed into a higher-tier summary (Tier 2), preserving the most recent 30 nodes at full resolution in Tier 1. Tier 2 itself can be compressed into Tier 3, recursively. All tiers are loaded into the system prompt with per-tier character budgets (8K / 4K / 2K). Pre-compression snapshots are archived for audit.
 
-Reminders — A per-user reminder system lives behind a sidebar button that pulses a yellow dot whenever active reminders exist. Reminders are optionally project-scoped, can be marked complete, edited, or deleted, and persist across sessions.
+- **Anti-Sycophancy Across the Memory Pipeline** — The same anti-flattery rules appear in three places: the chat system prompt, the tractatus update prompt, and the compression prompt. Defeats cannot be reframed as "strategic opportunities" during memory writes or compressions. Numbers, dates, names, and case numbers are preserved verbatim.
 
-Long-Form Coherent Generation — A "Write a Paper" button drives a structured multi-pass writing engine that produces essays and analyses far beyond a single chat turn, with response-length controls (Concise / Normal / Detailed / Exhaustive) governing both the system prompt and the per-call token budget.
+- **Stance Toggle** — Four-position content directive: Agreeable steel-mans the user's position, Strongly Critical steel-mans the contrary, Mildly Critical probes for weaknesses, Neutral weighs both sides. All four stances are equally bound by the truthfulness rules — Agreeable mode still corrects factual errors plainly.
 
-⚙️ Technical Features
+- **Three-Pass Coherence Engine** — Long-form generation engine producing documents up to 150,000 words. Outline → section-by-section streaming with auto-continuation → global stitch-and-repair. Source material is keyword-matched per section; section sizes scale with target length; mandatory pauses between chunks for rate-limit safety.
 
-Direct Model APIs — No middleware, no proxies, no abstraction frameworks. Server makes direct fetch calls to Anthropic Messages API, OpenAI Chat Completions, DeepSeek Chat Completions, and xAI Chat Completions. Every call gets 3× retry-with-exponential-backoff on 429 and 5xx responses. Per-call max-token ceiling: 16,384.
+- **Scholarly Research Integration** — Optional checkbox in the paper writer hits Semantic Scholar, OpenAlex, CrossRef, and PubMed in parallel for each section, dedupes by title, formats with author/year/abstract/DOI, and injects the results into the section prompt with citation requirements.
 
-Streaming Architecture — Token-by-token Server-Sent Events streaming for every chat, audit, and profile-generation endpoint. The client renders text as it arrives.
+- **Audit (Fact-Check)** — Every assistant message has an Audit button. Streams a claim-by-claim analysis cross-referenced against the project's full tiered memory, source documents, and recent chat history. Each claim marked `VERIFIED`, `UNVERIFIABLE`, or `CONTRADICTED` with evidence citations. Dates, numbers, and names checked with extra strictness.
 
-PostgreSQL Persistence (Neon) — All state lives in raw `pg`-driven SQL: users, sessions, projects, messages, global documents, project documents, Tractatus trees, profile snapshots, reminders, audit logs. No ORM, no Drizzle, no migrations framework — schema is created idempotently at boot via `CREATE TABLE IF NOT EXISTS` statements.
+- **Staleness Detection** — Projects track `last_tree_update` and `compression_count`. When a tree hasn't been updated in 3+ days or has been compressed 2+ times, a warning banner appears and anti-hallucination rules are injected into the system prompt forcing the model to qualify uncertain claims.
 
-Session Persistence — Express sessions are stored in PostgreSQL via `connect-pg-simple` (table `user_sessions`, auto-created), so logged-in users survive server restarts and deployments without re-authentication.
+- **Document Library** — Two tiers: per-project library scoped to each project, and a cross-project general library. PDF, DOCX, DOC, TXT, and image upload (PNG/JPG/GIF/BMP/TIFF/WebP via Google Cloud Vision OCR). Drag-and-drop. Multi-document selector in the paper writer.
 
-Multi-User Authentication & Per-User Isolation — Username/password auth with bcryptjs hashing, 30-day session cookies, and database-level ownership verification on every read and write. No user can see another user's projects, documents, sessions, reminders, or analytics. A bypass exists for the username `jmk` per design specification.
+- **Reports & Summaries** — Generate prose reports scoped to the entire project, a single chat, or "since N trees ago" using archive snapshots as temporal checkpoints. Auto-scaled length based on source size.
 
-Anti-Sycophancy Prompt Engineering — The system prompt enforces universal rules that apply across every stance: never lie or fabricate, never reframe defeats as victories without explicit factual grounding, court rulings must distinguish what was held / what was NOT held / forward implications, and negative findings must be preserved with full fidelity. The Tractatus tree update prompt and compression prompt include matching rules so that bad news cannot be laundered into optimistic framing during memory updates or compression cycles.
+- **User Analytics / Profile Me** — Cross-project user profiling. A second tractatus-style tree built incrementally every fifth exchange tracks topics, conversational style, writing patterns, cognitive patterns, emotional patterns, and evolution. Generates a longitudinal clinical profile with a "Changes Since Last Profile" diff.
 
-Context Management — Chat messages are truncated to 8K characters each; the last 16 messages are sent per request; total context capped at 100K characters; cross-session context capped at 10K characters (six messages per session, 400 characters each). System prompt size is logged to console for monitoring.
+- **Reminders, Stance, Length, Format Controls** — Sidebar reminders with active-count indicator. Four-mode response length (Concise / Normal / Detailed / Exhaustive). Two-mode response format (Prose / Bullets). Smart auto-continuation when the user requests a specific word count ("write 10000 words" → up to 40 chained calls).
 
-OCR Pipeline — Image documents (PNG, JPG, TIFF, WebP, etc.) are routed through the Google Cloud Vision API for text extraction before ingestion into the document library.
+- **System Diagnostic** — Five-phase self-check: environment variables, database tables, LLM API reachability (1-token ping to all four), functional CRUD round-trip with cleanup. Streams pass/fail per step. Distinguishes upstream rate-limits from real failures.
 
-Plain-Stack Architecture — Vanilla HTML, CSS, and JavaScript on the front end; Node.js / Express (ESM modules) on the back end; raw `pg` for database access; no React, no Vite, no Tailwind, no TypeScript, no Drizzle, no shadcn. The result is an application with zero build step, near-instant deploys, and a stack a single person can audit end-to-end.
+- **Multi-User Authentication** — Username/password with bcryptjs, 30-day session cookies via connect-pg-simple, complete data isolation between users via `user_id` filters and ownership-verifier helpers in every route.
 
-🎓 Designed For
+---
 
-Academics & Researchers: Persistent project memory across months of work; cross-model verification; rigorous fact-checking against your own document corpus.
+## 🚀 What Makes It Different
 
-Lawyers & Legal Analysts: Anti-sycophancy guardrails specifically engineered for adversarial analysis — stance toggle lets you steel-man your case in one breath and steel-man opposing counsel's case in the next, both within strict truthfulness rules. Court ruling analysis is hard-coded to separate what was held from what was not held from forward implications.
+- **It actually remembers.** The tractatus tree gives the model effective recall across thousands of exchanges, far beyond any native context window. Ask about a detail from three months ago and the answer comes from project memory, not a hallucination.
 
-Writers & Long-Form Authors: Multi-pass paper generation; persistent character, plot, and argument trees per project; "Profile Me" longitudinal tracking of how your thinking evolves.
+- **Bad news stays bad news.** Most AI memory systems quietly soften adverse facts during summarization. LLM Plus enforces anti-sycophancy rules at the system-prompt layer, the tree-update layer, AND the compression layer. A motion denied is recorded as "Motion denied" — not "Denial creates strategic opportunity."
 
-Strategists & Decision-Makers: Audit any answer claim-by-claim against your own evidence; staleness banners warn you when project memory has degraded; reminders keep open threads visible.
+- **Compression is recursive and lossless of structure.** When Tier 1 fills up, it compresses to Tier 2 — not into a paragraph, but into a smaller numbered tree with the same tag vocabulary. When Tier 2 fills up, it compresses to Tier 3. The structure survives every compression cycle, so the model can reason against memory the same way at any depth.
 
-💡 Core Idea
-LLM Plus treats AI consultation as a long-running, evidence-grounded, adversarially-tested intellectual partnership.
+- **Four LLMs, one project.** Switch between Claude, ChatGPT, DeepSeek, and Grok mid-conversation. The memory is model-agnostic — every model sees the same tractatus tree and the same conversation history. Use Claude for analysis, DeepSeek for cheap bulk work, Grok for a contrarian second opinion, all in the same project.
 
-It does not forget between sessions. It does not agree with you by default. It does not let bad news quietly disappear during memory compression. And it lets you swap models mid-conversation to see whether the conclusion holds under four different reasoning styles.
+- **Stance is a content directive, not a vibe.** Most "be more critical" toggles just change tone. The stance toggle here changes which case the model builds — Agreeable steel-mans you, Strongly Critical steel-mans your opponent. Tone stays professional in all four; what changes is the argument under construction.
 
-LLM Plus — chat with any frontier model, but with a memory and a backbone.
+- **The audit trail is real.** Every pre-compression snapshot is archived. Every claim can be re-checked against the full tiered memory and source documents. Staleness is tracked and surfaced. The diagnostic verifies the whole stack end-to-end.
+
+- **No frameworks, no surprises.** Plain HTML/CSS/JS frontend. Express + raw `pg` backend. No React, no Vite, no Tailwind, no TypeScript, no ORM. The whole backend is one file you can read top to bottom.
+
+---
+
+## 💡 Stack
+
+Plain HTML/CSS/JS · Node.js + Express (ESM) · raw `pg` · Neon Postgres · Anthropic / OpenAI / DeepSeek / xAI APIs · Google Cloud Vision OCR
