@@ -3595,11 +3595,27 @@
         runAuditBannerBtn.addEventListener('click', function() {
           var allMsgs = els.messages.querySelectorAll('.message.assistant');
           if (allMsgs.length === 0) { notify('No assistant messages to audit', 'info'); return; }
-          var lastMsg = allMsgs[allMsgs.length - 1];
-          var textEl = lastMsg.querySelector('.msg-text');
-          var textToAudit = textEl ? textEl.innerText : '';
+          var textToAudit = '';
+          for (var i = allMsgs.length - 1; i >= 0; i--) {
+            var m = allMsgs[i];
+            var t = '';
+            var te = m.querySelector('.msg-text');
+            if (te) t = te.innerText || '';
+            if (!t) {
+              var tb = m.querySelector('.msg-body');
+              if (tb) t = tb.innerText || '';
+            }
+            if (!t) {
+              var clone = m.cloneNode(true);
+              var actions = clone.querySelector('.msg-actions-row');
+              if (actions) actions.remove();
+              t = clone.innerText || clone.textContent || '';
+            }
+            t = (t || '').trim();
+            if (t.length >= 20) { textToAudit = t; break; }
+          }
           if (textToAudit) runAudit(textToAudit, runAuditBannerBtn);
-          else notify('No text found to audit', 'info');
+          else notify('No assistant text found to audit yet', 'info');
         });
       }
       var dismissBtn = stalenessContainer.querySelector('.btn-dismiss-staleness');
