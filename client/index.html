@@ -94,6 +94,67 @@
         </div>
       </div>
 
+      <div id="compare-picker-modal" class="modal hidden" data-testid="compare-picker-modal">
+        <div class="modal-content compare-picker-content">
+          <div class="modal-header">
+            <h3>&#9878; Compare Two Stances</h3>
+            <button class="modal-close" id="close-compare-picker" data-testid="close-compare-picker">&times;</button>
+          </div>
+          <div class="compare-picker-body">
+            <p class="compare-picker-intro">Pick two stances. The current message in your chat input will be sent to both at the same time, and the answers will stream side by side.</p>
+            <div class="compare-picker-row">
+              <div class="compare-picker-col">
+                <label class="compare-picker-label">Stance A (left)</label>
+                <select class="compare-picker-select" id="compare-stance-a" data-testid="compare-stance-a">
+                  <option value="agreeable">Agreeable</option>
+                  <option value="neutral" selected>Neutral</option>
+                  <option value="mildly_critical">Mildly Critical</option>
+                  <option value="strongly_critical">Strongly Critical</option>
+                </select>
+              </div>
+              <div class="compare-picker-col">
+                <label class="compare-picker-label">Stance B (right)</label>
+                <select class="compare-picker-select" id="compare-stance-b" data-testid="compare-stance-b">
+                  <option value="agreeable">Agreeable</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="mildly_critical" selected>Mildly Critical</option>
+                  <option value="strongly_critical">Strongly Critical</option>
+                </select>
+              </div>
+            </div>
+            <p class="compare-picker-note" id="compare-picker-note"></p>
+            <div class="compare-picker-actions">
+              <button class="compare-cancel-btn" id="btn-compare-cancel" data-testid="btn-compare-cancel">Cancel</button>
+              <button class="compare-go-btn" id="btn-compare-go" data-testid="btn-compare-go">Compare &#9654;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="compare-overlay" class="modal hidden" data-testid="compare-overlay">
+        <div class="modal-content compare-overlay-content">
+          <div class="modal-header compare-overlay-header">
+            <h3>&#9878; <span id="compare-overlay-title">Stance Comparison</span></h3>
+            <button class="modal-close" id="close-compare-overlay" data-testid="close-compare-overlay">&times;</button>
+          </div>
+          <div class="compare-cols">
+            <div class="compare-col" data-testid="compare-col-a">
+              <div class="compare-col-header" id="compare-col-a-header"></div>
+              <div class="compare-col-body" id="compare-col-a-body" data-testid="compare-col-a-body"></div>
+            </div>
+            <div class="compare-col" data-testid="compare-col-b">
+              <div class="compare-col-header" id="compare-col-b-header"></div>
+              <div class="compare-col-body" id="compare-col-b-body" data-testid="compare-col-b-body"></div>
+            </div>
+          </div>
+          <div class="compare-footer">
+            <span class="compare-status" id="compare-status"></span>
+            <button class="compare-copy-btn" id="btn-compare-copy-a" data-testid="btn-compare-copy-a">Copy A</button>
+            <button class="compare-copy-btn" id="btn-compare-copy-b" data-testid="btn-compare-copy-b">Copy B</button>
+          </div>
+        </div>
+      </div>
+
       <div id="staleness-container" data-testid="staleness-container" style="padding: 0 16px;"></div>
       <div class="messages" id="messages">
         <div class="welcome" id="welcome" data-testid="welcome-screen">
@@ -126,6 +187,7 @@
           <button class="rs-btn active" data-stance="neutral" data-testid="rs-neutral" title="Even-handed; weigh both sides">Neutral</button>
           <button class="rs-btn" data-stance="mildly_critical" data-testid="rs-mildly-critical" title="Probe weaknesses; raise objections">Mildly Critical</button>
           <button class="rs-btn" data-stance="strongly_critical" data-testid="rs-strongly-critical" title="Steel-man the contrary; push the user to reconsider">Strongly Critical</button>
+          <button class="rs-btn rs-compare-btn" id="btn-compare-stances" data-testid="btn-compare-stances" title="Compare two stances side by side" type="button">&#9878; Compare</button>
         </div>
         <div class="input-box" id="input-box">
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>

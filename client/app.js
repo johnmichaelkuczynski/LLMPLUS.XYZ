@@ -4061,5 +4061,172 @@
     showLogin();
   });
 
+  // === Compare Stances ===
+  var STANCE_LABELS = {
+    agreeable: 'Agreeable',
+    neutral: 'Neutral',
+    mildly_critical: 'Mildly Critical',
+    strongly_critical: 'Strongly Critical'
+  };
+  var MODEL_LABELS = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+  var compareAbort = null;
+
+  function openComparePicker() {
+    if (!state.currentSession || !state.currentProject) {
+      notify('Open a chat first', 'error');
+      return;
+    }
+    var msgInput = document.getElementById('chat-input');
+    if (!msgInput || !msgInput.value.trim()) {
+      notify('Type a message in the chat input first', 'error');
+      return;
+    }
+    var noteEl = document.getElementById('compare-picker-note');
+    if (noteEl) noteEl.textContent = '';
+    var aSel = document.getElementById('compare-stance-a');
+    var bSel = document.getElementById('compare-stance-b');
+    if (aSel) aSel.value = state.stance || 'neutral';
+    if (bSel) bSel.value = (state.stance === 'mildly_critical') ? 'neutral' : 'mildly_critical';
+    document.getElementById('compare-picker-modal').classList.remove('hidden');
+  }
+
+  function closeComparePicker() {
+    document.getElementById('compare-picker-modal').classList.add('hidden');
+  }
+
+  function closeCompareOverlay() {
+    if (compareAbort) {
+      try { compareAbort.abort(); } catch (e) {}
+      compareAbort = null;
+    }
+    document.getElementById('compare-overlay').classList.add('hidden');
+  }
+
+  async function runCompare(stanceA, stanceB) {
+    var msgInput = document.getElementById('chat-input');
+    var message = msgInput ? msgInput.value.trim() : '';
+    if (!message) { notify('Empty message', 'error'); return; }
+
+    var aBody = document.getElementById('compare-col-a-body');
+    var bBody = document.getElementById('compare-col-b-body');
+    var aHdr = document.getElementById('compare-col-a-header');
+    var bHdr = document.getElementById('compare-col-b-header');
+    var statusEl = document.getElementById('compare-status');
+    var titleEl = document.getElementById('compare-overlay-title');
+    var modelLabel = MODEL_LABELS[state.model] || 'Claude';
+    aHdr.textContent = STANCE_LABELS[stanceA] + '  ·  ' + modelLabel;
+    bHdr.textContent = STANCE_LABELS[stanceB] + '  ·  ' + modelLabel;
+    titleEl.textContent = STANCE_LABELS[stanceA] + ' vs ' + STANCE_LABELS[stanceB];
+    aBody.innerHTML = '<span class="compare-cursor"></span>';
+    bBody.innerHTML = '<span class="compare-cursor"></span>';
+    statusEl.textContent = 'Streaming both stances in parallel...';
+    document.getElementById('compare-overlay').classList.remove('hidden');
+
+    var textA = '', textB = '';
+    var doneA = false, doneB = false;
+
+    function appendLane(lane, t) {
+      var body = lane === 'A' ? aBody : bBody;
+      if (lane === 'A') textA += t; else textB += t;
+      var cursor = body.querySelector('.compare-cursor');
+      var node = document.createTextNode(t);
+      if (cursor) body.insertBefore(node, cursor); else body.appendChild(node);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function endLane(lane) {
+      if (lane === 'A') doneA = true; else doneB = true;
+      var body = lane === 'A' ? aBody : bBody;
+      var cursor = body.querySelector('.compare-cursor');
+      if (cursor) cursor.remove();
+      if (doneA && doneB) statusEl.textContent = 'Done. ' + textA.split(/\s+/).length + ' words (A) · ' + textB.split(/\s+/).length + ' words (B).';
+      else statusEl.textContent = 'Lane ' + lane + ' done. Waiting for the other...';
+    }
+
+    compareAbort = new AbortController();
+    try {
+      var res = await fetch('/api/chat/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: state.currentSession.id,
+          projectId: state.currentProject.id,
+          message: message,
+          stanceA: stanceA,
+          stanceB: stanceB,
+          responseLength: state.responseLength,
+          responseFormat: state.responseFormat,
+          model: state.model
+        }),
+        signal: compareAbort.signal
+      });
+      if (!res.ok || !res.body) {
+        statusEl.textContent = 'Error: HTTP ' + res.status;
+        return;
+      }
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith('data: ')) continue;
+          var data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            var ev = JSON.parse(data);
+            if (ev.type === 'text' && (ev.lane === 'A' || ev.lane === 'B')) {
+              appendLane(ev.lane, ev.text || '');
+            } else if (ev.type === 'lane_end' && (ev.lane === 'A' || ev.lane === 'B')) {
+              endLane(ev.lane);
+            } else if (ev.type === 'error') {
+              statusEl.textContent = 'Error: ' + ev.error;
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') statusEl.textContent = 'Error: ' + err.message;
+    } finally {
+      compareAbort = null;
+      var ca = aBody.querySelector('.compare-cursor'); if (ca) ca.remove();
+      var cb = bBody.querySelector('.compare-cursor'); if (cb) cb.remove();
+    }
+  }
+
+  var btnCompare = document.getElementById('btn-compare-stances');
+  if (btnCompare) btnCompare.addEventListener('click', openComparePicker);
+  var btnCmpCancel = document.getElementById('btn-compare-cancel');
+  if (btnCmpCancel) btnCmpCancel.addEventListener('click', closeComparePicker);
+  var btnCmpClosePick = document.getElementById('close-compare-picker');
+  if (btnCmpClosePick) btnCmpClosePick.addEventListener('click', closeComparePicker);
+  var btnCmpCloseOv = document.getElementById('close-compare-overlay');
+  if (btnCmpCloseOv) btnCmpCloseOv.addEventListener('click', closeCompareOverlay);
+  var btnCmpGo = document.getElementById('btn-compare-go');
+  if (btnCmpGo) btnCmpGo.addEventListener('click', function() {
+    var a = document.getElementById('compare-stance-a').value;
+    var b = document.getElementById('compare-stance-b').value;
+    var note = document.getElementById('compare-picker-note');
+    if (a === b) { if (note) note.textContent = 'Pick two different stances.'; return; }
+    if (note) note.textContent = '';
+    closeComparePicker();
+    runCompare(a, b);
+  });
+  var btnCpyA = document.getElementById('btn-compare-copy-a');
+  if (btnCpyA) btnCpyA.addEventListener('click', function() {
+    var t = document.getElementById('compare-col-a-body').innerText;
+    navigator.clipboard.writeText(t).then(function() { notify('Copied A', 'success'); });
+  });
+  var btnCpyB = document.getElementById('btn-compare-copy-b');
+  if (btnCpyB) btnCpyB.addEventListener('click', function() {
+    var t = document.getElementById('compare-col-b-body').innerText;
+    navigator.clipboard.writeText(t).then(function() { notify('Copied B', 'success'); });
+  });
+
   checkAuth();
 })();

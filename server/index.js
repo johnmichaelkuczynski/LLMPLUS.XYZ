@@ -1273,6 +1273,162 @@ app.post('/api/chat', async function(req, res) {
   }
 });
 
+// === Stance Compare: run two stances in parallel, stream both into one SSE channel ===
+app.post('/api/chat/compare', async function(req, res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  function send(obj) { res.write('data: ' + JSON.stringify(obj) + '\n\n'); }
+  send({ type: 'status', status: 'thinking' });
+
+  var clientClosed = false;
+  req.on('close', function() { clientClosed = true; });
+
+  try {
+    var sessionId = req.body.sessionId;
+    var projectId = req.body.projectId;
+    var message = req.body.message;
+    var validStances = ['agreeable', 'neutral', 'mildly_critical', 'strongly_critical'];
+    var stanceA = validStances.indexOf(req.body.stanceA) >= 0 ? req.body.stanceA : 'neutral';
+    var stanceB = validStances.indexOf(req.body.stanceB) >= 0 ? req.body.stanceB : 'mildly_critical';
+    if (stanceA === stanceB) {
+      send({ type: 'error', error: 'Pick two different stances' });
+      return res.end();
+    }
+    var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
+    var validFormats = ['prose', 'bullets'];
+    var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
+    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok'];
+    var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
+
+    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+      send({ type: 'error', error: 'Forbidden' });
+      return res.end();
+    }
+
+    var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
+    var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
+    var tieredMemory = await loadTieredMemory(projectId);
+
+    var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
+    var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
+
+    var userOwnWords = (message || '').substring(0, 2000);
+    var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
+
+    var stalenessInfo = null;
+    if (includeProjectContext) {
+      var sr = await pool.query('SELECT last_tree_update, compression_count FROM projects WHERE id = $1', [projectId]);
+      if (sr.rows[0] && sr.rows[0].last_tree_update) {
+        var daysSince = Math.floor((Date.now() - new Date(sr.rows[0].last_tree_update).getTime()) / (1000 * 60 * 60 * 24));
+        var compCount = sr.rows[0].compression_count || 0;
+        if (daysSince >= 3 || compCount >= 2) {
+          stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
+        }
+      }
+    }
+
+    var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA);
+    var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB);
+
+    var msgs = [];
+    var recent = transcript.slice(-16);
+    var totalChars = 0;
+    var charBudget = 100000;
+    for (var i = recent.length - 1; i >= 0; i--) {
+      var c = recent[i].content || '';
+      if (c.length > 8000) c = c.substring(0, 8000) + '\n\n[...truncated...]';
+      totalChars += c.length;
+      if (totalChars > charBudget) break;
+      msgs.unshift({ role: recent[i].role, content: c });
+    }
+    var userContent = message;
+    if (userContent.length > 80000) userContent = userContent.substring(0, 80000) + '\n\n[...truncated...]';
+    msgs.push({ role: 'user', content: userContent });
+
+    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
+                          responseLength === 'normal' ? 4096 :
+                          responseLength === 'detailed' ? 8192 : MAX_TOKENS;
+
+    console.log('[Compare] stanceA=' + stanceA + ' stanceB=' + stanceB + ' model=' + modelChoice + ' length=' + responseLength);
+
+    var writeLock = Promise.resolve();
+    function safeSend(obj) {
+      writeLock = writeLock.then(function() {
+        try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch (e) {}
+      });
+      return writeLock;
+    }
+
+    async function runLane(lane, systemPrompt) {
+      try {
+        safeSend({ type: 'lane_start', lane: lane });
+        var apiRes;
+        var isOAI = false;
+        if (modelChoice === 'chatgpt')      { apiRes = await callOpenAI(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
+        else if (modelChoice === 'deepseek'){ apiRes = await callDeepSeek(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
+        else if (modelChoice === 'grok')    { apiRes = await callGrok(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
+        else                                { apiRes = await callClaude(msgs, systemPrompt, true, lengthMaxTokens); }
+
+        if (!apiRes.ok) {
+          var errBody = await apiRes.text();
+          console.error('[Compare lane ' + lane + '] HTTP ' + apiRes.status + ': ' + errBody.substring(0, 300));
+          safeSend({ type: 'text', lane: lane, text: '\n\n[Error: API returned ' + apiRes.status + ']\n\n' });
+          safeSend({ type: 'lane_end', lane: lane });
+          return;
+        }
+        var reader = apiRes.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = '';
+        while (true) {
+          if (clientClosed) { try { reader.cancel(); } catch (e) {} break; }
+          var chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (var j = 0; j < lines.length; j++) {
+            var line = lines[j];
+            if (!line.startsWith('data: ')) continue;
+            var data = line.slice(6).trim();
+            if (!data || data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              if (isOAI) {
+                if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
+                  safeSend({ type: 'text', lane: lane, text: parsed.choices[0].delta.content });
+                }
+              } else {
+                if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+                  safeSend({ type: 'text', lane: lane, text: parsed.delta.text });
+                }
+              }
+            } catch (e) {}
+          }
+        }
+        safeSend({ type: 'lane_end', lane: lane });
+      } catch (err) {
+        console.error('[Compare lane ' + lane + '] Exception:', err.message);
+        safeSend({ type: 'text', lane: lane, text: '\n\n[Error: ' + err.message + ']\n\n' });
+        safeSend({ type: 'lane_end', lane: lane });
+      }
+    }
+
+    await Promise.all([runLane('A', systemA), runLane('B', systemB)]);
+    await writeLock;
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('Compare error:', err);
+    try { send({ type: 'error', error: err.message }); } catch (e) {}
+    res.end();
+  }
+});
+
 app.post('/api/report/scopes', async function(req, res) {
   try {
     var projectId = req.body.projectId;
