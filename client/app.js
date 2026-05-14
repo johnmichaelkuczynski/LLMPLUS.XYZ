@@ -3550,6 +3550,15 @@
               if (!fullText) {
                 auditBody.innerHTML = '<div class="audit-result-status">' + esc(parsed.message) + '</div>';
               }
+            } else if (parsed.type === 'complete') {
+              var saved = parsed.lessonsSaved || 0;
+              var noteHtml;
+              if (saved > 0) {
+                noteHtml = '<div class="audit-lesson-note audit-lesson-saved" data-testid="audit-lesson-note">&#10003; Saved ' + saved + ' contradicted finding' + (saved !== 1 ? 's' : '') + ' as a caution. Future answers in this project will be told not to repeat these mistakes. Existing answers are unchanged.</div>';
+              } else {
+                noteHtml = '<div class="audit-lesson-note audit-lesson-clean" data-testid="audit-lesson-note">&#10003; No contradicted findings to add to the project\'s caution list.</div>';
+              }
+              auditBody.innerHTML = fmt(fullText) + noteHtml;
             } else if (parsed.type === 'error') {
               auditBody.innerHTML = '<div class="audit-result-status" style="color:#dc2626;">' + esc(parsed.error) + '</div>';
             }

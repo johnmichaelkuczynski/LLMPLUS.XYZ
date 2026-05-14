@@ -2584,3 +2584,22 @@ html, body {
   margin-left: 2px;
   animation: blink 1s steps(2, start) infinite;
 }
+
+.audit-lesson-note {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid;
+}
+.audit-lesson-saved {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+}
+.audit-lesson-clean {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #4b5563;
+}
