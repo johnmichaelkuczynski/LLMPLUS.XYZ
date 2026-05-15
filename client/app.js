@@ -2505,6 +2505,153 @@
   }
 
   els.chatInput.addEventListener('input', autoResize);
+
+  (function setupMicRecording() {
+    var micBtn = document.getElementById('btn-mic');
+    if (!micBtn) return;
+    var mediaRecorder = null;
+    var chunks = [];
+    var stream = null;
+    var startTime = 0;
+    var timerInterval = null;
+    var timerEl = null;
+    var micState = 'idle';
+    var MAX_SEC = 120;
+
+    function forceStopStream() {
+      try { if (stream) stream.getTracks().forEach(function(t) { try { t.stop(); } catch (e) {} }); } catch (e) {}
+      stream = null;
+    }
+    window.addEventListener('beforeunload', forceStopStream);
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && micState === 'recording') stopRecording();
+    });
+
+    function showTimer() {
+      timerEl = document.createElement('div');
+      timerEl.className = 'mic-timer';
+      timerEl.textContent = '0:00';
+      document.body.appendChild(timerEl);
+      var rect = micBtn.getBoundingClientRect();
+      timerEl.style.left = (rect.left + rect.width / 2) + 'px';
+      timerEl.style.top = rect.top + 'px';
+      timerInterval = setInterval(function() {
+        if (!timerEl) return;
+        var s = Math.floor((Date.now() - startTime) / 1000);
+        var mm = Math.floor(s / 60);
+        var ss = s % 60;
+        timerEl.textContent = mm + ':' + (ss < 10 ? '0' : '') + ss;
+        if (s >= MAX_SEC) stopRecording();
+      }, 250);
+    }
+    function hideTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      if (timerEl && timerEl.parentNode) timerEl.parentNode.removeChild(timerEl);
+      timerEl = null;
+    }
+
+    async function startRecording() {
+      if (micState !== 'idle') return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        notify('Voice input not supported in this browser', 'error');
+        return;
+      }
+      micState = 'starting';
+      forceStopStream();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        micState = 'idle';
+        notify('Microphone access denied', 'error');
+        return;
+      }
+      if (micState !== 'starting') { forceStopStream(); return; }
+      var mimeOpts = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', ''];
+      var chosen = '';
+      for (var i = 0; i < mimeOpts.length; i++) {
+        if (!mimeOpts[i] || (window.MediaRecorder && MediaRecorder.isTypeSupported(mimeOpts[i]))) { chosen = mimeOpts[i]; break; }
+      }
+      try {
+        mediaRecorder = chosen ? new MediaRecorder(stream, { mimeType: chosen }) : new MediaRecorder(stream);
+      } catch (err) {
+        micState = 'idle';
+        notify('Could not start recorder: ' + err.message, 'error');
+        forceStopStream();
+        return;
+      }
+      chunks = [];
+      mediaRecorder.ondataavailable = function(e) { if (e.data && e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = function() { handleStop(); };
+      mediaRecorder.start();
+      micState = 'recording';
+      startTime = Date.now();
+      micBtn.classList.add('recording');
+      micBtn.title = 'Click again to stop & transcribe';
+      showTimer();
+    }
+
+    function stopRecording() {
+      if (micState !== 'recording' || !mediaRecorder) return;
+      micState = 'stopping';
+      micBtn.disabled = true;
+      micBtn.classList.remove('recording');
+      hideTimer();
+      try { mediaRecorder.stop(); } catch (e) { forceStopStream(); micState = 'idle'; micBtn.disabled = false; }
+    }
+
+    async function handleStop() {
+      micState = 'transcribing';
+      forceStopStream();
+      var elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed < 0.5 || chunks.length === 0) {
+        chunks = [];
+        notify('Recording too short', 'error');
+        micBtn.classList.remove('transcribing');
+        micBtn.disabled = false;
+        micState = 'idle';
+        return;
+      }
+      var blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
+      chunks = [];
+      micBtn.classList.add('transcribing');
+      micBtn.disabled = true;
+      micBtn.title = 'Transcribing...';
+      try {
+        var fd = new FormData();
+        var ext = (blob.type.indexOf('mp4') >= 0) ? 'm4a' : (blob.type.indexOf('ogg') >= 0 ? 'ogg' : 'webm');
+        fd.append('audio', blob, 'voice.' + ext);
+        var resp = await fetch('/api/transcribe', { method: 'POST', body: fd });
+        var json = await resp.json();
+        if (!resp.ok) {
+          notify('Transcription failed: ' + (json.error || resp.status), 'error');
+        } else {
+          var text = (json.text || '').trim();
+          if (!text) {
+            notify('No speech detected', 'error');
+          } else {
+            var current = els.chatInput.value;
+            els.chatInput.value = current ? (current.replace(/\s+$/, '') + ' ' + text) : text;
+            els.chatInput.focus();
+            try { autoResize(); } catch (e) {}
+            notify('Transcribed ' + text.length + ' chars', 'success');
+          }
+        }
+      } catch (err) {
+        notify('Transcription error: ' + err.message, 'error');
+      } finally {
+        micBtn.classList.remove('transcribing');
+        micBtn.disabled = false;
+        micBtn.title = 'Hold or click to record voice (AssemblyAI)';
+        micState = 'idle';
+      }
+    }
+
+    micBtn.addEventListener('click', function() {
+      if (micState === 'idle') startRecording();
+      else if (micState === 'recording') stopRecording();
+    });
+  })();
+
   els.chatInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

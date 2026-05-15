@@ -3542,6 +3542,69 @@ app.post('/api/documents/save-generated', async function(req, res) {
   }
 });
 
+app.post('/api/transcribe', upload.single('audio'), async function(req, res) {
+  try {
+    if (!process.env.ASSEMBLYAI_API_KEY) return res.status(500).json({ error: 'ASSEMBLYAI_API_KEY not configured' });
+    if (!req.file || !req.file.buffer || req.file.buffer.length === 0) return res.status(400).json({ error: 'No audio uploaded' });
+    if (req.file.buffer.length > 25 * 1024 * 1024) return res.status(413).json({ error: 'Audio too large (max 25 MB)' });
+
+    var aaiKey = process.env.ASSEMBLYAI_API_KEY;
+    console.log('[Transcribe] Received audio:', req.file.size, 'bytes,', req.file.mimetype);
+
+    var uploadResp = await fetch('https://api.assemblyai.com/v2/upload', {
+      method: 'POST',
+      headers: { 'authorization': aaiKey, 'content-type': 'application/octet-stream' },
+      body: req.file.buffer
+    });
+    if (!uploadResp.ok) {
+      var ut = await uploadResp.text();
+      console.error('[Transcribe] Upload failed:', uploadResp.status, ut);
+      return res.status(502).json({ error: 'AssemblyAI upload failed: ' + uploadResp.status });
+    }
+    var uploadJson = await uploadResp.json();
+    var audioUrl = uploadJson.upload_url;
+
+    var createResp = await fetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST',
+      headers: { 'authorization': aaiKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ audio_url: audioUrl, speech_model: 'universal' })
+    });
+    if (!createResp.ok) {
+      var ct = await createResp.text();
+      console.error('[Transcribe] Create failed:', createResp.status, ct);
+      return res.status(502).json({ error: 'AssemblyAI create failed: ' + createResp.status });
+    }
+    var createJson = await createResp.json();
+    var tid = createJson.id;
+
+    var maxAttempts = 60;
+    var attempt = 0;
+    while (attempt < maxAttempts) {
+      await new Promise(function(r) { setTimeout(r, 1500); });
+      var pollResp = await fetch('https://api.assemblyai.com/v2/transcript/' + tid, { headers: { 'authorization': aaiKey } });
+      if (!pollResp.ok) {
+        var pt = await pollResp.text();
+        console.error('[Transcribe] Poll failed:', pollResp.status, pt);
+        return res.status(502).json({ error: 'AssemblyAI poll failed: ' + pollResp.status });
+      }
+      var pollJson = await pollResp.json();
+      if (pollJson.status === 'completed') {
+        console.log('[Transcribe] Completed in', attempt + 1, 'polls,', (pollJson.text || '').length, 'chars');
+        return res.json({ text: pollJson.text || '', confidence: pollJson.confidence, duration: pollJson.audio_duration });
+      }
+      if (pollJson.status === 'error') {
+        console.error('[Transcribe] AAI error:', pollJson.error);
+        return res.status(502).json({ error: 'Transcription error: ' + (pollJson.error || 'unknown') });
+      }
+      attempt++;
+    }
+    return res.status(504).json({ error: 'Transcription timed out' });
+  } catch (err) {
+    console.error('[Transcribe] Exception:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/documents/upload', upload.single('file'), async function(req, res) {
   try {
     var file = req.file;
