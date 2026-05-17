@@ -124,6 +124,8 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
+const VENICE_API_KEY = process.env.VENICE_API_KEY;
+const VENICE_MODEL = 'venice-uncensored';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const OPENAI_MODEL = 'gpt-4o';
 const DEEPSEEK_MODEL = 'deepseek-chat';
@@ -387,6 +389,56 @@ async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
     }
   }
   throw new Error(lastErr || 'DeepSeek API failed after 3 attempts');
+}
+
+async function callVenice(messages, systemPrompt, streaming, maxTokens) {
+  if (!VENICE_API_KEY) throw new Error('Venice API key not configured. Set VENICE_API_KEY in environment.');
+  var apiMessages = [];
+  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
+  for (var i = 0; i < messages.length; i++) {
+    apiMessages.push({ role: messages[i].role, content: messages[i].content });
+  }
+  var body = {
+    model: VENICE_MODEL,
+    max_tokens: maxTokens || MAX_TOKENS,
+    messages: apiMessages,
+    stream: !!streaming
+  };
+  var lastErr = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      var delay = Math.pow(2, attempt) * 1000;
+      console.log('[Venice] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
+      await new Promise(function(r) { setTimeout(r, delay); });
+    }
+    try {
+      var response = await fetch('https://api.venice.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + VENICE_API_KEY
+        },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        if (streaming) return response;
+        var data = await response.json();
+        return data.choices[0].message.content;
+      }
+      var errText = await response.text();
+      lastErr = 'Venice API error ' + response.status + ': ' + errText.substring(0, 300);
+      if (response.status === 429 || response.status >= 500) {
+        console.log('[Venice] Retryable error ' + response.status);
+        continue;
+      }
+      throw new Error(lastErr);
+    } catch (fetchErr) {
+      if (fetchErr.message && fetchErr.message.startsWith('Venice API error')) throw fetchErr;
+      lastErr = fetchErr.message;
+      console.log('[Venice] Fetch error: ' + lastErr);
+    }
+  }
+  throw new Error(lastErr || 'Venice API failed after 3 attempts');
 }
 
 async function callGrok(messages, systemPrompt, streaming, maxTokens) {
@@ -1056,7 +1108,7 @@ app.post('/api/chat', async function(req, res) {
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
     var validStances = ['agreeable', 'neutral', 'mildly_critical', 'strongly_critical'];
     var stance = validStances.indexOf(req.body.stance) >= 0 ? req.body.stance : 'neutral';
-    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok'];
+    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
     var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
     if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
@@ -1226,6 +1278,9 @@ app.post('/api/chat', async function(req, res) {
         }
         if (modelChoice === 'grok') {
           return await streamOpenAICompatibleCall(callMsgs, callGrok, 'Grok');
+        }
+        if (modelChoice === 'venice') {
+          return await streamOpenAICompatibleCall(callMsgs, callVenice, 'Venice');
         }
         var anthropicRes = await callClaude(callMsgs, systemPrompt, true, lengthMaxTokens);
         if (!anthropicRes.ok) {
@@ -1409,7 +1464,7 @@ app.post('/api/chat/compare', async function(req, res) {
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
     var validFormats = ['prose', 'bullets'];
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
-    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok'];
+    var validModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
     var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
     if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
@@ -1480,6 +1535,7 @@ app.post('/api/chat/compare', async function(req, res) {
         if (modelChoice === 'chatgpt')      { apiRes = await callOpenAI(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
         else if (modelChoice === 'deepseek'){ apiRes = await callDeepSeek(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
         else if (modelChoice === 'grok')    { apiRes = await callGrok(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
+        else if (modelChoice === 'venice')  { apiRes = await callVenice(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
         else                                { apiRes = await callClaude(msgs, systemPrompt, true, lengthMaxTokens); }
 
         if (!apiRes.ok) {
@@ -4506,6 +4562,10 @@ app.post('/api/diagnostic/run', async function(req, res) {
       if (!XAI_API_KEY) throw new Error('Not set');
       return 'set (' + XAI_API_KEY.length + ' chars)';
     });
+    await runStep('VENICE_API_KEY present', 'env', async function() {
+      if (!VENICE_API_KEY) throw new Error('Not set');
+      return 'set (' + VENICE_API_KEY.length + ' chars)';
+    });
     await runStep('GOOGLE_CLOUD_VISION_API_KEY present', 'env', async function() {
       if (!process.env.GOOGLE_CLOUD_VISION_API_KEY) throw new Error('Not set');
       return 'set';
@@ -4576,6 +4636,18 @@ app.post('/api/diagnostic/run', async function(req, res) {
         throw new Error('HTTP ' + r.status + note);
       }
       return 'HTTP 200 from ' + GROK_MODEL;
+    });
+    await runStep('Venice API reachable', 'llm', async function() {
+      var r = await fetch('https://api.venice.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + VENICE_API_KEY },
+        body: JSON.stringify({ model: VENICE_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      });
+      if (!r.ok) {
+        var note = (r.status === 429) ? ' (rate-limited upstream — key OK)' : (r.status >= 500 ? ' (Venice server error — key OK)' : '');
+        throw new Error('HTTP ' + r.status + note);
+      }
+      return 'HTTP 200 from ' + VENICE_MODEL;
     });
 
     // === Category 4: Functional (CRUD round-trip) ===
@@ -4719,6 +4791,7 @@ initDB().then(function() {
       ' OPENAI=' + (OPENAI_API_KEY ? 'SET' : 'MISSING') +
       ' DEEPSEEK=' + (DEEPSEEK_API_KEY ? 'SET' : 'MISSING') +
       ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
+      ' VENICE=' + (VENICE_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
   });
 }).catch(function(err) {

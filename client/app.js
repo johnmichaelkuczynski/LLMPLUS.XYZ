@@ -897,7 +897,7 @@
     els.welcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message assistant';
-    var modelLabels = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+    var modelLabels = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok', venice: 'Venice' };
     var modelLabel = modelLabels[state.model] || 'Claude';
     var avatarLetter = modelLabel.charAt(0);
     div.innerHTML = '<div class="msg-avatar">' + avatarLetter + '</div>' +
@@ -2706,7 +2706,7 @@
       document.querySelectorAll('.rm-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.model = btn.getAttribute('data-model');
-      var modelNames = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+      var modelNames = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok', venice: 'Venice' };
       els.chatInput.placeholder = 'Message ' + (modelNames[state.model] || 'Claude') + '...';
     });
   });
@@ -4240,7 +4240,7 @@
     mildly_critical: 'Mildly Critical',
     strongly_critical: 'Strongly Critical'
   };
-  var MODEL_LABELS = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok' };
+  var MODEL_LABELS = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok', venice: 'Venice' };
   var compareAbort = null;
 
   function openComparePicker() {
