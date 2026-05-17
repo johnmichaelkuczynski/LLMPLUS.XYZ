@@ -1,0 +1,284 @@
+Build a synthetic user agent ("R1") that beta-tests LLMPlus end-to-end. R1 must produce raw, reviewable evidence of every interaction — not pass/fail summaries.
+NON-NEGOTIABLE REQUIREMENTS (read first)
+These are the parts a previous synthetic-user build for a different app failed on. If any are missing, the deliverable is rejected.
+
+No green-checkmark theater. R1 does NOT produce a summary that says "Function 3: PASS." R1 produces raw evidence: the exact text R1 typed, the exact text the app returned, the exact network responses, the exact screenshots. The judge's critique is a paragraph of prose, not a boolean. "PASS/FAIL" exists only as a filter for failures.md — never as a substitute for the evidence itself.
+The HTML report must be reviewable by a human in under 30 minutes. Every interaction shows: what R1 was trying to test, what R1 typed (verbatim), what the app returned (the actual response body), the screenshots, and the judge's prose critique. No collapsed sections. No "Click to expand." Everything visible.
+The live view must show R1's actual inputs and the app's actual outputs as they happen — not "Step 4 of N in progress." Spec below.
+Network traffic captured raw. Every request to /api/* and its response body goes into network.log as JSONL. Actual JSON, not summaries.
+Three screenshots per interactive step (before / after typing / after app responds). For read-only navigation steps, one screenshot is fine. The sanity check at the end must distinguish these two cases.
+If R1 cannot complete a step, the failure is logged with the actual error, the page HTML at the moment of failure, and a screenshot. R1 does NOT skip and mark green.
+Per-step API-call expectations are route-specific, not boolean. "Send chat message" expects POST /api/conversations/:id/messages specifically — not "any /api/* call." Boolean checks are forbidden.
+Critical button clicks wrapped in Promise.all([page.waitForResponse(predicate), click]) so R1 doesn't silently advance when a click fails to fire its expected request.
+
+What's different about this app — the Tractatus-tree invariants
+LLMPlus's defining feature (per the blueprint) is its hierarchical Tractatus memory tree that persists across conversations. R1's job is heaviest here. There are three invariants that elevate to CRITICAL VIOLATION status:
+Invariant A — Tree growth is bounded and tagged. After each chat exchange, 1–8 new nodes are added with Wittgenstein decimal notation (1.0, 1.1.2, etc.) and each node value begins with a tag from the fixed vocabulary: ASSERTS, REJECTS, ASSUMES, OPEN, RESOLVED, DOCUMENT, QUESTION. If R1 sends 3 exchanges and the tree grows by 0 nodes or 50 nodes, or any node lacks a valid tag prefix, that's a violation.
+Invariant B — Compression fires at ≥ 200 nodes. The blueprint specifies automatic compression when tree size exceeds 200 nodes, with the live tree trimmed to ~30 most recent and older nodes archived. R1 tests this by force-growing a project (cheap repeated exchanges or a seed import if available) past 200 and verifying: (a) compression actually fires, (b) live-tree node count drops to ~30 afterward, (c) an archive row appears via the admin/tier API.
+Invariant C — Cross-session persistence. Open a project, send a message containing a distinctive fact ("the test code is XQ-77-blue"). Close the session. Open a brand-new session in the same project. Ask "what was the test code?" The response must recall XQ-77-blue. If it doesn't, the tree-as-context isn't working and that's a CRITICAL VIOLATION.
+These three are the heart of the test. Everything else is supporting infrastructure.
+Architecture
+
+Browser automation: Playwright (Node, single-file tools/r1/run.mjs). Standalone Node project, not in any workspace.
+R1's brain: Anthropic API. Model: claude-opus-4-7. Key in ANTHROPIC_API_KEY.
+Judge: Separate Claude API call per interaction. Prose critique, not booleans.
+Live view: node:http server on port 7777. Zero extra deps.
+Target app: LLMPlus running locally. Auto-login (single-tenant per blueprint), so R1 does NOT need to register or sign in. Just navigate.
+Direct DB / API access for invariant verification: R1's judge needs to read tree state directly via the project's tractatus and memory-hierarchy endpoints (GET /api/projects/:id/tractatus, GET /api/projects/:id/memory-hierarchy). These are existing app endpoints, not new ones — R1 just calls them out-of-band to verify what the UI claims.
+
+Live view
+Top panel: current step + R1's approach/reasoning + URL + live-updating keystroke mirror + latest screenshot (refresh 2s).
+Middle panel: streamed app response (chat is SSE — show it streaming, don't wait), recent /api/* calls with body, judge critique once it lands, tractatus-tree state block showing node count before and after the exchange (this is the LLMPlus-specific addition — make it visually distinct so violations of Invariant A jump out).
+Bottom panel: reverse-chronological completed-interaction log.
+After exit: "RUN COMPLETE" banner kept open 60s with link to report.html.
+What R1 is testing — the functions
+Function 1 — Homepage / chat without a project
+
+Navigate to /.
+Send a simple chat message.
+Expected route: POST /api/chat (or whatever the no-project chat endpoint is per the blueprint — verify against code).
+Capture streamed response.
+Judge: in-voice, coherent, no errors.
+
+Function 2 — Projects list (/projects)
+
+Navigate.
+Expected route: GET /api/projects.
+Verify rendered list matches API response count.
+
+Function 3 — Create project
+
+Click create.
+Type name "R1 Test Project [timestamp]".
+Expected route: POST /api/projects.
+Verify it appears in list.
+Capture the project ID for downstream tests.
+
+Function 4 — Project workspace, Chat tab
+
+Navigate to /projects/:id, open Chat tab.
+Send first message. Expected route: POST /api/project-sessions/:sid/chat (or the documented variant).
+Verify response streams.
+Verify Invariant A: immediately call GET /api/projects/:id/tractatus and confirm:
+
+Tree grew by 1–8 nodes
+Every new node value starts with a valid tag (ASSERTS/REJECTS/ASSUMES/OPEN/RESOLVED/DOCUMENT/QUESTION)
+Node keys follow Wittgenstein decimal pattern
+
+
+Send 2 more messages on related topics. Verify Invariant A after each.
+
+Function 5 — Memory tab
+
+Switch to Memory tab.
+Expected route: GET /api/projects/:id/memory-hierarchy.
+Confirm rendered tiers match API. Confirm node count visible in UI matches API response.
+Confirm color-coding by tag type is consistent (judge checks).
+
+Function 6 — Invariant C: cross-session persistence
+
+In the current session, send a message containing the distinctive fact "the test code is XQ-77-blue, remember this for later."
+Verify response acknowledges.
+Verify the fact appears in the tree as an ASSERTS or DOCUMENT node (via GET /api/projects/:id/tractatus).
+Close the session (navigate away).
+Open a new session in the same project (POST /api/projects/:id/sessions).
+Ask: "What was the test code I mentioned earlier?"
+The streamed response must contain XQ-77-blue (case-insensitive substring match).
+If it doesn't, log as CRITICAL INVARIANT VIOLATION with the full response captured.
+
+Function 7 — Invariant B: compression at ≥ 200 nodes
+This is the expensive test. Run only if SKIP_FUNCTIONS does not include 7.
+
+In the test project, check current node count via GET /api/projects/:id/tractatus.
+Loop: send short, distinct chat messages (e.g., "Tell me fact #N about topic X") until node count crosses 200. Cap at 60 iterations to avoid runaway cost.
+After each batch of 5 messages, fetch tractatus and log node count.
+When node count crosses 200, verify on the next fetch that:
+
+Live tree was trimmed to ~30 nodes (allow 20–50 range)
+An archive tier appeared via GET /api/projects/:id/memory-hierarchy
+The compression_count field on the project incremented
+
+
+If crossing 200 does NOT trigger compression within 5 more exchanges, log CRITICAL INVARIANT VIOLATION.
+If R1 hits the 60-iteration cap without reaching 200 nodes, log as a HARNESS WARNING (not a violation) — the test couldn't run; tune the iteration count.
+
+Function 8 — Long Document Generator (Long Doc tab)
+
+Open Long Doc tab in the test project.
+Generate a 2K-word document (small target to save tokens).
+Expected route: POST /api/long-document/generate (or as named in blueprint).
+Capture all SSE events. Verify outline_complete, section_start, section_complete, stitch_complete (or the analogous documented event names) all appear at least once.
+Confirm final word count within ±20% of target.
+After completion, verify a DOCUMENT node appears in the project tractatus tree (per blueprint: "Completed documents add a DOCUMENT node").
+
+Function 9 — Multiple sessions per project
+
+Already partly exercised in Function 6.
+Confirm GET /api/projects/:id/sessions returns all created sessions.
+Switch between sessions and verify each loads independently.
+
+Function 10 — Project rename
+
+Rename via UI.
+Expected route: PATCH /api/projects/:id.
+Confirm new name persists after reload.
+
+Function 11 — Tractatus tree visualization
+
+On the Memory tab, verify the tree visualization renders.
+Judge inspects for: hierarchical structure visible, tag colors applied, decimal numbering correct.
+
+Function 12 — Project deletion (cleanup at end of run)
+
+Delete the test project.
+Expected route: DELETE /api/projects/:id.
+Verify it no longer appears in GET /api/projects.
+Verify associated sessions and archive are cleaned up.
+
+Function 13 — Voice dictation (if present per blueprint)
+R1 can't speak. Limited test:
+
+Click mic button.
+Expected route: POST /api/assemblyai/token (or analogous).
+Verify token mints or fails gracefully if ASSEMBLYAI_API_KEY missing.
+Verify WebSocket upgrade attempted in network logs.
+
+Function 14 — Diagnostic endpoint (if present)
+Per the AskThem-style pattern many of your apps share, LLMPlus likely has a /diagnostic page or /api/diagnostic endpoint. If so:
+
+Trigger it. Expected route: POST /api/diagnostic/run (verify against code).
+Capture full pass/fail grid as a separate artifact in the run folder (diagnostic.json).
+Any failing diagnostic check appears in failures.md under CRITICAL INVARIANT VIOLATIONS.
+
+If no diagnostic exists, skip and note in the report.
+R1's behavior
+For each interaction R1 picks one approach and logs the choice:
+
+Substantive question testing happy path
+Question designed to add specific tag types to tree (e.g., a yes/no question for RESOLVED, an open-ended one for OPEN, a contradictory follow-up for REJECTS)
+Reference back to earlier conversation to test memory injection
+Minimum viable input
+Long contextualized input
+Probe for hallucination (ask about something never mentioned and see if the model invents tree content)
+
+Typing constraint: No clipboard paste. .type() with TYPE_DELAY_MS=15 for live-view visibility.
+Per-interaction flow
+
+Navigate / open UI.
+Capture page state.
+R1 brain picks approach + composes input.
+"Before" screenshot.
+Type input.
+"After typing" screenshot (await element value matches typed input).
+Wrap submit click in Promise.all([page.waitForResponse(predicate), click]).
+Wait for streamed response to complete (await SSE stream end or specific DOM signal indicating done).
+"After" screenshot.
+Capture response, console errors, SSE events, network calls.
+For chat interactions: out-of-band fetch GET /api/projects/:id/tractatus, compute tree-delta (node count before vs after, new node IDs, new tags used), attach to interaction record.
+Send full interaction to judge: "Critique functionally and qualitatively. Did the response stream? Did the tree grow by 1–8 nodes? Did every new node have a valid tag? Did the response use context that earlier exchanges established? Anything broken or off?"
+Append to transcript, update live view, stream summary to console.
+
+Artifacts (written to tools/r1/runs/<ISO-timestamp>/)
+transcript.jsonl
+One JSON per interaction:
+json{
+  "timestamp": "...",
+  "function_number": 4,
+  "function_name": "Project chat — first exchange",
+  "step_description": "Send opening message to test project",
+  "url": "http://localhost:5000/projects/123",
+  "is_interactive": true,
+  "expected_routes": ["POST /api/project-sessions/456/chat"],
+  "r1_approach": "open-ended question to test ASSERTS/OPEN tag generation",
+  "r1_reasoning": "...",
+  "r1_input": "<verbatim>",
+  "app_response": {
+    "page_text_after": "...",
+    "errors_in_console": [],
+    "network_calls": [...],
+    "sse_events_observed": [...]
+  },
+  "tractatus_delta": {
+    "nodes_before": 12,
+    "nodes_after": 16,
+    "delta": 4,
+    "new_node_ids": ["1.4", "1.5", "1.5.1", "2.0"],
+    "new_node_tags": ["ASSERTS", "OPEN", "ASSUMES", "QUESTION"],
+    "all_tags_valid": true,
+    "all_ids_follow_decimal_format": true
+  },
+  "screenshots": ["screenshots/0007-before.png","screenshots/0007-typed.png","screenshots/0007-after.png"],
+  "judge_critique": "<2-5 sentence prose>",
+  "judge_concerns": [...],
+  "invariant_violations": [...]
+}
+report.html
+Self-contained. Grouped by function. Sticky TOC. Every section shows step + approach + reasoning + R1's input + page-text-after + network calls table + console errors + all screenshots inline + judge critique + concerns + tractatus delta block (the LLMPlus-specific addition) + invariant violations. No collapses.
+failures.md
+Opens with CRITICAL INVARIANT VIOLATIONS populated by the deterministic checker:
+
+Tree grew by 0 or >8 nodes after an exchange (Invariant A)
+Any new node missing valid tag prefix (Invariant A)
+Any new node ID not matching Wittgenstein decimal regex (Invariant A)
+Compression failed to fire after 5 exchanges past 200 nodes (Invariant B)
+Live tree not trimmed after compression (Invariant B)
+Archive tier absent after compression (Invariant B)
+New session unable to recall fact from old session (Invariant C)
+Any 5xx response
+Diagnostic endpoint reported failures
+Any uncaught exception in R1's harness
+
+Below: judge concerns linking to report anchors with screenshots inline.
+network.log
+JSONL of every /api/* request + response body. Bodies truncated at 50KB with response_truncated: true flag. Streaming responses captured as assembled-final-body plus chunk timestamps.
+tree-snapshots/
+NEW for LLMPlus: at every chat exchange, save the full tractatus JSON to tree-snapshots/NNNN-before.json and tree-snapshots/NNNN-after.json. Lets you diff manually if anything looks suspicious.
+console.log
+Full stdout.
+screenshots/
+Numbered PNGs.
+diagnostic.json (if Function 14 ran)
+The diagnostic endpoint's full response.
+run-summary.txt
+INTERACTIONS: N
+JUDGE CONCERNS RAISED: M
+CRITICAL INVARIANT VIOLATIONS: K
+TREE INVARIANT VIOLATIONS: T
+HARNESS SANITY FAILURES: J
+Anti-theater sanity checks
+For each interaction:
+
+Every route in expected_routes appears in network_calls. Route-specific.
+r1_input ≥ 10 chars for interactive steps.
+Interactive steps: 3 screenshots, not byte-identical. Navigation-only: 1 screenshot.
+judge_critique ≥ 30 words.
+For chat interactions: tractatus_delta field is present and populated (not stubbed empty).
+
+If any fail: HARNESS SANITY FAILURES: X in summary, exit code 3.
+Configuration
+jsconst APP_URL = process.env.APP_URL || 'http://localhost:5000';
+const OUTPUT_DIR = `./runs/${new Date().toISOString().replace(/[:.]/g,'-')}`;
+const HEADLESS = process.env.HEADLESS === 'true' || false;
+const TYPE_DELAY_MS = parseInt(process.env.TYPE_DELAY_MS || '15', 10);
+const LIVE_VIEW_PORT = parseInt(process.env.LIVE_VIEW_PORT || '7777', 10);
+const SKIP_FUNCTIONS = (process.env.SKIP_FUNCTIONS || '').split(',').filter(Boolean);
+const COMPRESSION_TEST_MAX_ITERATIONS = parseInt(process.env.COMPRESSION_TEST_MAX_ITERATIONS || '60', 10);
+const LONG_DOC_TARGET_WORDS = parseInt(process.env.LONG_DOC_TARGET_WORDS || '2000', 10);
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-7';
+Deliverable
+tools/r1/run.mjs + tools/r1/package.json + tools/r1/README.md. Standalone Node project, not in any workspace.
+npm start runs full plan. Smoke test: SKIP_FUNCTIONS=7,8 npm start (skip compression test and Long Doc to save tokens — those are the expensive ones).
+Startup banner:
+R1 is running.
+Live view:    http://localhost:7777
+Output dir:   ./runs/<timestamp>/
+Watch the live view; do not trust summary output alone.
+Finish banner:
+R1 finished.
+Open the report:     ./runs/<...>/report.html
+Open the failures:   ./runs/<...>/failures.md
+Tree snapshots:      ./runs/<...>/tree-snapshots/
+Raw transcript:      ./runs/<...>/transcript.jsonl
+Raw network log:     ./runs/<...>/network.log
+Exit codes: 0 clean, 1 judge concerns raised, 2 critical invariant violations, 3 harness sanity failed.
+UI selectors identified by inspecting the actual rendered LLMPlus app — do not guess. Confirm endpoint paths against the actual server code if the blueprint and code disagree; the code is authoritative.
