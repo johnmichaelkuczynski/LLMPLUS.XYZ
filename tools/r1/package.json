@@ -1,0 +1,16 @@
+{
+  "name": "llmplus-r1",
+  "version": "1.0.0",
+  "description": "Synthetic user agent that beta-tests LLMPlus end-to-end and produces raw, reviewable evidence.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node run.mjs",
+    "smoke": "SKIP_FUNCTIONS=7,8 node run.mjs",
+    "install-browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "playwright": "^1.45.0"
+  }
+}

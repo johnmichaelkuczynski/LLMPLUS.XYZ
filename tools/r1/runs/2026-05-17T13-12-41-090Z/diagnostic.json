@@ -1,0 +1,486 @@
+[
+  {
+    "type": "start",
+    "name": "ANTHROPIC_API_KEY present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "ANTHROPIC_API_KEY present",
+    "category": "env",
+    "status": "pass",
+    "message": "set (108 chars)",
+    "ms": 1
+  },
+  {
+    "type": "start",
+    "name": "OPENAI_API_KEY present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "OPENAI_API_KEY present",
+    "category": "env",
+    "status": "pass",
+    "message": "set (164 chars)",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "DEEPSEEK_API_KEY present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "DEEPSEEK_API_KEY present",
+    "category": "env",
+    "status": "pass",
+    "message": "set (35 chars)",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "XAI/GROK_API_KEY present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "XAI/GROK_API_KEY present",
+    "category": "env",
+    "status": "pass",
+    "message": "set (84 chars)",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "GOOGLE_CLOUD_VISION_API_KEY present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "GOOGLE_CLOUD_VISION_API_KEY present",
+    "category": "env",
+    "status": "pass",
+    "message": "set",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "SESSION_SECRET present",
+    "category": "env"
+  },
+  {
+    "type": "result",
+    "name": "SESSION_SECRET present",
+    "category": "env",
+    "status": "pass",
+    "message": "set",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "Database connection",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Database connection",
+    "category": "db",
+    "status": "pass",
+    "message": "connected",
+    "ms": 23
+  },
+  {
+    "type": "start",
+    "name": "Table: users",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: users",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 25
+  },
+  {
+    "type": "start",
+    "name": "Table: projects",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: projects",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Table: sessions",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: sessions",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Table: project_documents",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: project_documents",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Table: global_documents",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: global_documents",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Table: tractatus_archive",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: tractatus_archive",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Table: user_analytics",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: user_analytics",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Table: profile_snapshots",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: profile_snapshots",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Table: reminders",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: reminders",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Table: user_sessions",
+    "category": "db"
+  },
+  {
+    "type": "result",
+    "name": "Table: user_sessions",
+    "category": "db",
+    "status": "pass",
+    "message": "exists",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Anthropic Claude API reachable",
+    "category": "llm"
+  },
+  {
+    "type": "result",
+    "name": "Anthropic Claude API reachable",
+    "category": "llm",
+    "status": "pass",
+    "message": "HTTP 200 from claude-sonnet-4-20250514",
+    "ms": 741
+  },
+  {
+    "type": "start",
+    "name": "OpenAI ChatGPT API reachable",
+    "category": "llm"
+  },
+  {
+    "type": "result",
+    "name": "OpenAI ChatGPT API reachable",
+    "category": "llm",
+    "status": "pass",
+    "message": "HTTP 200 from gpt-4o",
+    "ms": 730
+  },
+  {
+    "type": "start",
+    "name": "DeepSeek API reachable",
+    "category": "llm"
+  },
+  {
+    "type": "result",
+    "name": "DeepSeek API reachable",
+    "category": "llm",
+    "status": "pass",
+    "message": "HTTP 200 from deepseek-chat",
+    "ms": 480
+  },
+  {
+    "type": "start",
+    "name": "xAI Grok API reachable",
+    "category": "llm"
+  },
+  {
+    "type": "result",
+    "name": "xAI Grok API reachable",
+    "category": "llm",
+    "status": "pass",
+    "message": "HTTP 200 from grok-3",
+    "ms": 1425
+  },
+  {
+    "type": "start",
+    "name": "Create project",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Create project",
+    "category": "func",
+    "status": "pass",
+    "message": "id=0353bb32",
+    "ms": 25
+  },
+  {
+    "type": "start",
+    "name": "List projects (ownership filter)",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "List projects (ownership filter)",
+    "category": "func",
+    "status": "pass",
+    "message": "visible",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Create session",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Create session",
+    "category": "func",
+    "status": "pass",
+    "message": "id=1613c61c",
+    "ms": 24
+  },
+  {
+    "type": "start",
+    "name": "Verify session ownership",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Verify session ownership",
+    "category": "func",
+    "status": "pass",
+    "message": "verified",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Create global document",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Create global document",
+    "category": "func",
+    "status": "pass",
+    "message": "id=4a4c9ec1",
+    "ms": 27
+  },
+  {
+    "type": "start",
+    "name": "Read global document content",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Read global document content",
+    "category": "func",
+    "status": "pass",
+    "message": "matches",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Create reminder",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Create reminder",
+    "category": "func",
+    "status": "pass",
+    "message": "id=07b242f1",
+    "ms": 24
+  },
+  {
+    "type": "start",
+    "name": "Toggle reminder complete",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Toggle reminder complete",
+    "category": "func",
+    "status": "pass",
+    "message": "toggled",
+    "ms": 22
+  },
+  {
+    "type": "start",
+    "name": "Reminder count endpoint",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Reminder count endpoint",
+    "category": "func",
+    "status": "pass",
+    "message": "4 active",
+    "ms": 20
+  },
+  {
+    "type": "start",
+    "name": "Tractatus tree storage round-trip",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Tractatus tree storage round-trip",
+    "category": "func",
+    "status": "pass",
+    "message": "2 nodes round-tripped",
+    "ms": 41
+  },
+  {
+    "type": "start",
+    "name": "Staleness query",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Staleness query",
+    "category": "func",
+    "status": "pass",
+    "message": "reachable",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Session prompt builder",
+    "category": "func"
+  },
+  {
+    "type": "result",
+    "name": "Session prompt builder",
+    "category": "func",
+    "status": "pass",
+    "message": "2499 chars",
+    "ms": 0
+  },
+  {
+    "type": "start",
+    "name": "Cleanup: delete reminder",
+    "category": "cleanup"
+  },
+  {
+    "type": "result",
+    "name": "Cleanup: delete reminder",
+    "category": "cleanup",
+    "status": "pass",
+    "message": "deleted",
+    "ms": 21
+  },
+  {
+    "type": "start",
+    "name": "Cleanup: delete document",
+    "category": "cleanup"
+  },
+  {
+    "type": "result",
+    "name": "Cleanup: delete document",
+    "category": "cleanup",
+    "status": "pass",
+    "message": "deleted",
+    "ms": 22
+  },
+  {
+    "type": "start",
+    "name": "Cleanup: delete session",
+    "category": "cleanup"
+  },
+  {
+    "type": "result",
+    "name": "Cleanup: delete session",
+    "category": "cleanup",
+    "status": "pass",
+    "message": "deleted",
+    "ms": 23
+  },
+  {
+    "type": "start",
+    "name": "Cleanup: delete project",
+    "category": "cleanup"
+  },
+  {
+    "type": "result",
+    "name": "Cleanup: delete project",
+    "category": "cleanup",
+    "status": "pass",
+    "message": "deleted",
+    "ms": 22
+  },
+  {
+    "type": "done"
+  }
+]

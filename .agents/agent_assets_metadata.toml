@@ -18,3 +18,27 @@ id = "HAy4s4MpM-FglaisNuLC2"
 uri = "file://README.md"
 type = "text"
 title = "LLM Plus — README"
+
+[[outputs]]
+id = "aVtH_re5DMffX4spTBF_z"
+uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z.tar.gz"
+type = "unspecified"
+title = "R1 Full Evidence Pack — transcript, network, screenshots, tree snapshots, report.html, failures.md"
+
+[[outputs]]
+id = "UD_myUue4NRHzTrJ-5nCf"
+uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/failures.md"
+type = "text"
+title = "R1 Failures — Categorized Findings"
+
+[[outputs]]
+id = "wR4HMRzeF5zI0UrDIsZIJ"
+uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/run-summary.txt"
+type = "text"
+title = "R1 Run Summary"
+
+[[outputs]]
+id = "6wx1VNkdUXE3iQjR5RIJ0"
+uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/network.log"
+type = "unspecified"
+title = "R1 Raw Network Log (267 calls)"

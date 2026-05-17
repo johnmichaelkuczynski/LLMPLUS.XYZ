@@ -1,0 +1,19 @@
+
+R1 is running.
+Live view:    http://localhost:7777
+Output dir:   /home/runner/workspace/tools/r1/runs/2026-05-17T13-03-58-356Z
+Watch the live view; do not trust summary output alone.
+
+Live view: http://localhost:7777
+[browser-console-error] Failed to load resource: the server responded with a status of 401 (Unauthorized)
+Logged in as JMK
+[f1] using project e2b0cb62-0991-4584-98cb-88e02fb92c99 session 0ddb8ab9-8204-4915-b11d-0a8c1e57ec9f
+The model 'claude-sonnet-4-20250514' is deprecated and will reach end-of-life on June 15th, 2026
+Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.
+The model 'claude-sonnet-4-20250514' is deprecated and will reach end-of-life on June 15th, 2026
+Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.
+The model 'claude-sonnet-4-20250514' is deprecated and will reach end-of-life on June 15th, 2026
+Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.
+[f3] no POST captured: page.waitForResponse: Timeout 15000ms exceeded while waiting for event "response"
+The model 'claude-sonnet-4-20250514' is deprecated and will reach end-of-life on June 15th, 2026
+Please migrate to a newer model. Visit https://docs.anthropic.com/en/docs/resources/model-deprecations for more information.

@@ -1,0 +1,602 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R1 Report — 2026-05-17T13-12-41-090Z</title>
+<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:20px;color:#111}
+nav{position:sticky;top:0;background:#fff;padding:10px;border-bottom:2px solid #2563eb;z-index:10}
+table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:left}
+h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
+</style></head><body>
+<h1>R1 Run Report — 2026-05-17T13-12-41-090Z</h1>
+<p>Interactions: <b>5</b> · Critical violations: <b style="color:#dc2626">15</b> · Judge concerns: <b style="color:#d97706">19</b> · Sanity failures: <b>3</b></p>
+<nav><b>Table of contents:</b> <ul><li><a href="#Function-1-Home-chat-default-project-">Function 1 — Home chat (default project)</a></li><li><a href="#Function-2-Projects-list">Function 2 — Projects list</a></li><li><a href="#Function-3-Create-project">Function 3 — Create project</a></li><li><a href="#Function-13-Voice-limited-no-audio-source-">Function 13 — Voice (limited — no audio source)</a></li><li><a href="#Function-14-Diagnostic-endpoint">Function 14 — Diagnostic endpoint</a></li></ul></nav>
+<section id="Function-1-Home-chat-default-project-"><h2>Function 1 — Home chat (default project)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Send a simple chat from a freshly-loaded page</h3>
+        <p><b>R1 approach:</b> substantive_question</p>
+        <p><b>R1 reasoning:</b> <i>Testing happy-path streaming with a clear scholarly question on a fresh session. This will verify basic functionality: question processing, knowledge retrieval, coherent response generation, and streaming delivery without any complex context or edge cases.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What are the key differences between deductive and inductive reasoning in scientific methodology, and how do they complement each other in the research process?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 144 → 160 (Δ 16)<br>
+        new ids: 2763.933, 2763.934, 2763.935, 2763.936, 2763.937, 2763.938, 2763.939, 2763.940, 2763.941, 2763.942, 2763.943, 2763.944, 2763.945, 2763.946, 2763.947, 2763.948<br>
+        new tags: ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, OPEN, OPEN, STRATEGIC, STRATEGIC, QUESTION<br>
+        tags valid: <b style="color:#dc2626">NO</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree grew by more than 8</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/e2b0cb62-0991-4584-98cb-88e02fb92c99/documents</td><td>200</td><td>1645ms</td><td><code>[{&quot;id&quot;:&quot;59eb9b47-49a0-4d13-a004-b5e9de4f0454&quot;,&quot;name&quot;:&quot;**Your instinct is absolutely correct - this is massively po&quot;,&quot;created_at&quot;:&quot;2026-05-15T08:16:52.226Z&quot;,&quot;word_count&quot;:391},{&quot;id&quot;:&quot;37400714-2650-40de-9b49-fb8a634b4819&quot;,&quot;name&quot;:&quot;Screenshot 2026-05-15 034430.png&quot;,&quot;created_at&quot;:&quot;2026-05-15T08:13:52.869Z&quot;,&quot;word_count&quot;:204},{&quot;id&quot;:&quot;7dd08093-897e-4862-8866-ae29ca69b824&quot;,&quot;name&quot;:&quot;**Perfect strategic pivot. T</code></td></tr><tr><td>POST</td><td>/api/chat</td><td>200</td><td>7029ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;You&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; just asked me the identical question about deductive and inductive reasoning that I answered comprehensively in my previous response. I explained&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;:\n\n- **Deductive reasoning:** moves from general principles to specific predictions\n- **Inductive reasoning:</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>16279ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;{&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n  \&quot;2763.933\&quot;: \&quot;ASSERTS: User asked identical question about de&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ductive and inductive reasoning in scientific methodology that assistant had just answered comprehensively\&quot;,\n  \&quot;2763.934\&quot;:&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; \&quot;ASSERTS: As</code></td></tr></tbody></table>
+        <p><b>SSE events observed (13)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;You&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; just asked me the identical question about deductive and inductive reasoning that I answered comprehensively in my previous response. I explained&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;:\n\n- **Deductive reasoning:** moves from general principles to specific predictions\n- **Inductive reasoning:** moves from specific observations to general conclusions\n- **Their complementa</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;:** induction builds theories from evidence, deduction tests theories against new evidence\n- **Modern scientific practice:** uses hypothetico-deductive methodology combining both approaches\n</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a detailed analysis covering their logical directions, strengths, limitations, and how&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; they work together in the scientific method.\n\nIs there something specific about your legal case you wanted to discuss&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;? We were analyzing the significant development of U&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;BS hiring Gordon Rees Scully Mansukhani as outside counsel and your strategic&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; positioning with the partial distribution letter. Or did you have a&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; different question you meant to ask?&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;e2b0cb62-0991-4584-98cb-88e02fb92c99&quot;,&quot;userMessage&quot;:&quot;What are the key differences between deductive and inductive reasoning in scientific methodology, and</code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 16 (&gt;8)</li><li>Invariant A: at least one new node has invalid tag prefix</li><li>Tractatus delta violates Invariant A with 16 new nodes (exceeds 8 node limit)</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Response claims to have previously answered the same question when this appears to be a fresh session</li><li>Assistant incorrectly assumes ongoing legal case context that doesn&#39;t exist</li><li>Content shows confusion between different conversation threads or sessions</li><li>Quality of response is poor due to incorrect context assumptions</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The response demonstrates concerning confusion about conversation context, claiming to have answered an identical question previously when this appears to be a fresh chat session. The assistant incorrectly references ongoing legal case discussions that don&#39;t exist in this context, suggesting serious memory or context management issues. While the streaming worked properly and network calls succeeded, the content quality is severely compromised by this contextual confusion.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0001-f1-1-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0002-f1-1-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0003-f1-1-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-2-Projects-list"><h2>Function 2 — Projects list</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm sidebar project count equals GET /api/projects count</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Reconcile UI render with backend list</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+MORMON VS MUSLIM
+📁
+RANDY DISSERTATION
+📁
+SOXL APP
+📁
+STOCK MARKET
+📁
+VIDEO APP
+📁
+OPTIONS RANDY APP
+📁
+HEALTH
+📁
+TO DO
+📁
+PHILOSOPHY 101 APP
+📁
+GENERAL
+📁
+MUSIC BUSINESS
+📁
+GENERAL INQUIRIES
+📁
+SAYINGS
+📁
+NEW GENERAL INQUIRIES
++ New Project
+CHATS
++ New Chat
+💬
+Tractatus Tree Legal Defeats Update
+💬
+Law Firm Fraud and Trust Abuse
+💬
+DC Bar Disciplinary Complaint Updates
+💬
+FINRA Complaint Strategy Against UBS
+💬
+Emrick Freeze Letter Date Claims
+💬
+Second Federal Case Strategy Planning
+💬
+Strategic Federal Case Filing Discussion
+💬
+Tractatus Tree Legal Document Update
+💬
+New Chat
+💬
+Tractatus Tree Document Analysis Update
+💬
+ACAB Email Exchange Legal Filing
+💬
+Emrick Federal Opposition Filing Summary
+💬
+New Chat
+💬
+New Chat
+💬
+Legal Opposition Filing Analysis
+💬
+Chuang Federal Court Ruling Analysis
+💬
+Tractatus Tree Legal Document Analysis
+💬
+Planning Devastating Response to Colby
+💬
+Carolina&#39;s Mounting Unpaid Legal Bills
+💬
+Carolina&#39;s Desperate Financial Deception Exposed
+💬
+Attorney Ethics Witness Advocate Conflict
+💬
+Discovery Filing Error Explanation
+💬
+Meeting With Chuang Emrick Conference Discussion
+💬
+Colby Files Bar Fee Arbitration Response
+💬
+Legal Defense Against Vexatious Litigant Challenge
+💬
+Unusual Legal Silence Before Federal Hearing
+💬
+New Chat
+💬
+Bradford Nordholm Trust Litigation Relevance
+💬
+Carolina Lawyers Opposition Filing Update
+💬
+TRO Motion Filed for Asset Freeze
+💬
+Federal Lawsuit Service Documentation Update
+💬
+Weird Email from Carolina Today
+💬
+COLBY MARYLAND DISBARMENT
+💬
+Length Test
+💬
+Stream Test 2
+💬
+Stream Test
+💬
+Maryland Court Deficiency Notice Help
+💬
+Federal Case Filing Location Query
+💬
+Legal Document Analysis Opposition Strategy
+💬
+Colby Situation Memory Confirmation
+💬
+Colby ACAB Arbitration Deadline Status
+💬
+Microsoft Stock Price August 2025
+💬
+Angry Client Wants Case Facts Only
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Report Generator
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+jmk
+Sign Out
+LLM Plus
+LEGAL CASE
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+⚠️
+Project memory, compressed 13 times. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.
+Run Audit
+×
+U
+You
+[Attached document: &quot;DEEPSEEK APRIL 28.txt&quot; (94462 words)]
+
+
+Trust Litigation Case Background Summary
+Court Hearing Summary and Rulings
+Finding law firm malpractice insurance carrier
+Pro Se Litigant Metadata Fraud Analysis
+FINRA complaint to maintain UBS freeze
+John Michael Kuczynski Index Loc...
+96543 words · 9815 lines
+Show full text
+C
+Claude
+📋
+Looking at the comprehensive case file you&#39;ve provided, I can see you&#39;ve built an extraordinary evidentiary record documenting what appears to be a sophisticated fraud scheme involving forged documents, perjury, and systematic breach of fiduciary duty.
+
+W. Scott Greco is exactly the type of lawyer you need.
+
+Greco is a securities fraud and investo</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route GET /api/projects was not called</li><li>No network calls made despite route being required for test validation</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Missing critical API call prevents verification of the core test requirement</li><li>Cannot assess data consistency between UI and backend without API response</li><li>Test appears incomplete as it only captures UI state without validation</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test step requires confirming that the sidebar project count matches the GET /api/projects count, but no network call was made to retrieve the API data for comparison. The response shows 14 projects in the sidebar, but without the corresponding API call, there&#39;s no way to verify if this count is accurate or if the data is synchronized.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0004-f2-2-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0005-f2-2-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-3-Create-project"><h2>Function 3 — Create project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click + New Project and type &quot;R1 Test Project mp9sqaq5&quot;</h3>
+        <p><b>R1 approach:</b> create_project</p>
+        <p><b>R1 reasoning:</b> <i>Use the real sidebar button so the UI path is exercised</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project mp9sqaq5</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Created project not present in GET /api/projects</li><li>Missing expected route: POST /api/projects was not called</li><li>No network calls made despite user interaction</li><li>Null tractatus delta violates state tracking requirements</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Complete absence of network activity despite clear user action</li><li>No tractatus delta indicating state management failure</li><li>Missing response data suggests broken UI-backend communication</li><li>No SSE events suggests real-time update mechanism is non-functional</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test shows a complete failure to execute the fundamental project creation functionality. Despite the clear instruction to create a project with a specific name, no network calls were made to the expected POST /api/projects endpoint, indicating the UI interaction failed entirely. The absence of any tractatus delta, SSE events, or response data suggests the system did not even attempt to process the user&#39;s action.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0006-f3-3-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0007-f3-3-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0008-f3-3-after2.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-13-Voice-limited-no-audio-source-"><h2>Function 13 — Voice (limited — no audio source)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>R1 cannot speak; verifies button presence + that /api/transcribe exists</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+MORMON VS MUSLIM
+📁
+RANDY DISSERTATION
+📁
+SOXL APP
+📁
+STOCK MARKET
+📁
+VIDEO APP
+📁
+OPTIONS RANDY APP
+📁
+HEALTH
+📁
+TO DO
+📁
+PHILOSOPHY 101 APP
+📁
+GENERAL
+📁
+MUSIC BUSINESS
+📁
+GENERAL INQUIRIES
+📁
+SAYINGS
+📁
+NEW GENERAL INQUIRIES
++ New Project
+CHATS
++ New Chat
+💬
+Tractatus Tree Legal Defeats Update
+💬
+Law Firm Fraud and Trust Abuse
+💬
+DC Bar Disciplinary Complaint Updates
+💬
+FINRA Complaint Strategy Against UBS
+💬
+Emrick Freeze Letter Date Claims
+💬
+Second Federal Case Strategy Planning
+💬
+Strategic Federal Case Filing Discussion
+💬
+Tractatus Tree Legal Document Update
+💬
+New Chat
+💬
+Tractatus Tree Document Analysis Update
+💬
+ACAB Email Exchange Legal Filing
+💬
+Emrick Federal Opposition Filing Summary
+💬
+New Chat
+💬
+New Chat
+💬
+Legal Opposition Filing Analysis
+💬
+Chuang Federal Court Ruling Analysis
+💬
+Tractatus Tree Legal Document Analysis
+💬
+Planning Devastating Response to Colby
+💬
+Carolina&#39;s Mounting Unpaid Legal Bills
+💬
+Carolina&#39;s Desperate Financial Deception Exposed
+💬
+Attorney Ethics Witness Advocate Conflict
+💬
+Discovery Filing Error Explanation
+💬
+Meeting With Chuang Emrick Conference Discussion
+💬
+Colby Files Bar Fee Arbitration Response
+💬
+Legal Defense Against Vexatious Litigant Challenge
+💬
+Unusual Legal Silence Before Federal Hearing
+💬
+New Chat
+💬
+Bradford Nordholm Trust Litigation Relevance
+💬
+Carolina Lawyers Opposition Filing Update
+💬
+TRO Motion Filed for Asset Freeze
+💬
+Federal Lawsuit Service Documentation Update
+💬
+Weird Email from Carolina Today
+💬
+COLBY MARYLAND DISBARMENT
+💬
+Length Test
+💬
+Stream Test 2
+💬
+Stream Test
+💬
+Maryland Court Deficiency Notice Help
+💬
+Federal Case Filing Location Query
+💬
+Legal Document Analysis Opposition Strategy
+💬
+Colby Situation Memory Confirmation
+💬
+Colby ACAB Arbitration Deadline Status
+💬
+Microsoft Stock Price August 2025
+💬
+Angry Client Wants Case Facts Only
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Report Generator
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+jmk
+Sign Out
+LLM Plus
+LEGAL CASE
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+⚠️
+Project memory, compressed 13 times. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.
+Run Audit
+×
+U
+You
+[Attached document: &quot;DEEPSEEK APRIL 28.txt&quot; (94462 words)]
+
+
+Trust Litigation Case Background Summary
+Court Hearing Summary and Rulings
+Finding law firm malpractice insurance carrier
+Pro Se Litigant Metadata Fraud Analysis
+FINRA complaint to maintain UBS freeze
+John Michael Kuczynski Index Loc...
+96543 words · 9815 lines
+Show full text
+C
+Claude
+📋
+Looking at the comprehensive case file you&#39;ve provided, I can see you&#39;ve built an extraordinary evidentiary record documenting what appears to be a sophisticated fraud scheme involving forged documents, perjury, and systematic breach of fiduciary duty.
+
+W. Scott Greco is exactly the type of lawyer you need.
+
+Greco is a securities fraud and investo</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected interaction with #btn-mic element</li><li>No demonstration of microphone permission request as specified in test step</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No verification that #btn-mic element exists in the rendered interface</li><li>Missing evidence of microphone permission request flow</li><li>Test appears to show only static interface content without interactive functionality</li><li>Unclear if the voice feature is actually implemented or accessible</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test output shows a complete interface rendering with projects and chat lists, but fails to demonstrate the core functionality being tested. There is no evidence that the #btn-mic element exists, was clicked, or triggered microphone permission requests. The absence of network calls, SSE events, and console errors suggests the microphone button either doesn&#39;t exist or wasn&#39;t properly tested.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0009-f13-4-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0010-f13-4-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-14-Diagnostic-endpoint"><h2>Function 14 — Diagnostic endpoint</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>POST /api/diagnostic/run and capture full pass/fail grid</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Server self-check; failing checks become CRITICAL violations</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+MORMON VS MUSLIM
+📁
+RANDY DISSERTATION
+📁
+SOXL APP
+📁
+STOCK MARKET
+📁
+VIDEO APP
+📁
+OPTIONS RANDY APP
+📁
+HEALTH
+📁
+TO DO
+📁
+PHILOSOPHY 101 APP
+📁
+GENERAL
+📁
+MUSIC BUSINESS
+📁
+GENERAL INQUIRIES
+📁
+SAYINGS
+📁
+NEW GENERAL INQUIRIES
++ New Project
+CHATS
++ New Chat
+💬
+Tractatus Tree Legal Defeats Update
+💬
+Law Firm Fraud and Trust Abuse
+💬
+DC Bar Disciplinary Complaint Updates
+💬
+FINRA Complaint Strategy Against UBS
+💬
+Emrick Freeze Letter Date Claims
+💬
+Second Federal Case Strategy Planning
+💬
+Strategic Federal Case Filing Discussion
+💬
+Tractatus Tree Legal Document Update
+💬
+New Chat
+💬
+Tractatus Tree Document Analysis Update
+💬
+ACAB Email Exchange Legal Filing
+💬
+Emrick Federal Opposition Filing Summary
+💬
+New Chat
+💬
+New Chat
+💬
+Legal Opposition Filing Analysis
+💬
+Chuang Federal Court Ruling Analysis
+💬
+Tractatus Tree Legal Document Analysis
+💬
+Planning Devastating Response to Colby
+💬
+Carolina&#39;s Mounting Unpaid Legal Bills
+💬
+Carolina&#39;s Desperate Financial Deception Exposed
+💬
+Attorney Ethics Witness Advocate Conflict
+💬
+Discovery Filing Error Explanation
+💬
+Meeting With Chuang Emrick Conference Discussion
+💬
+Colby Files Bar Fee Arbitration Response
+💬
+Legal Defense Against Vexatious Litigant Challenge
+💬
+Unusual Legal Silence Before Federal Hearing
+💬
+New Chat
+💬
+Bradford Nordholm Trust Litigation Relevance
+💬
+Carolina Lawyers Opposition Filing Update
+💬
+TRO Motion Filed for Asset Freeze
+💬
+Federal Lawsuit Service Documentation Update
+💬
+Weird Email from Carolina Today
+💬
+COLBY MARYLAND DISBARMENT
+💬
+Length Test
+💬
+Stream Test 2
+💬
+Stream Test
+💬
+Maryland Court Deficiency Notice Help
+💬
+Federal Case Filing Location Query
+💬
+Legal Document Analysis Opposition Strategy
+💬
+Colby Situation Memory Confirmation
+💬
+Colby ACAB Arbitration Deadline Status
+💬
+Microsoft Stock Price August 2025
+💬
+Angry Client Wants Case Facts Only
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Report Generator
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+jmk
+Sign Out
+LLM Plus
+LEGAL CASE
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+⚠️
+Project memory, compressed 13 times. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.
+Run Audit
+×
+U
+You
+[Attached document: &quot;DEEPSEEK APRIL 28.txt&quot; (94462 words)]
+
+
+Trust Litigation Case Background Summary
+Court Hearing Summary and Rulings
+Finding law firm malpractice insurance carrier
+Pro Se Litigant Metadata Fraud Analysis
+FINRA complaint to maintain UBS freeze
+John Michael Kuczynski Index Loc...
+96543 words · 9815 lines
+Show full text
+C
+Claude
+📋
+Looking at the comprehensive case file you&#39;ve provided, I can see you&#39;ve built an extraordinary evidentiary record documenting what appears to be a sophisticated fraud scheme involving forged documents, perjury, and systematic breach of fiduciary duty.
+
+W. Scott Greco is exactly the type of lawyer you need.
+
+Greco is a securities fraud and investo</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected route: POST /api/diagnostic/run was never called</li><li>No network calls recorded despite test requirement</li><li>Null tractatus_delta indicates missing core functionality</li><li>No SSE events captured when diagnostic streaming was expected</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No diagnostic endpoint execution occurred despite clear test specification</li><li>Response content appears to be a project management interface rather than diagnostic results</li><li>Complete absence of expected diagnostic pass/fail grid data</li><li>No streaming events captured for what should be a diagnostic process</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The beta test completely failed to execute its primary function - the diagnostic endpoint was never called despite being the core requirement. Instead of running POST /api/diagnostic/run to capture a pass/fail grid, the system appears to have returned an unrelated HTML interface showing project folders and chat history. This represents a fundamental breakdown in test execution where the wrong endpoint or interface was accessed entirely.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0011-f14-5-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0012-f14-5-page.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0013-f14-5-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0014-f14-5-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section>
+</body></html>
