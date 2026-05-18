@@ -3871,6 +3871,38 @@
     }
   }
 
+  var pinnedModal = document.getElementById('pinned-context-modal');
+  var pinnedInput = document.getElementById('pinned-context-input');
+  var pinnedCharcount = document.getElementById('pinned-context-charcount');
+  function updatePinnedCount() { if (pinnedCharcount && pinnedInput) pinnedCharcount.textContent = (pinnedInput.value || '').length; }
+  if (pinnedInput) pinnedInput.addEventListener('input', updatePinnedCount);
+  function closePinned() { if (pinnedModal) pinnedModal.classList.remove('show'); }
+  if (document.getElementById('close-pinned-context')) document.getElementById('close-pinned-context').addEventListener('click', closePinned);
+  if (document.getElementById('btn-pinned-cancel')) document.getElementById('btn-pinned-cancel').addEventListener('click', closePinned);
+  if (document.getElementById('btn-pinned-save')) document.getElementById('btn-pinned-save').addEventListener('click', async function() {
+    if (!state.currentProject) { notify('No project selected', 'error'); return; }
+    try {
+      var res = await fetch('/api/projects/' + state.currentProject.id + '/pinned-context', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinnedContext: pinnedInput.value || '' })
+      });
+      if (!res.ok) throw new Error('Save failed (' + res.status + ')');
+      notify('Pinned context saved', 'success');
+      closePinned();
+    } catch (e) { notify('Failed to save: ' + e.message, 'error'); }
+  });
+  document.getElementById('btn-pinned-context').addEventListener('click', async function() {
+    if (!state.currentProject) { notify('Select a project first', 'error'); return; }
+    try {
+      var res = await fetch('/api/projects/' + state.currentProject.id + '/pinned-context');
+      var data = await res.json();
+      pinnedInput.value = data.pinnedContext || '';
+      updatePinnedCount();
+      pinnedModal.classList.add('show');
+      setTimeout(function() { pinnedInput.focus(); }, 50);
+    } catch (e) { notify('Failed to load: ' + e.message, 'error'); }
+  });
+
   document.getElementById('btn-reminders').addEventListener('click', function() {
     remindersModal.classList.add('active');
     loadReminders();

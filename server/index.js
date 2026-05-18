@@ -230,6 +230,7 @@ async function initDB() {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_tree_update TIMESTAMPTZ DEFAULT NOW()");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS compression_count INTEGER DEFAULT 0");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS audit_lessons JSONB DEFAULT '[]'::jsonb");
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS pinned_context TEXT DEFAULT ''");
     } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
@@ -755,8 +756,17 @@ async function loadAuditLessons(projectId) {
   } catch (e) { return []; }
 }
 
-function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons) {
+function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext) {
   var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort. Provide expert-level, intellectually rigorous responses.';
+
+  if (includeProjectContext !== false && pinnedContext && String(pinnedContext).trim().length > 0) {
+    var pinned = String(pinnedContext).trim();
+    if (pinned.length > 6000) pinned = pinned.substring(0, 6000) + '\n[...pinned context truncated at 6000 chars...]';
+    prompt += '\n\n## PINNED PROJECT CONTEXT — GROUND TRUTH\n';
+    prompt += 'The text below is user-curated, persistent, and authoritative for this project. It survives all memory compression. Treat every statement here as established fact about the user, the case, the parties, and the project scope. Do NOT contradict it, do NOT claim ignorance of facts stated here, and do NOT ask the user to re-confirm their identity or basic facts that are already pinned below. If a later memory node or tree entry contradicts the pinned context, the pinned context wins.\n\n';
+    prompt += pinned;
+    prompt += '\n\n[END PINNED CONTEXT]';
+  }
   prompt += '\n\nUNIVERSAL RULES (apply in every stance):';
   prompt += '\n- NEVER lie, fabricate facts, invent citations, or distort the historical/factual record. Truthfulness is non-negotiable across all stances.';
   prompt += '\n- NEVER reframe a defeat as a victory or a setback as an opportunity unless that reframing is supported by specific facts and explicit logic you can state plainly.';
@@ -904,6 +914,23 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
 
   return prompt;
 }
+
+app.get('/api/projects/:id/pinned-context', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var r = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [req.params.id]);
+    res.json({ pinnedContext: r.rows[0] ? (r.rows[0].pinned_context || '') : '' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/projects/:id/pinned-context', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var text = String(req.body.pinnedContext || '').slice(0, 8000);
+    await pool.query('UPDATE projects SET pinned_context = $1 WHERE id = $2', [text, req.params.id]);
+    res.json({ ok: true, pinnedContext: text });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.get('/api/projects', async function(req, res) {
   try {
@@ -1176,7 +1203,9 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var auditLessons = await loadAuditLessons(projectId);
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons);
+    var pinnedCtxRes = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [projectId]);
+    var pinnedCtx = pinnedCtxRes.rows[0] ? (pinnedCtxRes.rows[0].pinned_context || '') : '';
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedCtx);
     if (includeProjectContext && crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
     }
@@ -1495,8 +1524,10 @@ app.post('/api/chat/compare', async function(req, res) {
     }
 
     var auditLessonsCmp = await loadAuditLessons(projectId);
-    var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA, auditLessonsCmp);
-    var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB, auditLessonsCmp);
+    var pinnedCmpRes = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [projectId]);
+    var pinnedCmpCtx = pinnedCmpRes.rows[0] ? (pinnedCmpRes.rows[0].pinned_context || '') : '';
+    var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA, auditLessonsCmp, pinnedCmpCtx);
+    var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB, auditLessonsCmp, pinnedCmpCtx);
 
     var msgs = [];
     var recent = transcript.slice(-16);
