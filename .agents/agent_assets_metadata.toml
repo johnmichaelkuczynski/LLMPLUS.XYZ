@@ -42,3 +42,9 @@ id = "6wx1VNkdUXE3iQjR5RIJ0"
 uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/network.log"
 type = "unspecified"
 title = "R1 Raw Network Log (267 calls)"
+
+[[outputs]]
+id = "NtGzAithQ8ekDkL-zVGkX"
+uri = "file://tools/demo/out/demo.mp4"
+type = "video"
+title = "LLM Plus demo (81s, no narration)"
