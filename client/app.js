@@ -694,10 +694,21 @@
     renderTranscript(s.transcript || []);
   }
 
+  function setGreeting() {
+    var g = document.getElementById('welcome-greeting');
+    if (!g) return;
+    var name = (window.__userName || '').trim();
+    if (name) name = name.charAt(0).toUpperCase() + name.slice(1);
+    var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var day = days[new Date().getDay()];
+    g.textContent = name ? ('Happy ' + day + ', ' + name) : 'How can I help you today?';
+  }
+
   function showWelcome() {
     els.messages.innerHTML = '';
     els.messages.appendChild(els.welcome);
     els.welcome.style.display = '';
+    setGreeting();
   }
 
   function renderTranscript(transcript) {
@@ -705,6 +716,7 @@
     if (!transcript || transcript.length === 0) {
       els.messages.appendChild(els.welcome);
       els.welcome.style.display = '';
+      setGreeting();
       return;
     }
     els.welcome.style.display = 'none';
@@ -4066,6 +4078,8 @@
     loginScreen.classList.add('hidden');
     appEl.classList.remove('hidden');
     userDisplay.textContent = user.username;
+    window.__userName = user.username || '';
+    setGreeting();
     loadProjects();
     updateReminderDot();
   }

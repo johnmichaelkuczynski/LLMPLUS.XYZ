@@ -13,8 +13,8 @@
   <meta name="description" content="LLM Plus - Minimalist AI chat with document management and persistent memory">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=3">
 </head>
 <body>
   <div id="login-screen" class="login-screen">
@@ -170,8 +170,11 @@
       <div id="staleness-container" data-testid="staleness-container" style="padding: 0 16px;"></div>
       <div class="messages" id="messages">
         <div class="welcome" id="welcome" data-testid="welcome-screen">
-          <h2>Welcome to LLM Plus</h2>
-          <p>Chat with Claude. Upload documents, build persistent memory, and generate large coherent documents with the three-pass coherence engine.</p>
+          <div class="welcome-inner">
+            <div class="welcome-star" aria-hidden="true">&#10037;</div>
+            <h2 id="welcome-greeting">How can I help you today?</h2>
+            <p id="welcome-sub">Ask anything &mdash; with persistent memory across your projects.</p>
+          </div>
         </div>
       </div>
 
