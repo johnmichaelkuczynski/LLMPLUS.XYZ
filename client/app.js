@@ -4083,18 +4083,87 @@
     authUsername.focus();
   }
 
+  var btnGoogle = document.getElementById('btn-google');
+  var loginDivider = document.getElementById('login-divider');
+  var clerkInstance = null;
+  var clerkBridging = false;
+
+  function loadClerkScript(pk) {
+    return new Promise(function(resolve, reject) {
+      if (window.Clerk) return resolve();
+      var fa;
+      try { fa = atob(pk.split('_')[2] || '').replace(/\$+$/, ''); } catch (e) { return reject(new Error('bad key')); }
+      if (!fa) return reject(new Error('bad key'));
+      var s = document.createElement('script');
+      s.setAttribute('data-clerk-publishable-key', pk);
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.src = 'https://' + fa + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+      s.onload = function() { resolve(); };
+      s.onerror = function() { reject(new Error('Clerk script failed to load')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function bridgeClerkSession() {
+    if (clerkBridging || !clerkInstance || !clerkInstance.session) return;
+    clerkBridging = true;
+    try {
+      var token = await clerkInstance.session.getToken();
+      if (!token) return;
+      var r = await fetch('/api/auth/clerk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token })
+      });
+      if (r.ok) {
+        var user = await r.json();
+        showApp(user);
+      } else {
+        showAuthError('Google sign-in failed. Please try again.');
+      }
+    } catch (e) {
+      showAuthError('Google sign-in failed. Please try again.');
+    } finally {
+      clerkBridging = false;
+    }
+  }
+
+  async function initClerk() {
+    try {
+      var cfg = await (await fetch('/api/auth/config')).json();
+      if (!cfg.clerkEnabled || !cfg.clerkPublishableKey) return;
+      await loadClerkScript(cfg.clerkPublishableKey);
+      clerkInstance = window.Clerk;
+      await clerkInstance.load();
+      btnGoogle.classList.remove('hidden');
+      loginDivider.classList.remove('hidden');
+      btnGoogle.addEventListener('click', function() {
+        clerkInstance.openSignIn({
+          afterSignInUrl: window.location.origin + '/',
+          afterSignUpUrl: window.location.origin + '/'
+        });
+      });
+      clerkInstance.addListener(function(payload) {
+        if (payload && payload.session) bridgeClerkSession();
+      });
+      if (clerkInstance.session) bridgeClerkSession();
+    } catch (e) {
+      /* Clerk unavailable — username/password login still works */
+    }
+  }
+
   async function checkAuth() {
     try {
       var r = await fetch('/api/auth/me');
       if (r.ok) {
         var user = await r.json();
         showApp(user);
-      } else {
-        showLogin();
+        return;
       }
-    } catch (e) {
-      showLogin();
-    }
+    } catch (e) { /* fall through to login */ }
+    showLogin();
+    initClerk();
   }
 
   btnLogin.addEventListener('click', async function() {

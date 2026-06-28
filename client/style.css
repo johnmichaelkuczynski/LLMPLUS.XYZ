@@ -91,6 +91,45 @@ html, body {
   color: #374151;
 }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  margin: 4px 0;
+}
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
+}
+.login-divider span {
+  padding: 0 10px;
+}
+
+.login-btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+}
+.login-btn-google:hover {
+  background: #f8faff;
+  border-color: #c6d4f0;
+}
+.login-btn-google svg {
+  flex-shrink: 0;
+}
+.login-btn-google[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .login-error {
   color: #dc2626;
   font-size: 13px;

@@ -7,7 +7,58 @@ import multer from 'multer';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { pool } from './db.js';
+
+const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
+function clerkConfigured() { return !!(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY); }
+function clerkFrontendApi() {
+  if (!CLERK_PUBLISHABLE_KEY) return null;
+  var parts = CLERK_PUBLISHABLE_KEY.split('_');
+  var encoded = parts[2] || '';
+  try { return Buffer.from(encoded, 'base64').toString('utf8').replace(/\$+$/, ''); }
+  catch (e) { return null; }
+}
+function b64urlToBuf(s) {
+  s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return Buffer.from(s, 'base64');
+}
+var _jwksCache = { api: null, keys: null, fetchedAt: 0 };
+async function getClerkJwks() {
+  var api = clerkFrontendApi();
+  if (!api) throw new Error('Clerk not configured');
+  if (_jwksCache.keys && _jwksCache.api === api && (Date.now() - _jwksCache.fetchedAt) < 3600000) return _jwksCache.keys;
+  var r = await fetch('https://' + api + '/.well-known/jwks.json');
+  if (!r.ok) throw new Error('JWKS fetch failed: ' + r.status);
+  var data = await r.json();
+  _jwksCache = { api: api, keys: data.keys || [], fetchedAt: Date.now() };
+  return _jwksCache.keys;
+}
+async function verifyClerkToken(token) {
+  var segs = String(token || '').split('.');
+  if (segs.length !== 3) throw new Error('malformed token');
+  var header = JSON.parse(b64urlToBuf(segs[0]).toString('utf8'));
+  var payload = JSON.parse(b64urlToBuf(segs[1]).toString('utf8'));
+  var keys = await getClerkJwks();
+  var jwk = keys.find(function(k) { return k.kid === header.kid; });
+  if (!jwk) throw new Error('signing key not found');
+  var pub = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  var ok = crypto.verify('RSA-SHA256', Buffer.from(segs[0] + '.' + segs[1]), pub, b64urlToBuf(segs[2]));
+  if (!ok) throw new Error('invalid signature');
+  var now = Math.floor(Date.now() / 1000);
+  if (payload.exp && now > payload.exp + 5) throw new Error('token expired');
+  if (payload.nbf && now < payload.nbf - 5) throw new Error('token not yet valid');
+  return payload;
+}
+async function getClerkUser(userId) {
+  var r = await fetch('https://api.clerk.com/v1/users/' + encodeURIComponent(userId), {
+    headers: { Authorization: 'Bearer ' + CLERK_SECRET_KEY }
+  });
+  if (!r.ok) throw new Error('Clerk user fetch failed: ' + r.status);
+  return r.json();
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,6 +138,66 @@ app.get('/api/auth/me', function(req, res) {
   }
 });
 
+app.get('/api/auth/config', function(req, res) {
+  res.json({
+    clerkEnabled: clerkConfigured(),
+    clerkPublishableKey: clerkConfigured() ? CLERK_PUBLISHABLE_KEY : null
+  });
+});
+
+app.post('/api/auth/clerk', async function(req, res) {
+  try {
+    if (!clerkConfigured()) return res.status(503).json({ error: 'Clerk is not configured' });
+    var token = req.body && req.body.token;
+    if (!token) return res.status(400).json({ error: 'Missing token' });
+
+    var payload = await verifyClerkToken(token);
+    var clerkId = payload.sub;
+    if (!clerkId) return res.status(401).json({ error: 'Invalid token' });
+
+    var profile = await getClerkUser(clerkId);
+    var primaryId = profile.primary_email_address_id;
+    var emails = profile.email_addresses || [];
+    var primary = emails.find(function(e) { return e.id === primaryId; }) || emails[0];
+    var email = ((primary && primary.email_address) || '').toLowerCase();
+    var displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim()
+      || profile.username
+      || (email ? email.split('@')[0] : 'user');
+
+    var user = null;
+    var byClerk = await pool.query('SELECT id, username FROM users WHERE clerk_id = $1', [clerkId]);
+    if (byClerk.rows.length > 0) {
+      user = byClerk.rows[0];
+    } else if (email) {
+      var byEmail = await pool.query('SELECT id, username FROM users WHERE LOWER(email) = $1', [email]);
+      if (byEmail.rows.length > 0) {
+        user = byEmail.rows[0];
+        await pool.query('UPDATE users SET clerk_id = $1 WHERE id = $2', [clerkId, user.id]);
+      }
+    }
+    if (!user) {
+      var base = (displayName || 'user').replace(/\s+/g, '').slice(0, 40) || 'user';
+      var username = base;
+      var suffix = 0;
+      while (true) {
+        var exists = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (exists.rows.length === 0) break;
+        suffix++;
+        username = base + suffix;
+      }
+      var ins = await pool.query('INSERT INTO users (username, email, clerk_id) VALUES ($1, $2, $3) RETURNING id, username', [username, email, clerkId]);
+      user = ins.rows[0];
+    }
+
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.json({ id: user.id, username: user.username });
+  } catch (err) {
+    console.error('Clerk auth error:', err.message);
+    res.status(401).json({ error: 'Authentication failed' });
+  }
+});
+
 function requireAuth(req, res, next) {
   if (req.session && req.session.userId) {
     req.userId = req.session.userId;
@@ -126,7 +237,7 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
 const VENICE_API_KEY = process.env.VENICE_API_KEY;
 const VENICE_MODEL = 'venice-uncensored';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 const OPENAI_MODEL = 'gpt-4o';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 const GROK_MODEL = 'grok-3';
@@ -231,6 +342,12 @@ async function initDB() {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS compression_count INTEGER DEFAULT 0");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS audit_lessons JSONB DEFAULT '[]'::jsonb");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS pinned_context TEXT DEFAULT ''");
+    } catch (e) { /* columns may already exist */ }
+    try {
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
     } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
