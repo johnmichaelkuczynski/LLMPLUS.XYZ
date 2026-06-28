@@ -945,6 +945,61 @@
     var artifactOpened = false;
     var artifactCheckInterval = null;
     var lastArtifactLen = 0;
+    var shownLen = 0;
+    var streamDone = false;
+    var finalized = false;
+    var rafId = null;
+
+    function finalizeRender() {
+      if (finalized) return;
+      finalized = true;
+      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+      if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
+      var ti2 = textEl.querySelector('.thinking-indicator');
+      if (ti2) ti2.remove();
+      var c = textEl.querySelector('.cursor-blink');
+      if (c) c.remove();
+      textEl.innerHTML = fmt(fullText);
+      if (isDocumentArtifact(fullText)) {
+        var artTitle = extractArtifactTitle(fullText);
+        var viewBtn = document.createElement('button');
+        viewBtn.className = 'artifact-link';
+        viewBtn.setAttribute('data-testid', 'btn-view-artifact');
+        viewBtn.textContent = '\uD83D\uDCC4 View as Document';
+        viewBtn.addEventListener('click', function() { showArtifact(fullText, artTitle); });
+        textEl.appendChild(viewBtn);
+      }
+      if (onDone) onDone(fullText);
+    }
+
+    // Smooth typewriter renderer: drains received text at a steady pace
+    // so output flows naturally instead of appearing in network-sized blocks.
+    function renderLoop() {
+      rafId = null;
+      if (finalized) return;
+      if (shownLen < fullText.length) {
+        var ti = textEl.querySelector('.thinking-indicator');
+        if (ti) ti.remove();
+        var remaining = fullText.length - shownLen;
+        var step = Math.max(2, Math.ceil(remaining * 0.18));
+        if (step > 180) step = 180;
+        shownLen += step;
+        if (shownLen > fullText.length) shownLen = fullText.length;
+        textEl.innerHTML = fmt(fullText.slice(0, shownLen)) + '<span class="cursor-blink"></span>';
+        scrollBottom();
+      }
+      if (shownLen < fullText.length || !streamDone) {
+        rafId = requestAnimationFrame(renderLoop);
+      } else {
+        finalizeRender();
+      }
+    }
+
+    function ensureLoop() {
+      if (rafId == null && !finalized) {
+        rafId = requestAnimationFrame(renderLoop);
+      }
+    }
 
     function updateLiveArtifact() {
       if (!artifactOpened) return;
@@ -977,22 +1032,8 @@
     function pump() {
       reader.read().then(function(result) {
         if (result.done) {
-          if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
-          var ti2 = textEl.querySelector('.thinking-indicator');
-          if (ti2) ti2.remove();
-          var c = textEl.querySelector('.cursor-blink');
-          if (c) c.remove();
-          textEl.innerHTML = fmt(fullText);
-          if (isDocumentArtifact(fullText)) {
-            var artTitle = extractArtifactTitle(fullText);
-            var viewBtn = document.createElement('button');
-            viewBtn.className = 'artifact-link';
-            viewBtn.setAttribute('data-testid', 'btn-view-artifact');
-            viewBtn.textContent = '\uD83D\uDCC4 View as Document';
-            viewBtn.addEventListener('click', function() { showArtifact(fullText, artTitle); });
-            textEl.appendChild(viewBtn);
-          }
-          if (onDone) onDone(fullText);
+          streamDone = true;
+          ensureLoop();
           return;
         }
         buffer += decoder.decode(result.value, { stream: true });
@@ -1007,13 +1048,8 @@
               if (parsed.type === 'status') {
                 // status events (thinking, etc.) — no action needed, indicator already shown
               } else if (parsed.type === 'text') {
-                var ti = textEl.querySelector('.thinking-indicator');
-                if (ti) ti.remove();
                 fullText += parsed.text;
-                var c = textEl.querySelector('.cursor-blink');
-                if (c) c.remove();
-                textEl.innerHTML = fmt(fullText) + '<span class="cursor-blink"></span>';
-                scrollBottom();
+                ensureLoop();
               } else if (parsed.type === 'error') {
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {
@@ -1027,6 +1063,8 @@
         if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
         var c = textEl.querySelector('.cursor-blink');
         if (c) c.remove();
+        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+        finalized = true;
         var ti2 = textEl.querySelector('.thinking-indicator');
         if (ti2) ti2.remove();
         if (err && err.name === 'AbortError') {

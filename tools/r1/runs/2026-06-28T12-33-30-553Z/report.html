@@ -1,0 +1,257 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R1 Report — 2026-06-28T12-33-30-553Z</title>
+<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:20px;color:#111}
+nav{position:sticky;top:0;background:#fff;padding:10px;border-bottom:2px solid #2563eb;z-index:10}
+table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:left}
+h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
+</style></head><body>
+<h1>R1 Run Report — 2026-06-28T12-33-30-553Z</h1>
+<p>Interactions: <b>3</b> · Critical violations: <b style="color:#dc2626">3</b> · Judge concerns: <b style="color:#d97706">0</b> · Sanity failures: <b>4</b></p>
+<nav><b>Table of contents:</b> <ul><li><a href="#Function-1-Home-chat-default-project-">Function 1 — Home chat (default project)</a></li><li><a href="#Function-2-Projects-list">Function 2 — Projects list</a></li><li><a href="#Function-3-Create-project">Function 3 — Create project</a></li></ul></nav>
+<section id="Function-1-Home-chat-default-project-"><h2>Function 1 — Home chat (default project)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Send a simple chat from a freshly-loaded page</h3>
+        <p><b>R1 approach:</b> substantive_question</p>
+        <p><b>R1 reasoning:</b> <i>(brain returned malformed JSON; fallback used)</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">substantive_question — ask a clear scholarly question to test happy-path streaming</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 72 → 154 (Δ 82)<br>
+        new ids: nodes.1.0, nodes.2.0, nodes.3.0, nodes.4.0, nodes.5.0, nodes.6.0, nodes.7.0, nodes.8.0, nodes.9.0, nodes.10.0, nodes.11.0, nodes.12.0, nodes.13.0, nodes.14.0, nodes.15.0, nodes.16.0, nodes.17.0, nodes.18.0, nodes.19.0, nodes.20.0, nodes.21.0, nodes.22.0, nodes.23.0, nodes.24.0, nodes.25.0, nodes.5000.0, nodes.5000.1, nodes.5000.2, nodes.5000.3, nodes.5000.4, nodes.5000.5, nodes.5000.6, nodes.5000.7, nodes.5000.8, nodes.5000.9, nodes.5000.10, nodes.5000.11, nodes.5000.12, nodes.5000.13, nodes.5000.14, nodes.5000.15, nodes.5000.16, nodes.5000.17, nodes.5000.18, nodes.5000.19, nodes.5000.20, nodes.5000.21, nodes.5000.22, nodes.5000.23, nodes.5000.24, nodes.5000.25, nodes.5000.26, nodes.5000.27, nodes.5000.28, nodes.5000.29, nodes.5000.30, nodes.5000.31, nodes.5000.32, nodes.5000.33, nodes.5000.34, nodes.5000.35, nodes.5000.36, nodes.5000.37, nodes.5000.38, nodes.5000.39, nodes.5000.40, nodes.5000.41, nodes.5000.42, nodes.5000.43, nodes.5000.44, nodes.5000.45, nodes.5000.46, nodes.5000.47, nodes.5000.48, nodes.5000.49, nodes.5000.50, nodes.5000.51, nodes.5000.52, nodes.5000.53, nodes.5000.54, nodes.5000.55, nodes.5000.56, nodes.5000.57, nodes.5000.58, nodes.5000.59, nodes.5000.60, nodes.5000.61, nodes.5000.62, nodes.5000.63, metadata.last_update, metadata.update_description<br>
+        new tags: ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, QUESTION, QUESTION, QUESTION, OPEN, OPEN, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, DOCUMENT, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS<br>
+        tags valid: <b style="color:#dc2626">NO</b> ·
+        ids valid: <b style="color:#dc2626">NO</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree grew by more than 8</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/e2b0cb62-0991-4584-98cb-88e02fb92c99/documents</td><td>200</td><td>1920ms</td><td><code>[{&quot;id&quot;:&quot;c721e059-633b-4077-86a4-e5f6bb2fe91c&quot;,&quot;name&quot;:&quot;HACKERMAN VERSION OF Kuczynski.objections.txt&quot;,&quot;created_at&quot;:&quot;2026-06-15T02:27:53.944Z&quot;,&quot;word_count&quot;:1731},{&quot;id&quot;:&quot;b2d55343-2986-4613-9697-59675788f88a&quot;,&quot;name&quot;:&quot;Motion_Request for Issuance of Written Order Regarding UBS Financial Services, Inc.-C15CV26000381.pdf&quot;,&quot;created_at&quot;:&quot;2026-06-15T02:23:10.306Z&quot;,&quot;word_count&quot;:456},{&quot;id&quot;:&quot;0d1a16be-6265-443a-</code></td></tr><tr><td>POST</td><td>/api/chat</td><td>200</td><td>2378ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;I&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;m ready for your substantive scholarly question.&quot;}
+
+data: {&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;e2b0cb62-0991-4584-98cb-88e02fb92c99&quot;,&quot;userMessage&quot;:&quot;substantive_question â€” ask a clear scholarly question to test happy-path streaming&quot;,&quot;assistantResponse&quot;:&quot;I&#39;m ready for your substantive s</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>50514ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;nodes&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\&quot;: {\n    \&quot;1.0\&quot;: \&quot;ASSERTS: Petitioner is beneficiary of trust established by Mae&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Roslyn Davis\&quot;,\n    \&quot;2.0\&quot;: \&quot;ASSERTS: Mae Roslyn Davis died&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; November 2024\&quot;,\n    \&quot;3.0\&quot;: \&quot;ASSERT</code></td></tr></tbody></table>
+        <p><b>SSE events observed (5)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;I&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;m ready for your substantive scholarly question.&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;e2b0cb62-0991-4584-98cb-88e02fb92c99&quot;,&quot;userMessage&quot;:&quot;substantive_question â€” ask a clear scholarly question to test happy-path streaming&quot;,&quot;assi</code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 82 (&gt;8)</li><li>Invariant A: at least one new node has invalid tag prefix</li><li>Invariant A: at least one new node id is not decimal-formatted</li></ul></div>
+        
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">(judge returned no JSON; raw text included)</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0001-f1-1-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0002-f1-1-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0003-f1-1-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-2-Projects-list"><h2>Function 2 — Projects list</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm sidebar project count equals GET /api/projects count</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Reconcile UI render with backend list</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+MORMON VS MUSLIM
+📁
+RANDY DISSERTATION
+📁
+SOXL APP
+📁
+STOCK MARKET
+📁
+VIDEO APP
+📁
+OPTIONS RANDY APP
+📁
+HEALTH
+📁
+TO DO
+📁
+PHILOSOPHY 101 APP
+📁
+GENERAL
+📁
+MUSIC BUSINESS
+📁
+GENERAL INQUIRIES
+📁
+SAYINGS
+📁
+NEW GENERAL INQUIRIES
+📁
+R1 Test Project mqxpljgm
+📁
+R1 Test Project mqxpwn8y
+📁
+R1 Test Project mqxqs902
+📁
+R1 Test Project mqxqtpvo
++ New Project
+CHATS
++ New Chat
+💬
+Complex Multi-Jurisdictional Trust Litigation Analysis
+💬
+New Chat
+💬
+Kantian Ethics Versus Utilitarian Consequentialism
+💬
+Trust Accounting Document Analysis Request
+💬
+Tractatus Tree Legal Defeats Update
+💬
+Law Firm Fraud and Trust Abuse
+💬
+DC Bar Disciplinary Complaint Updates
+💬
+FINRA Complaint Strategy Against UBS
+💬
+Emrick Freeze Letter Date Claims
+💬
+Second Federal Case Strategy Planning
+💬
+Strategic Federal Case Filing Discussion
+💬
+Tractatus Tree Legal Document Update
+💬
+New Chat
+💬
+Tractatus Tree Document Analysis Update
+💬
+ACAB Email Exchange Legal Filing
+💬
+Emrick Federal Opposition Filing Summary
+💬
+New Chat
+💬
+New Chat
+💬
+Legal Opposition Filing Analysis
+💬
+Chuang Federal Court Ruling Analysis
+💬
+Tractatus Tree Legal Document Analysis
+💬
+Planning Devastating Response to Colby
+💬
+Carolina&#39;s Mounting Unpaid Legal Bills
+💬
+Carolina&#39;s Desperate Financial Deception Exposed
+💬
+Attorney Ethics Witness Advocate Conflict
+💬
+Discovery Filing Error Explanation
+💬
+Meeting With Chuang Emrick Conference Discussion
+💬
+Colby Files Bar Fee Arbitration Response
+💬
+Legal Defense Against Vexatious Litigant Challenge
+💬
+Unusual Legal Silence Before Federal Hearing
+💬
+New Chat
+💬
+Bradford Nordholm Trust Litigation Relevance
+💬
+Carolina Lawyers Opposition Filing Update
+💬
+TRO Motion Filed for Asset Freeze
+💬
+Federal Lawsuit Service Documentation Update
+💬
+Weird Email from Carolina Today
+💬
+COLBY MARYLAND DISBARMENT
+💬
+Length Test
+💬
+Stream Test 2
+💬
+Stream Test
+💬
+Maryland Court Deficiency Notice Help
+💬
+Federal Case Filing Location Query
+💬
+Legal Document Analysis Opposition Strategy
+💬
+Colby Situation Memory Confirmation
+💬
+Colby ACAB Arbitration Deadline Status
+💬
+Microsoft Stock Price August 2025
+💬
+Angry Client Wants Case Facts Only
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Report Generator
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+jmk
+Sign Out
+LLM Plus
+LEGAL CASE
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+⚠️
+Project memory, compressed 15 times. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.
+Run Audit
+×
+[Attached document: &quot;MASTER_CASE_BRIEF_MAY 13  2026.txt&quot; (137822 words)]
+
+﻿SETTLEMENT: READ THIS THOROUGHLY 
+
+CRIMINAL REFERRAL
+In re: Financial Exploitation of Jane Casey Hughes (Deceased)
+EXHIBIT I
+Settlement Agreement with Adobe Sign Audit Trail
+Document:
+Settlement Agreement
+Case:
+C-15-...
+138299 words · 21673 lines
+Show full text
+Claude
+📋
+Looking at this comprehensive 137,822-word master case bri</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">(judge returned no JSON; raw text included)</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0004-f2-2-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0005-f2-2-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-3-Create-project"><h2>Function 3 — Create project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click + New Project and type &quot;R1 Test Project mqxrtsig&quot;</h3>
+        <p><b>R1 approach:</b> create_project</p>
+        <p><b>R1 reasoning:</b> <i>Use the real sidebar button so the UI path is exercised</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project mqxrtsig</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/projects</td><td>200</td><td>85ms</td><td><code>{&quot;id&quot;:&quot;0a132300-1c4c-4ffc-bb85-5c36a795d49c&quot;,&quot;name&quot;:&quot;R1 Test Project mqxrtsig&quot;,&quot;tractatus_tree&quot;:{},&quot;created_at&quot;:&quot;2026-06-28T12:34:34.564Z&quot;,&quot;tractatus_tier&quot;:1,&quot;parent_project_id&quot;:null,&quot;user_id&quot;:&quot;42fd1588-ba3e-410a-b4ef-ade52518d02d&quot;,&quot;last_tree_update&quot;:&quot;2026-06-28T12:34:34.564Z&quot;,&quot;compression_count&quot;:0,&quot;audit_lessons&quot;:[],&quot;pinned_context&quot;:&quot;&quot;}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>155ms</td><td><code>[{&quot;id&quot;:&quot;e2b0cb62-0991-4584-98cb-88e02fb92c99&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;nodes&quot;:{&quot;1.0&quot;:&quot;ASSERTS: Petitioner is beneficiary of trust established by Mae Roslyn Davis&quot;,&quot;2.0&quot;:&quot;ASSERTS: Mae Roslyn Davis died November 2024&quot;,&quot;3.0&quot;:&quot;ASSERTS: Trust assets total approximately $3.5 million&quot;,&quot;4.0&quot;:&quot;ASSERTS: Carolina Trust Company serves as corporate trustee&quot;,&quot;5.0&quot;:&quot;ASSERTS: David Emrick serves as </code></td></tr><tr><td>GET</td><td>/api/projects/0a132300-1c4c-4ffc-bb85-5c36a795d49c/sessions</td><td>200</td><td>95ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/0a132300-1c4c-4ffc-bb85-5c36a795d49c/staleness</td><td>200</td><td>87ms</td><td><code>{&quot;isStale&quot;:false,&quot;severity&quot;:&quot;fresh&quot;,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;nodeCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-06-28T12:34:34.564Z&quot;}</code></td></tr><tr><td>GET</td><td>/api/projects/0a132300-1c4c-4ffc-bb85-5c36a795d49c/documents</td><td>200</td><td>108ms</td><td><code>[]</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">(judge returned no JSON; raw text included)</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0006-f3-3-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0007-f3-3-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0008-f3-3-after2.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section>
+</body></html>
