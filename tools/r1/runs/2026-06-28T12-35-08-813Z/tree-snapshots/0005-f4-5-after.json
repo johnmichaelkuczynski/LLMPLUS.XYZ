@@ -1,0 +1,13 @@
+{
+  "1.0": "OPEN: How can courts maintain legitimacy as impartial constitutional arbiters when deciding cases that implicate their own institutional power, and when does judicial review itself become a constitutional crisis rather than a resolution?",
+  "1.1": "OPEN: What normative and empirical framework distinguishes legitimate judicial assertion of constitutional authority from judicial overreach when the distinction criteria are themselves contested constitutional questions?",
+  "1.2": "ASSUMES: Courts claim authority to interpret constitutional boundaries while being constitutional actors whose power is defined by the document they interpret",
+  "1.3": "OPEN: When courts invalidate coordinate branch actions, how is the court's assertion of final interpretive authority legitimated when there is no higher court to review whether the Supreme Court correctly understood its own jurisdiction?",
+  "1.4": "OPEN: In constitutional crises with incompatible but facially reasonable interpretations from different governmental actors, does decisive court intervention undermine neutrality claims or does abstention fail the essential constitutional function?",
+  "1.5": "QUESTION: Does the framework for distinguishing legitimate judicial authority from overreach differ depending on whether judicial legitimacy is grounded in originalist, living constitutionalist, popular constitutionalist, or other interpretive frameworks?",
+  "1.6": "OPEN: The paradox that courts cannot neutrally adjudicate their own constitutional claims about the scope of their jurisdiction",
+  "1.7": "RESOLVED: The United States Supreme Court held in Marbury v. Madison (1803) that it possesses the power of judicial review—the authority to declare acts of Congress unconstitutional and void",
+  "1.7.1": "DOCUMENT: Chief Justice Marshall's opinion in Marbury v. Madison established that when statutory law conflicts with constitutional law, courts must refuse to enforce the statute, deriving this from the premises that the Constitution is supreme law and courts must apply law to cases",
+  "1.7.2": "ASSERTS: While the historical fact that Marbury announced judicial review is uncontested, scholarly debate continues regarding whether Marshall's reasoning was sound and whether the Framers intended this power",
+  "1.7.3": "DOCUMENT: Marbury invalidated Section 13 of the Judiciary Act of 1789 as unconstitutional for attempting to expand the Court's original jurisdiction beyond Article III limits"
+}

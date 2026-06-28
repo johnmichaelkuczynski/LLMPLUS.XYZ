@@ -4184,20 +4184,47 @@
       await loadClerkScript(cfg.clerkPublishableKey);
       clerkInstance = window.Clerk;
       await clerkInstance.load();
+
+      // Handle the OAuth redirect callback (Google sends the user back to /sso-callback)
+      if (window.location.pathname === '/sso-callback') {
+        try {
+          await clerkInstance.handleRedirectCallback({
+            afterSignInUrl: '/',
+            afterSignUpUrl: '/'
+          });
+        } catch (cbErr) {
+          console.error('[google] callback failed:', cbErr);
+          showAuthError('Google sign-in could not be completed: ' + (cbErr && cbErr.message ? cbErr.message : cbErr));
+          window.history.replaceState({}, '', '/');
+        }
+        if (clerkInstance.session) { await bridgeClerkSession(); }
+        return;
+      }
+
       btnGoogle.classList.remove('hidden');
       loginDivider.classList.remove('hidden');
-      btnGoogle.addEventListener('click', function() {
-        clerkInstance.openSignIn({
-          afterSignInUrl: window.location.origin + '/',
-          afterSignUpUrl: window.location.origin + '/'
-        });
+      btnGoogle.addEventListener('click', async function() {
+        hideAuthError();
+        try {
+          if (!clerkInstance.client || !clerkInstance.client.signIn) {
+            throw new Error('Clerk sign-in resource unavailable');
+          }
+          await clerkInstance.client.signIn.authenticateWithRedirect({
+            strategy: 'oauth_google',
+            redirectUrl: window.location.origin + '/sso-callback',
+            redirectUrlComplete: window.location.origin + '/'
+          });
+        } catch (e) {
+          console.error('[google] failed to start sign-in:', e);
+          showAuthError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
+        }
       });
       clerkInstance.addListener(function(payload) {
         if (payload && payload.session) bridgeClerkSession();
       });
       if (clerkInstance.session) bridgeClerkSession();
     } catch (e) {
-      /* Clerk unavailable — username/password login still works */
+      console.error('[clerk] init failed (username/password login still works):', e);
     }
   }
 
