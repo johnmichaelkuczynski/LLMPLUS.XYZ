@@ -973,7 +973,6 @@
           textEl.innerHTML = fmt(fullText);
           if (isDocumentArtifact(fullText)) {
             var artTitle = extractArtifactTitle(fullText);
-            showArtifact(fullText, artTitle);
             var viewBtn = document.createElement('button');
             viewBtn.className = 'artifact-link';
             viewBtn.setAttribute('data-testid', 'btn-view-artifact');
@@ -1003,9 +1002,6 @@
                 if (c) c.remove();
                 textEl.innerHTML = fmt(fullText) + '<span class="cursor-blink"></span>';
                 scrollBottom();
-                if (!artifactOpened && fullText.split(/\s+/).length > 120) {
-                  checkAndOpenArtifact();
-                }
               } else if (parsed.type === 'error') {
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {

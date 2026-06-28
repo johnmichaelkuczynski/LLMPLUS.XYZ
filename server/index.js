@@ -724,7 +724,8 @@ function isProjectSpecificQuery(userMessage, tree, transcript) {
   if (tree && Object.keys(tree).length > 0) {
     var treeValues = Object.values(tree);
     for (var t = 0; t < treeValues.length; t++) {
-      var val = (treeValues[t] || '').toLowerCase();
+      var rawVal = treeValues[t];
+      var val = (typeof rawVal === 'string' ? rawVal : (rawVal == null ? '' : JSON.stringify(rawVal))).toLowerCase();
       if (val.length < 5) continue;
       var keyTerms = val.split(/\s+/).filter(function(w) { return w.length > 5; }).slice(0, 3);
       for (var k = 0; k < keyTerms.length; k++) {
@@ -1473,7 +1474,10 @@ app.post('/api/chat', async function(req, res) {
         }
         return { segmentText: segmentText, stopReason: stopReason };
       } catch (err) {
-        console.error('[streamOneCall] Exception:', err.message);
+        console.error('[streamOneCall] Exception:', err && err.stack ? err.stack : err.message);
+        if (!res.writableEnded) {
+          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error generating response: ' + (err.message || 'unknown') + '. Please try again.]\n\n' }) + '\n\n');
+        }
         return { segmentText: '', stopReason: 'error' };
       }
     }
@@ -4000,7 +4004,7 @@ async function updateUserProfileTree(userId, userMessage, assistantResponse) {
       treeSummary += '\n[Project: ' + allTrees.rows[t].name + '] ';
       var sample = keys.slice(-15);
       for (var sk = 0; sk < sample.length; sk++) {
-        treeSummary += sample[sk] + ': ' + (tree[sample[sk]] || '').substring(0, 120) + ' | ';
+        treeSummary += sample[sk] + ': ' + String(tree[sample[sk]] == null ? '' : tree[sample[sk]]).substring(0, 120) + ' | ';
       }
     }
     if (treeSummary.length > 6000) treeSummary = treeSummary.substring(0, 6000);

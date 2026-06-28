@@ -1,0 +1,1 @@
+- [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
