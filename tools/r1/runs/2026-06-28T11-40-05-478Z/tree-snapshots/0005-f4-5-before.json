@@ -1,0 +1,14 @@
+{
+  "1.0": "QUESTION: When a constitutional provision's original public meaning conflicts with its structural logic or systemic coherence within the Constitution as a whole, which should prevail?",
+  "1.1": "OPEN: Suppose historical evidence establishes that framers and ratifiers understood a provision to mean X, but meaning X creates significant tensions with other constitutional provisions, undermines overall structural design, or produces outcomes defeating the Constitution's broader purposes",
+  "1.2": "DOCUMENT: This question surfaces in real cases involving the Eleventh Amendment's scope regarding sovereign immunity, Commerce Clause interpretation and federalism balance, and Fourteenth Amendment privileges or immunities after Slaughter-House Cases",
+  "1.3": "ASSERTS: What makes this genuinely difficult is that thoughtful jurists and scholars can marshal powerful arguments on multiple sides, and the choice between them isn't obviously dictated by any meta-principle that itself commands universal assent",
+  "1.4": "ASSERTS: This forces confrontation with what constitutional interpretation is for, and reasonable minds diverge on that foundational question",
+  "1.5": "OPEN: This unresolved jurisprudential question continues to generate productive scholarly debate without definitive answer",
+  "1.1.1": "OPEN: Option 1 - Follow the original public meaning faithfully, accepting that constitutional design may contain internal tensions, and that amendments (not interpretive workarounds) are the proper remedy for structural problems",
+  "1.1.2": "OPEN: Option 2 - Privilege systematic coherence, reading the provision in light of the Constitution's overall architecture even when that requires departure from the most likely original understanding",
+  "1.1.3": "OPEN: Option 3 - Accept interpretive pluralism, recognizing that different provisions may call for different interpretive methods depending on their nature, generality, and relationship to fundamental rights",
+  "1.2.1": "QUESTION: Does the Eleventh Amendment's text extend only to suits 'by Citizens of another State,' or does its structural logic regarding sovereign immunity reach further?",
+  "1.2.2": "QUESTION: Does the Commerce Clause's original scope matter more or less than maintaining a coherent balance of federalism across the document?",
+  "1.2.3": "QUESTION: When the Fourteenth Amendment's privileges or immunities were gutted in the Slaughter-House Cases, should we read citizenship rights narrowly (per original understanding of that case) or broadly (per the Amendment's structural purpose)?"
+}
