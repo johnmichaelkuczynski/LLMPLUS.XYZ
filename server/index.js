@@ -141,7 +141,8 @@ app.get('/api/auth/me', function(req, res) {
 app.get('/api/auth/config', function(req, res) {
   res.json({
     clerkEnabled: clerkConfigured(),
-    clerkPublishableKey: clerkConfigured() ? CLERK_PUBLISHABLE_KEY : null
+    clerkPublishableKey: clerkConfigured() ? CLERK_PUBLISHABLE_KEY : null,
+    replitAuthEnabled: replitAuthEnabled()
   });
 });
 
@@ -195,6 +196,128 @@ app.post('/api/auth/clerk', async function(req, res) {
   } catch (err) {
     console.error('Clerk auth error:', err.message);
     res.status(401).json({ error: 'Authentication failed' });
+  }
+});
+
+// ---- Replit Auth (OpenID Connect) — first-party Google/GitHub/email sign-in ----
+var REPLIT_OIDC = {
+  authEndpoint: 'https://replit.com/oidc/auth',
+  tokenEndpoint: 'https://replit.com/oidc/token',
+  userinfoEndpoint: 'https://replit.com/oidc/me'
+};
+function replitAuthEnabled() { return !!process.env.REPL_ID; }
+function b64url(buf) {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function oidcRedirectUri(req) {
+  return 'https://' + req.get('host') + '/api/auth/replit/callback';
+}
+function decodeJwtPayload(jwt) {
+  try {
+    var part = (jwt || '').split('.')[1];
+    if (!part) return null;
+    var json = Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch (e) { return null; }
+}
+
+app.get('/api/auth/replit/login', function(req, res) {
+  if (!replitAuthEnabled()) return res.status(503).send('Replit Auth is not configured');
+  var verifier = b64url(crypto.randomBytes(48));
+  var challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
+  var state = b64url(crypto.randomBytes(24));
+  req.session.oidc = { verifier: verifier, state: state };
+  req.session.save(function() {
+    var params = new URLSearchParams({
+      client_id: process.env.REPL_ID,
+      response_type: 'code',
+      scope: 'openid profile email offline_access',
+      redirect_uri: oidcRedirectUri(req),
+      state: state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      prompt: 'login'
+    });
+    res.redirect(REPLIT_OIDC.authEndpoint + '?' + params.toString());
+  });
+});
+
+app.get('/api/auth/replit/callback', async function(req, res) {
+  try {
+    if (!replitAuthEnabled()) return res.status(503).send('Replit Auth is not configured');
+    var saved = req.session.oidc || {};
+    if (req.query.error) {
+      return res.redirect('/?auth_error=' + encodeURIComponent(req.query.error_description || req.query.error));
+    }
+    var code = req.query.code;
+    var state = req.query.state;
+    if (!code || !state || state !== saved.state) {
+      return res.redirect('/?auth_error=' + encodeURIComponent('Invalid sign-in state, please try again'));
+    }
+
+    var body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: oidcRedirectUri(req),
+      client_id: process.env.REPL_ID,
+      code_verifier: saved.verifier || ''
+    });
+    var tokenResp = await fetch(REPLIT_OIDC.tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    if (!tokenResp.ok) {
+      var t = await tokenResp.text();
+      console.error('Replit Auth token exchange failed:', tokenResp.status, t.slice(0, 300));
+      return res.redirect('/?auth_error=' + encodeURIComponent('Token exchange failed'));
+    }
+    var tokens = await tokenResp.json();
+    var claims = decodeJwtPayload(tokens.id_token) || {};
+    if (!claims.sub && tokens.access_token) {
+      try {
+        var ui = await fetch(REPLIT_OIDC.userinfoEndpoint, { headers: { Authorization: 'Bearer ' + tokens.access_token } });
+        if (ui.ok) claims = await ui.json();
+      } catch (e) { /* ignore */ }
+    }
+    var replitId = claims.sub;
+    if (!replitId) return res.redirect('/?auth_error=' + encodeURIComponent('No user id returned from Replit'));
+    var email = (claims.email || '').toLowerCase();
+    var displayName = [claims.first_name, claims.last_name].filter(Boolean).join(' ').trim()
+      || claims.name || claims.username || (email ? email.split('@')[0] : 'user');
+
+    var user = null;
+    var byReplit = await pool.query('SELECT id, username FROM users WHERE replit_id = $1', [replitId]);
+    if (byReplit.rows.length > 0) {
+      user = byReplit.rows[0];
+    } else if (email) {
+      var byEmail = await pool.query('SELECT id, username FROM users WHERE LOWER(email) = $1', [email]);
+      if (byEmail.rows.length > 0) {
+        user = byEmail.rows[0];
+        await pool.query('UPDATE users SET replit_id = $1 WHERE id = $2', [replitId, user.id]);
+      }
+    }
+    if (!user) {
+      var base = (displayName || 'user').replace(/\s+/g, '').slice(0, 40) || 'user';
+      var username = base;
+      var suffix = 0;
+      while (true) {
+        var exists = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (exists.rows.length === 0) break;
+        suffix++;
+        username = base + suffix;
+      }
+      var ins = await pool.query('INSERT INTO users (username, email, replit_id) VALUES ($1, $2, $3) RETURNING id, username', [username, email, replitId]);
+      user = ins.rows[0];
+    }
+
+    delete req.session.oidc;
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    req.session.save(function() { res.redirect('/'); });
+  } catch (err) {
+    console.error('Replit Auth callback error:', err.message);
+    res.redirect('/?auth_error=' + encodeURIComponent('Sign-in failed'));
   }
 });
 
@@ -348,6 +471,7 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
     } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');

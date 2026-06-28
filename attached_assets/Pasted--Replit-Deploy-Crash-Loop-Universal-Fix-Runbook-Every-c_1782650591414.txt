@@ -1,0 +1,67 @@
+# Replit Deploy Crash-Loop — Universal Fix Runbook
+
+Every crash you've hit is the SAME class of bug: the deployment's **run command** points at a file the **build** didn't produce. Stop republishing. Republishing just re-runs the same broken command. Work in the **Shell tab**, not the Logs tab.
+
+---
+
+## STEP 1 — Read the error line (tells you which bug you have)
+
+Find the line that says `command finished with error [node ./dist/INDEX.XXX]` and the matching `Error:` line.
+
+- **`Cannot find module '.../dist/index.cjs'`** (or `.js`) → BUG A (wrong/missing entry file)
+- **`Cannot find package 'SOME-PACKAGE'`** / `ERR_MODULE_NOT_FOUND` → BUG B (missing dependency)
+
+---
+
+## STEP 2 — Run these THREE commands in the Shell
+
+```bash
+npm run build
+ls -la dist/
+cat package.json | grep -A 20 '"scripts"'
+```
+
+Look at what `ls -la dist/` actually printed. That filename is the truth.
+
+---
+
+## BUG A — "Cannot find module .../dist/index.XXX"
+
+The run command and the real built filename don't match. Two outcomes from `ls dist/`:
+
+1. **`dist/` is empty or missing** → the build didn't run or it errored. Scroll up in the Shell for the build error and fix that first.
+2. **`dist/` has a DIFFERENT name** (e.g. error says `index.cjs` but you see `index.js`, or vice versa) → fix the mismatch ONE of two ways:
+   - Change the **run command** (Deployment → Manage/Settings → Run command) to the real filename, e.g. `node dist/index.js`, OR
+   - Change the **build** so it outputs the expected name (in your esbuild line: `--outfile=dist/index.cjs`).
+
+Pick one and make both sides agree. `.cjs` vs `.js` matters — they are not interchangeable.
+
+---
+
+## BUG B — "Cannot find package 'X'"
+
+The code imports a package that isn't installed/shipped.
+
+```bash
+npm install <package-name>          # e.g. npm install @paypal/paypal-server-sdk
+cat package.json | grep -A 30 '"dependencies"'   # confirm it's under dependencies, NOT devDependencies
+ls node_modules/<package-name>      # confirm it physically exists
+```
+
+If it's already listed but still fails, your bundler is marking packages external (esbuild `--packages=external`). That's fine — it means `node_modules` must ship with the deploy, so the package MUST be a real `dependency`. Move it out of `devDependencies` if needed.
+
+> ⚠️ **DO NOT reactivate payment-related API keys or secrets** (e.g. PayPal, Stripe, or any billing/checkout credentials) as part of fixing a build. Installing the SDK package is fine — it only adds code. But do NOT re-enable, re-add, or re-populate the corresponding live API keys/secrets to "make it work." A missing package is a build problem; a missing payment key is a deliberate state. If the app boots without the payment flow active, that is the intended condition — leave it that way. Reactivate payment keys ONLY as a separate, intentional decision, never as a reflexive crash-loop fix.
+
+---
+
+## STEP 3 — Republish ONCE, then re-read Step 1
+
+After a fix, the error should either disappear or CHANGE to a new one. A changed error = progress, fix the next one. The SAME error = your fix didn't land (wrong file edited, or build cached).
+
+---
+
+## The 10-second pattern to internalize
+
+> Run command says `dist/index.XXX`. Build must produce a file at exactly `dist/index.XXX`, and every imported package must be an installed `dependency`. If those two things are true, it boots.
+
+These apps are crashing the same way because they share a build template that's slightly off. Once you align run-command ↔ build-output ↔ dependencies on one, copy that exact config to the rest.

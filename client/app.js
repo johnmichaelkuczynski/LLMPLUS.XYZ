@@ -4133,98 +4133,20 @@
 
   var btnGoogle = document.getElementById('btn-google');
   var loginDivider = document.getElementById('login-divider');
-  var clerkInstance = null;
-  var clerkBridging = false;
 
-  function loadClerkScript(pk) {
-    return new Promise(function(resolve, reject) {
-      if (window.Clerk) return resolve();
-      var fa;
-      try { fa = atob(pk.split('_')[2] || '').replace(/\$+$/, ''); } catch (e) { return reject(new Error('bad key')); }
-      if (!fa) return reject(new Error('bad key'));
-      var s = document.createElement('script');
-      s.setAttribute('data-clerk-publishable-key', pk);
-      s.async = true;
-      s.crossOrigin = 'anonymous';
-      s.src = 'https://' + fa + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
-      s.onload = function() { resolve(); };
-      s.onerror = function() { reject(new Error('Clerk script failed to load')); };
-      document.head.appendChild(s);
-    });
-  }
-
-  async function bridgeClerkSession() {
-    if (clerkBridging || !clerkInstance || !clerkInstance.session) return;
-    clerkBridging = true;
-    try {
-      var token = await clerkInstance.session.getToken();
-      if (!token) return;
-      var r = await fetch('/api/auth/clerk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token })
-      });
-      if (r.ok) {
-        var user = await r.json();
-        showApp(user);
-      } else {
-        showAuthError('Google sign-in failed. Please try again.');
-      }
-    } catch (e) {
-      showAuthError('Google sign-in failed. Please try again.');
-    } finally {
-      clerkBridging = false;
-    }
-  }
-
-  async function initClerk() {
+  async function initAuthProviders() {
     try {
       var cfg = await (await fetch('/api/auth/config')).json();
-      if (!cfg.clerkEnabled || !cfg.clerkPublishableKey) return;
-      await loadClerkScript(cfg.clerkPublishableKey);
-      clerkInstance = window.Clerk;
-      await clerkInstance.load();
-
-      // Handle the OAuth redirect callback (Google sends the user back to /sso-callback)
-      if (window.location.pathname === '/sso-callback') {
-        try {
-          await clerkInstance.handleRedirectCallback({
-            afterSignInUrl: '/',
-            afterSignUpUrl: '/'
-          });
-        } catch (cbErr) {
-          console.error('[google] callback failed:', cbErr);
-          showAuthError('Google sign-in could not be completed: ' + (cbErr && cbErr.message ? cbErr.message : cbErr));
-          window.history.replaceState({}, '', '/');
-        }
-        if (clerkInstance.session) { await bridgeClerkSession(); }
-        return;
+      if (cfg && cfg.replitAuthEnabled) {
+        btnGoogle.classList.remove('hidden');
+        loginDivider.classList.remove('hidden');
+        btnGoogle.addEventListener('click', function() {
+          hideAuthError();
+          window.location.href = '/api/auth/replit/login';
+        });
       }
-
-      btnGoogle.classList.remove('hidden');
-      loginDivider.classList.remove('hidden');
-      btnGoogle.addEventListener('click', async function() {
-        hideAuthError();
-        try {
-          if (!clerkInstance.client || !clerkInstance.client.signIn) {
-            throw new Error('Clerk sign-in resource unavailable');
-          }
-          await clerkInstance.client.signIn.authenticateWithRedirect({
-            strategy: 'oauth_google',
-            redirectUrl: window.location.origin + '/sso-callback',
-            redirectUrlComplete: window.location.origin + '/'
-          });
-        } catch (e) {
-          console.error('[google] failed to start sign-in:', e);
-          showAuthError('Could not start Google sign-in: ' + (e && e.message ? e.message : e));
-        }
-      });
-      clerkInstance.addListener(function(payload) {
-        if (payload && payload.session) bridgeClerkSession();
-      });
-      if (clerkInstance.session) bridgeClerkSession();
     } catch (e) {
-      console.error('[clerk] init failed (username/password login still works):', e);
+      console.error('[auth] provider init failed (username/password login still works):', e);
     }
   }
 
@@ -4238,7 +4160,15 @@
       }
     } catch (e) { /* fall through to login */ }
     showLogin();
-    initClerk();
+    initAuthProviders();
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var authErr = params.get('auth_error');
+      if (authErr) {
+        showAuthError(authErr);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (e) { /* ignore */ }
   }
 
   btnLogin.addEventListener('click', async function() {

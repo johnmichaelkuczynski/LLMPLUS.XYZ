@@ -1,0 +1,20 @@
+{
+  "1.0": "QUESTION: To what extent can a constitutional system maintain democratic legitimacy when the meaning of its foundational text is determined primarily by an unelected judiciary operating under doctrines of life tenure and counter-majoritarian review?",
+  "1.1": "OPEN: The relationship between popular sovereignty and constitutional constraint remains unresolved - if 'we the people' are sovereign, what justifies binding current majorities to interpretations of text authored by long-dead supermajorities?",
+  "1.2": "ASSERTS: Judges are selected through political processes but then insulated from political accountability through life tenure and salary protection",
+  "1.3": "ASSERTS: Formal amendment processes are typically so demanding that de facto constitutional evolution occurs primarily through judicial reinterpretation",
+  "1.4": "DOCUMENT: Different constitutional traditions attempt various accommodations: judicial term limits, mandatory retirement ages, legislative override mechanisms, supermajority requirements for constitutional invalidation, or specialized constitutional courts",
+  "1.5": "OPEN: The competing values at stake (democratic responsiveness versus constitutional stability, popular sovereignty versus individual rights, political accountability versus judicial independence) admit no obvious hierarchy or simple reconciliation",
+  "1.6": "ASSERTS: The question resists empirical resolution because the counterfactuals are unknowable - controlled experiments comparing otherwise-identical societies with and without strong-form judicial review are impossible",
+  "1.7": "OPEN: This question has no resolution - only provisional accommodations that each generation must negotiate anew in light of its own circumstances and commitments",
+  "1.1.1": "ASSUMES: Precommitment theory (constitutional provisions represent our better angels speaking to our baser impulses) merely relocates rather than resolves the democratic difficulty",
+  "1.1.2": "OPEN: Who gets to distinguish our better from our baser selves remains contested",
+  "1.2.1": "DOCUMENT: Alexander Bickel termed this 'the counter-majoritarian difficulty' - the power to invalidate the acts of elected representatives",
+  "1.2.2": "DOCUMENT: Jeremy Waldron argues this arrangement treats disagreement about rights as a problem to be solved by judicial fiat rather than as an inevitable feature of free societies that must be worked through democratically",
+  "1.3.1": "ASSERTS: This transforms courts into ongoing constitutional conventions, exercising a quasi-legislative function under the guise of interpretation",
+  "1.3.2": "OPEN: Whether this represents an illegitimate usurpation or a necessary adaptation mechanism remains genuinely contested",
+  "1.4.1": "ASSERTS: Each approach reflects different judgments about the democracy-constitution tension",
+  "1.5.1": "ASSERTS: Reasonable people examining the same constitutional structure can reach radically different conclusions about its legitimacy depending on which values they prioritize",
+  "1.5.2": "ASSERTS: Legitimacy assessments depend on how one weighs the risks of judicial overreach against the risks of majoritarian tyranny",
+  "1.6.1": "ASSERTS: Historical examples exist along the spectrum but differ in so many variables that clean causal inference proves impossible"
+}
