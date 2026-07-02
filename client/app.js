@@ -4187,6 +4187,30 @@
     showApp(data);
   }
 
+  function inIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  function startGoogleInNewTab() {
+    var w = window.open(window.location.origin + '/?start_google=1', '_blank');
+    if (!w) {
+      showAuthError('Popup blocked. Please allow popups for this site, or open the app in its own browser tab and try again.');
+      return;
+    }
+    showAuthError('Google sign-in opened in a new tab. Finish signing in there — this page will log you in automatically.');
+    var tries = 0;
+    var iv = setInterval(function() {
+      tries++;
+      if (tries > 100) { clearInterval(iv); return; }
+      fetch('/api/auth/me').then(function(r) {
+        if (r.ok) {
+          clearInterval(iv);
+          r.json().then(function(user) { showApp(user); });
+        }
+      }).catch(function() {});
+    }, 3000);
+  }
+
   async function startClerkGoogle() {
     var cfg = authConfig || {};
     btnGoogle.disabled = true;
@@ -4250,7 +4274,11 @@
         loginDivider.classList.remove('hidden');
         btnGoogle.addEventListener('click', function() {
           hideAuthError();
-          startClerkGoogle();
+          if (inIframe()) {
+            startGoogleInNewTab();
+          } else {
+            startClerkGoogle();
+          }
         });
       } else if (cfg && cfg.replitAuthEnabled) {
         btnGoogle.classList.remove('hidden');
@@ -4276,6 +4304,16 @@
     } catch (e) { /* fall through to login */ }
     try {
       if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
+    } catch (e) { /* ignore */ }
+    try {
+      var startParams = new URLSearchParams(window.location.search);
+      if (startParams.get('start_google') && authConfig && authConfig.clerkEnabled) {
+        window.history.replaceState({}, '', window.location.pathname);
+        showLogin();
+        initAuthProviders();
+        startClerkGoogle();
+        return;
+      }
     } catch (e) { /* ignore */ }
     var handled = false;
     try {
