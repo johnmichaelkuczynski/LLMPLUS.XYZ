@@ -80,3 +80,4 @@ timeoutMs = 20000
 [agent]
 stack = "FULLSTACK_JS"
 integrations = ["javascript_anthropic_ai_integrations:2.0.0"]
+expertMode = true
