@@ -354,7 +354,8 @@ async function verifyGlobalDocOwnership(docId, userId) {
   return r.rows.length > 0;
 }
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_BASE_URL = (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
@@ -495,7 +496,7 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
 
   var maxRetries = 3;
   for (var attempt = 0; attempt < maxRetries; attempt++) {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch(ANTHROPIC_BASE_URL + '/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -4875,7 +4876,7 @@ app.post('/api/diagnostic/run', async function(req, res) {
 
     // === Category 3: External LLM APIs (1-token ping) ===
     await runStep('Anthropic Claude API reachable', 'llm', async function() {
-      var r = await fetch('https://api.anthropic.com/v1/messages', {
+      var r = await fetch(ANTHROPIC_BASE_URL + '/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
