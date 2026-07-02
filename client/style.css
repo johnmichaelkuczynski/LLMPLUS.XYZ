@@ -1186,10 +1186,19 @@ html, body {
 .send-btn.stop-mode {
   background: #dc2626;
   font-size: 12px;
+  animation: stop-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35);
 }
 
 .send-btn.stop-mode:hover {
-  background: #b91c1c;
+  background: #991b1b;
+  animation: none;
+  transform: scale(1.08);
+}
+
+@keyframes stop-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.15); }
 }
 
 .mic-btn {

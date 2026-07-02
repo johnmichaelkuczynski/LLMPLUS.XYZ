@@ -1368,6 +1368,14 @@ app.post('/api/chat', async function(req, res) {
 
   res.write('data: ' + JSON.stringify({ type: 'status', status: 'thinking' }) + '\n\n');
 
+  var clientClosed = false;
+  res.on('close', function() {
+    if (!res.writableEnded) {
+      clientClosed = true;
+      console.log('[Chat] Client disconnected — killing generation');
+    }
+  });
+
   try {
     var sessionId = req.body.sessionId;
     var projectId = req.body.projectId;
@@ -1504,6 +1512,10 @@ app.post('/api/chat', async function(req, res) {
         var segmentText = '';
         var stopReason = 'end_turn';
         while (true) {
+          if (clientClosed) {
+            try { await reader.cancel(); } catch (e) {}
+            return { segmentText: segmentText, stopReason: 'aborted' };
+          }
           var chunk = await reader.read();
           if (chunk.done) break;
           buffer += decoder.decode(chunk.value, { stream: true });
@@ -1568,6 +1580,10 @@ app.post('/api/chat', async function(req, res) {
         var stopReason = 'end_turn';
 
         while (true) {
+          if (clientClosed) {
+            try { await reader.cancel(); } catch (e) {}
+            return { segmentText: segmentText, stopReason: 'aborted' };
+          }
           var chunk = await reader.read();
           if (chunk.done) break;
           buffer += decoder.decode(chunk.value, { stream: true });
@@ -1626,6 +1642,10 @@ app.post('/api/chat', async function(req, res) {
     console.log('[Chat first call] words=' + countWords(fullText) + ' stopReason=' + lastResult.stopReason);
 
     while (continuationCount < maxContinuations) {
+      if (clientClosed || lastResult.stopReason === 'aborted') {
+        console.log('[Chat] Generation killed by user — stopping continuations');
+        break;
+      }
       var currentWords = countWords(fullText);
       var needsMore = false;
 
@@ -1694,19 +1714,34 @@ app.post('/api/chat', async function(req, res) {
       console.log('[Chat complete] Total words: ' + finalWords + ' / requested: ' + requestedWords + ' | continuations: ' + continuationCount);
     }
 
+    var wasKilled = clientClosed || lastResult.stopReason === 'aborted';
+    var savedText = fullText;
+    if (wasKilled && savedText) {
+      savedText += '\n\n[Stopped by user]';
+    }
     var existingTranscript = transcript.slice();
     existingTranscript.push({ role: 'user', content: message });
-    existingTranscript.push({ role: 'assistant', content: fullText });
+    existingTranscript.push({ role: 'assistant', content: savedText });
     await pool.query('UPDATE sessions SET transcript = $1 WHERE id = $2',
       [JSON.stringify(existingTranscript), sessionId]);
+
+    if (wasKilled) {
+      console.log('[Chat] Killed. Saved partial response (' + countWords(fullText) + ' words) and stopped.');
+      try { res.end(); } catch (e) {}
+      return;
+    }
 
     res.write('data: ' + JSON.stringify({ type: 'tractatus_trigger', projectId: projectId, userMessage: message, assistantResponse: fullText.substring(0, 8000) }) + '\n\n');
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
     console.error('Chat error:', err);
-    res.write('data: ' + JSON.stringify({ type: 'error', error: err.message }) + '\n\n');
-    res.end();
+    if (!res.writableEnded) {
+      try {
+        res.write('data: ' + JSON.stringify({ type: 'error', error: err.message }) + '\n\n');
+        res.end();
+      } catch (e) {}
+    }
   }
 });
 
