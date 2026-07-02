@@ -66,6 +66,14 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 ## Database Tables
 users (id UUID, username, password_hash nullable), projects (with user_id FK, tractatus_tier, parent_project_id for memory hierarchy), sessions, project_documents, global_documents (with user_id FK), document_jobs (with user_id FK), document_chunks, tractatus_archive, user_analytics (user_id UNIQUE, profile_tree JSONB, exchange_count, last_updated), profile_snapshots (user_id, profile_text, word_count, created_at)
 
+## Replit Environment Notes
+- Run: `npm run dev` (dev) / `npm start` (prod) — both run `node server/index.js` on port 5000; no build step
+- Deployment: autoscale, run `npm start`
+- Anthropic key prefers Replit AI integration (AI_INTEGRATIONS_ANTHROPIC_API_KEY/_BASE_URL) with fallback to ANTHROPIC_API_KEY
+- Kill switch: stop button or Escape aborts the client fetch; server detects disconnect (res/req close), cancels upstream model streams, saves partial transcript with "[Stopped by user]"
+- Transcript saves use an atomic JSONB append to avoid lost updates
+- R1 Beta Test workflow (tools/r1/run.mjs) needs user JMK (password r1test) in the DB; recreate it if the dev database is reset
+
 ## Environment Variables
 - ANTHROPIC_API_KEY: Claude API key
 - OPENAI_API_KEY: OpenAI ChatGPT API key

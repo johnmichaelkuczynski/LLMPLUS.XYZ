@@ -474,6 +474,11 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
     } catch (e) { /* columns may already exist */ }
+    try {
+      await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id UUID");
+      await client.query("ALTER TABLE global_documents ADD COLUMN IF NOT EXISTS user_id UUID");
+      await client.query("ALTER TABLE document_jobs ADD COLUMN IF NOT EXISTS user_id UUID");
+    } catch (e) { /* columns may already exist */ }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
     if (projects.rows.length === 0) {
@@ -1369,12 +1374,15 @@ app.post('/api/chat', async function(req, res) {
   res.write('data: ' + JSON.stringify({ type: 'status', status: 'thinking' }) + '\n\n');
 
   var clientClosed = false;
-  res.on('close', function() {
-    if (!res.writableEnded) {
+  function markClosed() {
+    if (!res.writableEnded && !clientClosed) {
       clientClosed = true;
       console.log('[Chat] Client disconnected — killing generation');
     }
-  });
+  }
+  res.on('close', markClosed);
+  req.on('close', markClosed);
+  req.on('aborted', markClosed);
 
   try {
     var sessionId = req.body.sessionId;
@@ -1719,11 +1727,13 @@ app.post('/api/chat', async function(req, res) {
     if (wasKilled && savedText) {
       savedText += '\n\n[Stopped by user]';
     }
-    var existingTranscript = transcript.slice();
-    existingTranscript.push({ role: 'user', content: message });
-    existingTranscript.push({ role: 'assistant', content: savedText });
-    await pool.query('UPDATE sessions SET transcript = $1 WHERE id = $2',
-      [JSON.stringify(existingTranscript), sessionId]);
+    var newEntries = [
+      { role: 'user', content: message },
+      { role: 'assistant', content: savedText }
+    ];
+    await pool.query(
+      "UPDATE sessions SET transcript = COALESCE(transcript, '[]'::jsonb) || $1::jsonb WHERE id = $2",
+      [JSON.stringify(newEntries), sessionId]);
 
     if (wasKilled) {
       console.log('[Chat] Killed. Saved partial response (' + countWords(fullText) + ' words) and stopped.');

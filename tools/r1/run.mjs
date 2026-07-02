@@ -18,7 +18,7 @@ const LIVE_VIEW_PORT = parseInt(process.env.LIVE_VIEW_PORT || '7777', 10);
 const SKIP_FUNCTIONS = new Set((process.env.SKIP_FUNCTIONS || '').split(',').filter(Boolean));
 const COMPRESSION_TEST_MAX_ITERATIONS = parseInt(process.env.COMPRESSION_TEST_MAX_ITERATIONS || '60', 10);
 const LONG_DOC_TARGET_WORDS = parseInt(process.env.LONG_DOC_TARGET_WORDS || '2000', 10);
-const R1_MODEL = process.env.R1_MODEL || 'claude-sonnet-4-20250514';
+const R1_MODEL = process.env.R1_MODEL || 'claude-sonnet-4-5-20250929';
 const R1_USERNAME = process.env.R1_USERNAME || 'JMK';
 const R1_PASSWORD = process.env.R1_PASSWORD || 'r1test';
 

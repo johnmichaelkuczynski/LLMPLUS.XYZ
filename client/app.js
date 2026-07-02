@@ -2704,6 +2704,11 @@
       sendMessage();
     }
   });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && state.streaming && state.abortController) {
+      state.abortController.abort();
+    }
+  });
   els.chatInput.addEventListener('paste', function(e) {
     var items = (e.clipboardData || {}).items;
     if (!items) return;
