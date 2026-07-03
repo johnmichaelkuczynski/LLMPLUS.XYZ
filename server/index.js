@@ -11,7 +11,14 @@ import crypto from 'crypto';
 import { pool } from './db.js';
 
 const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY;
-const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
+function pickClerkSecret() {
+  var candidates = [process.env.CLERK_API_KEY, process.env.CLERK_SECRET_KEY];
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i] && candidates[i].indexOf('sk_') === 0) return candidates[i];
+  }
+  return process.env.CLERK_SECRET_KEY;
+}
+const CLERK_SECRET_KEY = pickClerkSecret();
 function clerkConfigured() { return !!(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY); }
 function clerkFrontendApi() {
   if (!CLERK_PUBLISHABLE_KEY) return null;
@@ -5115,7 +5122,7 @@ initDB().then(function() {
       ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
       ' VENICE=' + (VENICE_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
-    var _csk = process.env.CLERK_SECRET_KEY || '';
+    var _csk = CLERK_SECRET_KEY || '';
     console.log('Clerk secret key: ' + (_csk ? (_csk.indexOf('sk_') === 0 ? 'VALID FORMAT' : 'INVALID FORMAT (does not start with sk_)') : 'MISSING'));
   });
 }).catch(function(err) {
