@@ -14,7 +14,10 @@ const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || process.env.V
 function pickClerkSecret() {
   var candidates = [process.env.CLERK_API_KEY, process.env.CLERK_SECRET_KEY];
   for (var i = 0; i < candidates.length; i++) {
-    if (candidates[i] && candidates[i].indexOf('sk_') === 0) return candidates[i];
+    var v = (candidates[i] || '').trim();
+    if (!v) continue;
+    var m = v.match(/sk_[A-Za-z0-9_]+/);
+    if (m) return m[0];
   }
   return process.env.CLERK_SECRET_KEY;
 }
