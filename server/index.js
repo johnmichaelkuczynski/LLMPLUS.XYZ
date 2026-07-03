@@ -5115,6 +5115,8 @@ initDB().then(function() {
       ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
       ' VENICE=' + (VENICE_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
+    var _csk = process.env.CLERK_SECRET_KEY || '';
+    console.log('Clerk secret key: ' + (_csk ? (_csk.indexOf('sk_') === 0 ? 'VALID FORMAT' : 'INVALID FORMAT (does not start with sk_)') : 'MISSING'));
   });
 }).catch(function(err) {
   console.error('Failed to initialize database:', err);
