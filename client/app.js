@@ -4100,19 +4100,131 @@
     } catch (e) {}
   });
 
+  var loginScreen = document.getElementById('login-screen');
+  var authError = document.getElementById('auth-error');
+  var userBar = document.getElementById('user-bar');
+  var userDisplay = document.getElementById('user-display');
+  var btnLogout = document.getElementById('btn-logout');
+
   function showApp(user) {
+    loginScreen.classList.add('hidden');
     appEl.classList.remove('hidden');
+    if (user && user.via === 'clerk') {
+      userDisplay.textContent = user.username;
+      userBar.classList.remove('hidden');
+    }
     window.__userName = user.username || '';
     setGreeting();
     loadProjects();
     updateReminderDot();
   }
 
+  function authErrMsg(msg) {
+    authError.textContent = msg;
+    authError.classList.remove('hidden');
+  }
+
+  function inIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  function loadClerkJs(cfg) {
+    return new Promise(function(resolve, reject) {
+      if (window.Clerk) return resolve();
+      var s = document.createElement('script');
+      s.src = 'https://' + cfg.clerkFapiDomain + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+      s.setAttribute('data-clerk-publishable-key', cfg.clerkPublishableKey);
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.onload = function() { resolve(); };
+      s.onerror = function() { reject(new Error('sign-in script could not load (blocked or unreachable)')); };
+      document.head.appendChild(s);
+      setTimeout(function() { if (!window.Clerk) reject(new Error('sign-in script timed out')); }, 20000);
+    });
+  }
+
+  var clerkExchangeInFlight = false;
+  async function exchangeClerkSession() {
+    if (clerkExchangeInFlight) return;
+    clerkExchangeInFlight = true;
+    try {
+      var token = await window.Clerk.session.getToken();
+      var r = await fetch('/api/auth/clerk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token })
+      });
+      var data = await r.json();
+      if (r.ok) {
+        showApp(data);
+      } else {
+        clerkExchangeInFlight = false;
+        authErrMsg(data.error || 'Sign-in failed');
+      }
+    } catch (e) {
+      clerkExchangeInFlight = false;
+      authErrMsg('Sign-in failed: ' + e.message);
+    }
+  }
+
+  var mePollTimer = null;
+  async function showLogin() {
+    appEl.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    authError.classList.add('hidden');
+    try {
+      var cfg = await (await fetch('/api/auth/config')).json();
+      if (!cfg.clerkEnabled) {
+        authErrMsg('Sign-in is not configured on the server.');
+        return;
+      }
+      if (inIframe() && !mePollTimer) {
+        document.getElementById('login-iframe-note').classList.remove('hidden');
+        mePollTimer = setInterval(async function() {
+          try {
+            var r = await fetch('/api/auth/me');
+            if (r.ok) {
+              clearInterval(mePollTimer);
+              mePollTimer = null;
+              showApp(await r.json());
+            }
+          } catch (e) { /* keep polling */ }
+        }, 3000);
+      }
+      await loadClerkJs(cfg);
+      await window.Clerk.load();
+      if (window.Clerk.user && window.Clerk.session) {
+        exchangeClerkSession();
+        return;
+      }
+      window.Clerk.mountSignIn(document.getElementById('clerk-signin'), {});
+      window.Clerk.addListener(function(state) {
+        if (state.user && state.session) exchangeClerkSession();
+      });
+    } catch (e) {
+      authErrMsg('Could not load sign-in: ' + e.message);
+    }
+  }
+
+  document.getElementById('btn-open-signin-tab').addEventListener('click', function() {
+    window.open(window.location.href, '_blank');
+  });
+
+  btnLogout.addEventListener('click', async function() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    try { if (window.Clerk && window.Clerk.session) await window.Clerk.signOut(); } catch (e) {}
+    window.location.reload();
+  });
+
   async function checkAuth() {
     try {
       var r = await fetch('/api/auth/me');
       if (r.ok) {
         showApp(await r.json());
+        return;
+      }
+      if (r.status === 401) {
+        showLogin();
         return;
       }
       notify('Could not start the app. Please refresh.', 'error');

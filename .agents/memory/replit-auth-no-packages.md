@@ -1,29 +1,34 @@
 ---
-name: No login in this app
-description: ALL login (Clerk, Replit OIDC, and the username/password screen) was permanently removed at the user's demand — app auto-starts as default JMK user. Do not re-add any login.
+name: Clerk login without packages
+description: Google login via Clerk rebuilt IN-APP with no npm packages after a full login rip-out; server verifies Clerk JWTs itself; auto-JMK fallback only on plain-http localhost.
 ---
 
-**Rule: this app has NO login at all. The user escalated from removing Google login to
-removing the entire login screen ("RIP OUT LOGIN"). The app auto-starts a session as the
-default JMK user (auto-created if missing). Never re-add Clerk, Replit OIDC, any
-Google/OAuth/social login, or a username/password screen, unless the user explicitly
-requests login again.**
+**Rule: login here is Google-via-Clerk rendered IN-APP (clerk-js v5 script tag from the
+instance FAPI domain), with the server verifying the RS256 session JWT itself using
+builtin crypto + the instance JWKS. Never add Clerk npm packages (package.json is
+locked) and never redirect to Clerk's hosted accounts.*.dev portal.**
 
-**Why:** (July 2026) Clerk failed repeatedly for this user (mismatched key pairs from
-different Clerk apps, iframe cookie issues, VPN blocking clerk.accounts.dev JS) and was
-ripped out on demand. A server-side Replit OIDC replacement was built and the user
-immediately ordered that removed too ("TOTAL FAILURE. RIP IT OUT. DO NOT FIX. DO NOT
-REBUILD."). Rebuilding any social login uninvited would directly violate an explicit,
-repeated user demand.
+**Why:** (July 2026) Clerk first failed for this user (mismatched keys from two Clerk
+apps, iframe cookie issues, VPN blocking Clerk JS), leading to a total login rip-out
+("RIP OUT LOGIN"). The user then explicitly requested Google login back via Clerk with
+their own keys, in-app only. Keys were verified to belong to the same instance via
+matching JWKS kid before building.
 
-**How to apply:** There is no login to fix — "login is broken" reports mean the app
-failed to auto-start its JMK session, not that auth UI is missing. If login is ever
-explicitly requested again, prefer a server-side flow with no new packages (VPNs can
-block third-party browser JS like Clerk's), and note Replit OIDC forces users onto
-Replit accounts via a Replit consent screen.
+**How to apply:**
+- JWT verify must check alg=RS256, signature vs JWKS (cache + kid-miss refetch),
+  exp/nbf/sub, iss === https://<fapi-domain>, and azp against the origin allowlist.
+- Personal app: all verified sign-ins map to the single default JMK account; JMK's
+  clerk_id is claimed by the first Clerk account and others get 403. Regenerate the
+  session on login.
+- Fail closed on https with no session (401 → login screen). Auto-JMK sessions exist
+  ONLY on plain-http localhost — that's what keeps the R1 Playwright harness running
+  with zero credentials.
+- Google OAuth cannot complete inside the Replit preview iframe: show an
+  "open in a new tab" button and poll /api/auth/me; SameSite=None; Secure cookies
+  (trust proxy) make the new-tab session visible to the iframe.
 
-**Iframe/preview session gotcha (still applies even without login):** session cookies
-are invisible inside the Replit preview iframe unless `SameSite=None; Secure` (needs
-`trust proxy`). Keep the per-request cookie mutation (secure requests → None/Secure,
-plain http localhost → Lax for the R1 Playwright harness) plus the Origin-allowlist
-CSRF guard on non-GET `/api/*` — SameSite=None without that guard is a CSRF hole.
+**Iframe/preview session gotcha:** session cookies are invisible inside the Replit
+preview iframe unless `SameSite=None; Secure` (needs `trust proxy`). Keep the
+per-request cookie mutation (secure requests → None/Secure, plain http localhost → Lax)
+plus the Origin-allowlist CSRF guard on non-GET `/api/*` — SameSite=None without that
+guard is a CSRF hole.

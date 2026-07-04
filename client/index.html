@@ -14,9 +14,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=5">
+  <link rel="stylesheet" href="/style.css?v=6">
 </head>
 <body>
+  <div id="login-screen" class="login-screen hidden">
+    <div class="login-card">
+      <h1 class="login-title">LLM Plus</h1>
+      <p class="login-subtitle">Sign in to continue</p>
+      <div id="clerk-signin"></div>
+      <div class="login-iframe-note hidden" id="login-iframe-note">
+        <p>Google sign-in can't finish inside this preview frame.</p>
+        <button class="login-btn" id="btn-open-signin-tab" data-testid="btn-open-signin-tab">Open sign-in in a new tab</button>
+        <p class="login-iframe-hint">After signing in there, this window will log in automatically.</p>
+      </div>
+      <div class="login-error hidden" id="auth-error" data-testid="auth-error"></div>
+    </div>
+  </div>
+
   <div id="app" class="hidden">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
@@ -54,6 +68,10 @@
         <div id="cc-status" class="cc-status hidden">
           <div class="cc-label"><strong>Coherence Engine</strong> <span id="cc-status-text">Idle</span></div>
           <div class="cc-bar"><div class="cc-fill" id="cc-fill"></div></div>
+        </div>
+        <div class="user-bar hidden" id="user-bar">
+          <span class="user-bar-name" id="user-display" data-testid="user-display"></span>
+          <button class="user-bar-logout" id="btn-logout" data-testid="btn-logout">Sign out</button>
         </div>
       </div>
     </aside>
@@ -471,6 +489,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=18"></script>
+  <script src="/app.js?v=19"></script>
 </body>
 </html>

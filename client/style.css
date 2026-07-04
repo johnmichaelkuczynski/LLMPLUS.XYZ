@@ -2843,3 +2843,34 @@ html, body{
 .login-btn-alt:hover{ background:var(--c-side-hover); }
 .login-btn-google{ background:#fff; color:#3c4043; border:1px solid #dadce0; }
 .login-btn-google:hover{ background:#f7f4ec; border-color:var(--c-border); }
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--c-border, #e5e0d5);
+  margin-top: 8px;
+}
+.user-bar-name {
+  font-size: 12px;
+  color: #8a8577;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-bar-logout {
+  background: none;
+  border: 1px solid #d8d2c4;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #6b6657;
+  cursor: pointer;
+}
+.user-bar-logout:hover { background: #f3efe4; }
+.login-iframe-note { margin-top: 14px; text-align: center; font-size: 13px; color: #6b6657; }
+.login-iframe-note .login-btn { margin-top: 8px; }
+.login-iframe-hint { margin-top: 8px; font-size: 12px; color: #8a8577; }
+#clerk-signin { display: flex; justify-content: center; }

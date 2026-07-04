@@ -71,13 +71,123 @@ async function getDefaultUserId() {
   return defaultUserId;
 }
 
+// ─── Clerk (Google login) — server-side token verification, no Clerk backend SDK ───
+var CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || '';
+var CLERK_SECRET = process.env.CLERK_SECRET_KEY || '';
+
+function clerkFapiDomain() {
+  var m = CLERK_PK.match(/^pk_(test|live)_(.+)$/);
+  if (!m) return null;
+  try {
+    var d = Buffer.from(m[2], 'base64').toString('utf8').replace(/\$+$/, '');
+    if (!/^[a-z0-9.-]+$/i.test(d)) return null;
+    return d;
+  } catch (e) { return null; }
+}
+function clerkEnabled() { return !!(CLERK_PK && CLERK_SECRET && clerkFapiDomain()); }
+
+var clerkJwksCache = { keys: null, fetchedAt: 0 };
+async function getClerkJwks(force) {
+  if (!force && clerkJwksCache.keys && Date.now() - clerkJwksCache.fetchedAt < 3600000) return clerkJwksCache.keys;
+  var resp = await fetch('https://' + clerkFapiDomain() + '/.well-known/jwks.json');
+  if (!resp.ok) throw new Error('Could not fetch Clerk signing keys (' + resp.status + ')');
+  var data = await resp.json();
+  clerkJwksCache = { keys: data.keys || [], fetchedAt: Date.now() };
+  return clerkJwksCache.keys;
+}
+
+async function verifyClerkToken(token) {
+  var parts = String(token).split('.');
+  if (parts.length !== 3) throw new Error('Malformed token');
+  var header, payload;
+  try {
+    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch (e) {
+    throw new Error('Malformed token');
+  }
+  if (header.alg !== 'RS256') throw new Error('Unexpected token algorithm');
+  var keys = await getClerkJwks(false);
+  var jwk = null;
+  for (var i = 0; i < keys.length; i++) { if (keys[i].kid === header.kid) { jwk = keys[i]; break; } }
+  if (!jwk) {
+    keys = await getClerkJwks(true);
+    for (var j = 0; j < keys.length; j++) { if (keys[j].kid === header.kid) { jwk = keys[j]; break; } }
+  }
+  if (!jwk) throw new Error('Unknown signing key');
+  var pubKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  var ok = crypto.verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]), pubKey, Buffer.from(parts[2], 'base64url'));
+  if (!ok) throw new Error('Invalid token signature');
+  var now = Math.floor(Date.now() / 1000);
+  if (!payload.exp || payload.exp < now - 5) throw new Error('Token expired');
+  if (payload.nbf && payload.nbf > now + 5) throw new Error('Token not yet valid');
+  if (!payload.sub) throw new Error('Token has no subject');
+  if (payload.iss !== 'https://' + clerkFapiDomain()) throw new Error('Token issued by wrong instance');
+  if (payload.azp && !allowedOrigins.has(payload.azp)) throw new Error('Token issued for an unrecognized origin');
+  return payload;
+}
+
+app.get('/api/auth/config', function(req, res) {
+  res.json({
+    clerkEnabled: clerkEnabled(),
+    clerkPublishableKey: clerkEnabled() ? CLERK_PK : null,
+    clerkFapiDomain: clerkEnabled() ? clerkFapiDomain() : null
+  });
+});
+
+app.post('/api/auth/clerk', async function(req, res) {
+  try {
+    if (!clerkEnabled()) return res.status(503).json({ error: 'Google login is not configured' });
+    var token = (req.body && req.body.token) || '';
+    if (!token) return res.status(400).json({ error: 'Missing token' });
+    var claims = await verifyClerkToken(token);
+    // Personal app: the JMK workspace is bound to ONE Clerk account.
+    // First successful Google sign-in claims it; any other Clerk account is rejected.
+    var userId = await getDefaultUserId();
+    var bind = await pool.query(
+      'UPDATE users SET clerk_id = $1 WHERE id = $2 AND (clerk_id IS NULL OR clerk_id = $1) RETURNING id',
+      [claims.sub, userId]
+    );
+    if (bind.rows.length === 0) {
+      return res.status(403).json({ error: 'This app belongs to a different Google account.' });
+    }
+    req.session.regenerate(function(err) {
+      if (err) return res.status(500).json({ error: 'Session error' });
+      req.session.userId = userId;
+      req.session.username = DEFAULT_USERNAME;
+      req.session.via = 'clerk';
+      req.session.save(function() {
+        res.json({ id: userId, username: DEFAULT_USERNAME, via: 'clerk' });
+      });
+    });
+  } catch (err) {
+    res.status(401).json({ error: 'Authentication failed: ' + err.message });
+  }
+});
+
+app.post('/api/auth/logout', function(req, res) {
+  req.session.destroy(function() {
+    res.json({ ok: true });
+  });
+});
+
+// Plain-http localhost (R1 harness, curl during dev) keeps the automatic JMK session.
+function isLocalPlainHttp(req) {
+  return !req.secure && (req.hostname === 'localhost' || req.hostname === '127.0.0.1');
+}
+
 app.get('/api/auth/me', async function(req, res) {
   try {
-    if (!req.session.userId) {
+    if (req.session && req.session.userId) {
+      return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto' });
+    }
+    if (isLocalPlainHttp(req)) {
       req.session.userId = await getDefaultUserId();
       req.session.username = DEFAULT_USERNAME;
+      req.session.via = 'auto';
+      return res.json({ id: req.session.userId, username: req.session.username, via: 'auto' });
     }
-    res.json({ id: req.session.userId, username: req.session.username });
+    res.status(401).json({ error: 'Not signed in' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -88,14 +198,18 @@ function requireAuth(req, res, next) {
     req.userId = req.session.userId;
     return next();
   }
-  getDefaultUserId().then(function(id) {
-    req.session.userId = id;
-    req.session.username = DEFAULT_USERNAME;
-    req.userId = id;
-    next();
-  }).catch(function(err) {
-    res.status(500).json({ error: err.message });
-  });
+  if (isLocalPlainHttp(req)) {
+    getDefaultUserId().then(function(id) {
+      req.session.userId = id;
+      req.session.username = DEFAULT_USERNAME;
+      req.userId = id;
+      next();
+    }).catch(function(err) {
+      res.status(500).json({ error: err.message });
+    });
+    return;
+  }
+  res.status(401).json({ error: 'Not signed in' });
 }
 
 app.use('/api', function(req, res, next) {
