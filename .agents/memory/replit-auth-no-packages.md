@@ -37,13 +37,19 @@ password path. Username/password login is untouched. The `/api` guard already sk
 `/api/auth/*`, so the login/callback routes are public. `req.session.save()` before
 redirecting (PgSession persists async — redirect can outrun the write otherwise).
 
-**Client priority (Google button):** even when Clerk IS configured, prefer the Replit
-OIDC path in `initAuthProviders` (check `replitAuthEnabled` BEFORE `clerkEnabled`). The
-Clerk browser flow (`authenticateWithRedirect` + `clerk.accounts.dev` script) loops or
-dies behind VPN/iframe and produces "Authentication failed" with NO server-side log
-(fails before hitting `/api/auth/clerk`). The OIDC redirect is a plain server 302 — no
-browser script to block. Inside the Replit preview iframe, open `/api/auth/replit/login`
-in a NEW TAB and poll `/api/auth/me` (Google refuses to run OAuth in an iframe).
+**DO NOT use Replit OIDC as the end-user "Continue with Google" button for a COMMERCIAL
+app.** Replit OIDC shows a "…would like to access your Replit account / Log in secured by
+Replit" consent screen — it forces the app's customers to have Replit accounts, which is
+unacceptable. It's fine only for internal/admin login. For real end-user Google sign-in
+use Clerk (brokers Google OAuth with its own dev keys, no per-app Google Cloud client
+needed) OR direct Google OAuth (needs GOOGLE client id/secret from the user). Keep
+`clerkEnabled` checked BEFORE `replitAuthEnabled` in `initAuthProviders`.
+
+**Clerk "Authentication failed" root cause:** the 401 from `/api/auth/clerk` was almost
+always a bad `CLERK_SECRET_KEY` value (name glued to value, or literal placeholder text)
+making `getClerkUser()` 401 upstream. `pickClerkSecret()` regex-extracts `sk_[A-Za-z0-9_]+`
+so paste format no longer matters; confirm via startup log "Clerk secret key: VALID FORMAT"
+and a live `GET https://api.clerk.com/v1/users?limit=1` returning 200.
 
 **Non-blocking hardening ideas (not done):** `req.session.regenerate()` on login to
 prevent session fixation; canonical allowed-domain config instead of raw Host.
