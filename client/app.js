@@ -3969,7 +3969,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', auth: 'Google Login', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;
@@ -4109,7 +4109,7 @@
   function showApp(user) {
     loginScreen.classList.add('hidden');
     appEl.classList.remove('hidden');
-    if (user && user.via === 'clerk') {
+    if (user && user.via === 'google') {
       userDisplay.textContent = user.username;
       userBar.classList.remove('hidden');
     }
@@ -4130,111 +4130,59 @@
     try { return window.self !== window.top; } catch (e) { return true; }
   }
 
-  function loadClerkJs(cfg) {
-    return new Promise(function(resolve, reject) {
-      if (window.Clerk) return resolve();
-      var s = document.createElement('script');
-      s.src = 'https://' + cfg.clerkFapiDomain + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
-      s.setAttribute('data-clerk-publishable-key', cfg.clerkPublishableKey);
-      s.async = true;
-      s.crossOrigin = 'anonymous';
-      s.onload = function() { resolve(); };
-      s.onerror = function() { reject(new Error('sign-in script could not load (blocked or unreachable)')); };
-      document.head.appendChild(s);
-      setTimeout(function() { if (!window.Clerk) reject(new Error('sign-in script timed out')); }, 20000);
-    });
-  }
-
-  var clerkExchangeInFlight = false;
-  async function exchangeClerkSession() {
-    if (clerkExchangeInFlight) return;
-    clerkExchangeInFlight = true;
-    try {
-      var token = await window.Clerk.session.getToken();
-      var r = await fetch('/api/auth/clerk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token })
-      });
-      var data = await r.json();
-      if (r.ok) {
-        showApp(data);
-      } else {
-        clerkExchangeInFlight = false;
-        authErrMsg(data.error || 'Sign-in failed');
-      }
-    } catch (e) {
-      clerkExchangeInFlight = false;
-      authErrMsg('Sign-in failed: ' + e.message);
-    }
-  }
-
   var mePollTimer = null;
+  function startMePolling() {
+    if (mePollTimer) return;
+    mePollTimer = setInterval(async function() {
+      try {
+        var r = await fetch('/api/auth/me');
+        if (r.ok) {
+          clearInterval(mePollTimer);
+          mePollTimer = null;
+          showApp(await r.json());
+        }
+      } catch (e) { /* keep polling */ }
+    }, 3000);
+  }
+
   async function showLogin() {
     appEl.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     authError.classList.add('hidden');
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('auth_error')) {
+      authErrMsg(params.get('auth_error'));
+      window.history.replaceState({}, '', '/');
+    }
     try {
       var cfg = await (await fetch('/api/auth/config')).json();
-      if (!cfg.clerkEnabled) {
+      if (!cfg.googleEnabled) {
         authErrMsg('Sign-in is not configured on the server.');
-        return;
-      }
-      if (inIframe() && !mePollTimer) {
-        document.getElementById('login-iframe-note').classList.remove('hidden');
-        mePollTimer = setInterval(async function() {
-          try {
-            var r = await fetch('/api/auth/me');
-            if (r.ok) {
-              clearInterval(mePollTimer);
-              mePollTimer = null;
-              showApp(await r.json());
-            }
-          } catch (e) { /* keep polling */ }
-        }, 3000);
-      }
-      await loadClerkJs(cfg);
-      await window.Clerk.load();
-      if (window.location.pathname === '/sso-callback') {
-        document.getElementById('btn-google-signin').classList.add('hidden');
-        document.getElementById('signin-wait').classList.remove('hidden');
-        try {
-          await window.Clerk.handleRedirectCallback({ redirectUrlComplete: '/' });
-        } catch (e) {
-          window.history.replaceState({}, '', '/');
-        }
-      }
-      if (window.Clerk.user && window.Clerk.session) {
-        exchangeClerkSession();
         return;
       }
       var googleBtn = document.getElementById('btn-google-signin');
       googleBtn.classList.remove('hidden');
       googleBtn.onclick = function() {
         if (inIframe()) {
-          window.open(window.location.origin + '/', '_blank');
+          window.open(window.location.origin + '/api/auth/google', '_blank');
+          startMePolling();
           return;
         }
         googleBtn.disabled = true;
-        window.Clerk.client.signIn.authenticateWithRedirect({
-          strategy: 'oauth_google',
-          redirectUrl: '/sso-callback',
-          redirectUrlComplete: '/'
-        }).catch(function(e) {
-          googleBtn.disabled = false;
-          authErrMsg('Google sign-in could not start: ' + e.message);
-        });
+        window.location.href = '/api/auth/google';
       };
-      window.Clerk.addListener(function(state) {
-        if (state.user && state.session) exchangeClerkSession();
-      });
+      if (inIframe()) {
+        document.getElementById('login-iframe-note').classList.remove('hidden');
+        startMePolling();
+      }
     } catch (e) {
       authErrMsg('Could not load sign-in: ' + e.message);
     }
   }
 
   document.getElementById('btn-open-signin-tab').addEventListener('click', function() {
-    window.open(window.location.href, '_blank');
+    window.open(window.location.origin + '/api/auth/google', '_blank');
+    startMePolling();
   });
 
   document.getElementById('btn-administrative').addEventListener('click', function() {
@@ -4243,7 +4191,6 @@
 
   btnLogout.addEventListener('click', async function() {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
-    try { if (window.Clerk && window.Clerk.session) await window.Clerk.signOut(); } catch (e) {}
     window.location.reload();
   });
 

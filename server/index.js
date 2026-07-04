@@ -71,32 +71,33 @@ async function getDefaultUserId() {
   return defaultUserId;
 }
 
-// ─── Clerk (Google login) — server-side token verification, no Clerk backend SDK ───
-var CLERK_PK = (process.env.CLERK_PUBLISHABLE_KEY || '').trim();
-var CLERK_SECRET = (process.env.CLERK_SECRET_KEY || '').trim();
+// ─── Google OAuth 2.0 (direct, no third-party auth service) ───
+var GOOGLE_CLIENT_ID = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+var GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
 
-function clerkFapiDomain() {
-  var m = CLERK_PK.match(/^pk_(test|live)_(.+)$/);
-  if (!m) return null;
-  try {
-    var d = Buffer.from(m[2], 'base64').toString('utf8').replace(/\$+$/, '');
-    if (!/^[a-z0-9.-]+$/i.test(d)) return null;
-    return d;
-  } catch (e) { return null; }
+function googleEnabled() { return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET); }
+
+function requestBaseUrl(req) {
+  var candidate = (req.secure ? 'https' : 'http') + '://' + req.get('host');
+  if (allowedOrigins.has(candidate)) return candidate;
+  // Host header not on the allowlist — fall back to the canonical app domain.
+  if (process.env.REPLIT_DEV_DOMAIN) return 'https://' + process.env.REPLIT_DEV_DOMAIN;
+  var domains = (process.env.REPLIT_DOMAINS || '').split(',');
+  if (domains[0] && domains[0].trim()) return 'https://' + domains[0].trim();
+  return candidate;
 }
-function clerkEnabled() { return !!(CLERK_PK && CLERK_SECRET && clerkFapiDomain()); }
 
-var clerkJwksCache = { keys: null, fetchedAt: 0 };
-async function getClerkJwks(force) {
-  if (!force && clerkJwksCache.keys && Date.now() - clerkJwksCache.fetchedAt < 3600000) return clerkJwksCache.keys;
-  var resp = await fetch('https://' + clerkFapiDomain() + '/.well-known/jwks.json');
-  if (!resp.ok) throw new Error('Could not fetch Clerk signing keys (' + resp.status + ')');
+var googleJwksCache = { keys: null, fetchedAt: 0 };
+async function getGoogleJwks(force) {
+  if (!force && googleJwksCache.keys && Date.now() - googleJwksCache.fetchedAt < 3600000) return googleJwksCache.keys;
+  var resp = await fetch('https://www.googleapis.com/oauth2/v3/certs');
+  if (!resp.ok) throw new Error('Could not fetch Google signing keys (' + resp.status + ')');
   var data = await resp.json();
-  clerkJwksCache = { keys: data.keys || [], fetchedAt: Date.now() };
-  return clerkJwksCache.keys;
+  googleJwksCache = { keys: data.keys || [], fetchedAt: Date.now() };
+  return googleJwksCache.keys;
 }
 
-async function verifyClerkToken(token) {
+async function verifyGoogleIdToken(token) {
   var parts = String(token).split('.');
   if (parts.length !== 3) throw new Error('Malformed token');
   var header, payload;
@@ -107,11 +108,11 @@ async function verifyClerkToken(token) {
     throw new Error('Malformed token');
   }
   if (header.alg !== 'RS256') throw new Error('Unexpected token algorithm');
-  var keys = await getClerkJwks(false);
+  var keys = await getGoogleJwks(false);
   var jwk = null;
   for (var i = 0; i < keys.length; i++) { if (keys[i].kid === header.kid) { jwk = keys[i]; break; } }
   if (!jwk) {
-    keys = await getClerkJwks(true);
+    keys = await getGoogleJwks(true);
     for (var j = 0; j < keys.length; j++) { if (keys[j].kid === header.kid) { jwk = keys[j]; break; } }
   }
   if (!jwk) throw new Error('Unknown signing key');
@@ -120,45 +121,86 @@ async function verifyClerkToken(token) {
   if (!ok) throw new Error('Invalid token signature');
   var now = Math.floor(Date.now() / 1000);
   if (!payload.exp || payload.exp < now - 5) throw new Error('Token expired');
-  if (payload.nbf && payload.nbf > now + 5) throw new Error('Token not yet valid');
   if (!payload.sub) throw new Error('Token has no subject');
-  if (payload.iss !== 'https://' + clerkFapiDomain()) throw new Error('Token issued by wrong instance');
-  if (payload.azp && !allowedOrigins.has(payload.azp)) throw new Error('Token issued for an unrecognized origin');
+  if (payload.iss !== 'https://accounts.google.com' && payload.iss !== 'accounts.google.com') throw new Error('Token issued by wrong provider');
+  if (payload.aud !== GOOGLE_CLIENT_ID) throw new Error('Token issued for a different app');
   return payload;
 }
 
 app.get('/api/auth/config', function(req, res) {
-  res.json({
-    clerkEnabled: clerkEnabled(),
-    clerkPublishableKey: clerkEnabled() ? CLERK_PK : null,
-    clerkFapiDomain: clerkEnabled() ? clerkFapiDomain() : null
+  res.json({ googleEnabled: googleEnabled() });
+});
+
+app.get('/api/auth/google', function(req, res) {
+  if (!googleEnabled()) return res.status(503).send('Google login is not configured');
+  var state = crypto.randomBytes(24).toString('hex');
+  req.session.oauthState = state;
+  req.session.save(function(err) {
+    if (err) return res.status(500).send('Session error');
+    var params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: requestBaseUrl(req) + '/api/auth/google/callback',
+      response_type: 'code',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      state: state
+    });
+    res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString());
   });
 });
 
-app.post('/api/auth/clerk', async function(req, res) {
+app.get('/api/auth/google/callback', async function(req, res) {
+  function fail(msg) {
+    if (!res.headersSent) res.redirect('/?auth_error=' + encodeURIComponent(msg));
+  }
   try {
-    if (!clerkEnabled()) return res.status(503).json({ error: 'Google login is not configured' });
-    var token = (req.body && req.body.token) || '';
-    if (!token) return res.status(400).json({ error: 'Missing token' });
-    var claims = await verifyClerkToken(token);
-    var profile = (await fetchClerkProfile(claims.sub)) || { email: '', name: '' };
+    if (!googleEnabled()) return fail('Google login is not configured');
+    if (req.query.error) return fail('Google sign-in was cancelled');
+    var state = String(req.query.state || '');
+    if (!state || !req.session || state !== req.session.oauthState) {
+      return fail('Sign-in session expired. Please try again.');
+    }
+    delete req.session.oauthState;
+    var code = String(req.query.code || '');
+    if (!code) return fail('Missing authorization code');
 
-    // The FIRST Clerk account to sign in claims the owner (JMK) workspace.
-    // Every other Google account gets its own separate user + empty workspace.
+    var tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: requestBaseUrl(req) + '/api/auth/google/callback',
+        grant_type: 'authorization_code'
+      }).toString()
+    });
+    var tokenData = null;
+    try { tokenData = await tokenResp.json(); } catch (e) { tokenData = {}; }
+    if (!tokenResp.ok || !tokenData.id_token) {
+      console.error('Google token exchange failed:', tokenResp.status, JSON.stringify(tokenData || {}).slice(0, 300));
+      return fail('Google sign-in failed during token exchange');
+    }
+    var claims = await verifyGoogleIdToken(tokenData.id_token);
+    var email = String(claims.email || '').toLowerCase();
+    var name = String(claims.name || '').trim();
+
+    // The owner's Google account (OWNER_EMAIL) claims the JMK workspace and keeps
+    // all existing projects. Every other Google account gets its own user + workspace.
     var ownerId = await getDefaultUserId();
     var user = null;
-    var claim = await pool.query(
-      'UPDATE users SET clerk_id = $1, email = COALESCE(NULLIF($2, \'\'), email) WHERE id = $3 AND (clerk_id IS NULL OR clerk_id = $1) RETURNING id, username',
-      [claims.sub, profile.email, ownerId]
-    );
-    if (claim.rows.length > 0) {
+    if (email === OWNER_EMAIL && claims.email_verified === true) {
+      var claim = await pool.query(
+        'UPDATE users SET google_id = $1, email = $2 WHERE id = $3 RETURNING id, username',
+        [claims.sub, email, ownerId]
+      );
       user = claim.rows[0];
     } else {
-      var r = await pool.query('SELECT id, username FROM users WHERE clerk_id = $1', [claims.sub]);
+      var r = await pool.query('SELECT id, username FROM users WHERE google_id = $1', [claims.sub]);
       if (r.rows.length > 0) {
         user = r.rows[0];
       } else {
-        var base = (profile.email || ('user_' + claims.sub.slice(-8))).slice(0, 60);
+        var base = (email || ('user_' + String(claims.sub).slice(-8))).slice(0, 60);
         var candidate = base;
         var n = 1;
         while (true) {
@@ -168,8 +210,8 @@ app.post('/api/auth/clerk', async function(req, res) {
           candidate = base.slice(0, 55) + '_' + n;
         }
         var ins = await pool.query(
-          'INSERT INTO users (username, password_hash, clerk_id, email) VALUES ($1, NULL, $2, $3) RETURNING id, username',
-          [candidate, claims.sub, profile.email]
+          'INSERT INTO users (username, password_hash, google_id, email) VALUES ($1, NULL, $2, $3) RETURNING id, username',
+          [candidate, claims.sub, email]
         );
         user = ins.rows[0];
       }
@@ -177,48 +219,23 @@ app.post('/api/auth/clerk', async function(req, res) {
 
     try {
       await pool.query(
-        'INSERT INTO login_events (user_id, clerk_id, email, name) VALUES ($1, $2, $3, $4)',
-        [user.id, claims.sub, profile.email, profile.name]
+        'INSERT INTO login_events (user_id, google_id, email, name) VALUES ($1, $2, $3, $4)',
+        [user.id, claims.sub, email, name]
       );
     } catch (e) { console.error('Failed to record login event:', e.message); }
 
-    var isOwnerLogin = (user.id === ownerId) || (profile.email === 'johnmichaelkuczynski@gmail.com');
     req.session.regenerate(function(err) {
-      if (err) return res.status(500).json({ error: 'Session error' });
+      if (err) return fail('Session error');
       req.session.userId = user.id;
       req.session.username = user.username;
-      req.session.via = 'clerk';
-      req.session.save(function() {
-        res.json({ id: user.id, username: user.username, via: 'clerk', isOwner: isOwnerLogin });
-      });
+      req.session.via = 'google';
+      req.session.save(function() { res.redirect('/'); });
     });
   } catch (err) {
-    res.status(401).json({ error: 'Authentication failed: ' + err.message });
+    console.error('Google callback error:', err.message);
+    fail('Sign-in failed: ' + err.message);
   }
 });
-
-async function fetchClerkProfile(clerkId) {
-  try {
-    var resp = await fetch('https://api.clerk.com/v1/users/' + encodeURIComponent(clerkId), {
-      headers: { 'Authorization': 'Bearer ' + CLERK_SECRET }
-    });
-    if (!resp.ok) return null;
-    var u = await resp.json();
-    var email = '';
-    if (Array.isArray(u.email_addresses) && u.email_addresses.length > 0) {
-      var primary = null;
-      for (var i = 0; i < u.email_addresses.length; i++) {
-        if (u.email_addresses[i].id === u.primary_email_address_id) { primary = u.email_addresses[i]; break; }
-      }
-      email = ((primary || u.email_addresses[0]).email_address || '').toLowerCase();
-    }
-    var name = (((u.first_name || '') + ' ' + (u.last_name || '')).trim());
-    return { email: email, name: name };
-  } catch (e) {
-    console.error('Clerk profile fetch failed:', e.message);
-    return null;
-  }
-}
 
 // ─── Administrative page (visitor log) — OWNER ONLY ───
 var ADMIN_PASSWORD = '1234';
@@ -226,7 +243,7 @@ var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
 
 async function isOwnerSession(req) {
   if (!req.session || !req.session.userId) return false;
-  if (req.session.via !== 'clerk' && !isLocalPlainHttp(req)) return false;
+  if (req.session.via !== 'google' && !isLocalPlainHttp(req)) return false;
   var ownerId = await getDefaultUserId();
   if (req.session.userId === ownerId) return true;
   var r = await pool.query('SELECT email FROM users WHERE id = $1', [req.session.userId]);
@@ -295,13 +312,13 @@ app.get('/api/admin/visits', async function(req, res) {
     var stats = await pool.query(
       `SELECT
          COUNT(*)::int AS signins_all,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id))::int AS visitors_all,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id))::int AS visitors_all,
          COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS signins_day,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS visitors_day,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS visitors_day,
          COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS signins_month,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS visitors_month,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS visitors_month,
          COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS signins_year,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS visitors_year
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS visitors_year
        FROM login_events`
     );
     var seriesDay = await pool.query(
@@ -367,7 +384,7 @@ function isLocalPlainHttp(req) {
 
 app.get('/api/auth/me', async function(req, res) {
   try {
-    if (req.session && req.session.userId && (req.session.via === 'clerk' || isLocalPlainHttp(req))) {
+    if (req.session && req.session.userId && (req.session.via === 'google' || isLocalPlainHttp(req))) {
       return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto', isOwner: await isOwnerSession(req) });
     }
     if (isLocalPlainHttp(req)) {
@@ -383,7 +400,7 @@ app.get('/api/auth/me', async function(req, res) {
 });
 
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId && (req.session.via === 'clerk' || isLocalPlainHttp(req))) {
+  if (req.session && req.session.userId && (req.session.via === 'google' || isLocalPlainHttp(req))) {
     req.userId = req.session.userId;
     return next();
   }
@@ -546,6 +563,7 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT");
     } catch (e) { /* columns may already exist */ }
     try {
       await client.query(`CREATE TABLE IF NOT EXISTS login_events (
@@ -556,6 +574,7 @@ async function initDB() {
         name TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )`);
+      await client.query("ALTER TABLE login_events ADD COLUMN IF NOT EXISTS google_id TEXT");
       await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_created_at ON login_events (created_at)");
       await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_email ON login_events (email)");
     } catch (e) { console.error('login_events table init failed:', e.message); }
@@ -4980,6 +4999,55 @@ app.post('/api/diagnostic/run', async function(req, res) {
     await runStep('SESSION_SECRET present', 'env', async function() {
       if (!process.env.SESSION_SECRET) throw new Error('Not set');
       return 'set';
+    });
+
+    // === Category 1b: Google Login ===
+    await runStep('Google OAuth credentials present', 'auth', async function() {
+      if (!GOOGLE_CLIENT_ID) throw new Error('GOOGLE_OAUTH_CLIENT_ID not set');
+      if (!GOOGLE_CLIENT_SECRET) throw new Error('GOOGLE_OAUTH_CLIENT_SECRET not set');
+      return 'client id + secret set';
+    });
+    await runStep('Google accepts this client (credential check)', 'auth', async function() {
+      var r = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: 'diagnostic-dummy-code',
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: 'https://localhost/api/auth/google/callback',
+          grant_type: 'authorization_code'
+        }).toString()
+      });
+      var data = null;
+      try { data = await r.json(); } catch (e) { data = {}; }
+      if (data && data.error === 'invalid_client') throw new Error('Google rejected the client credentials (invalid_client) — check GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET');
+      if (data && (data.error === 'invalid_grant' || data.error === 'invalid_request' || data.error === 'redirect_uri_mismatch')) {
+        return 'credentials accepted by Google (dummy code correctly rejected as ' + data.error + ')';
+      }
+      if (!r.ok) throw new Error('Unexpected response from Google token endpoint: HTTP ' + r.status + ' ' + JSON.stringify(data || {}).slice(0, 120));
+      return 'token endpoint reachable';
+    });
+    await runStep('Google signing keys (JWKS) reachable', 'auth', async function() {
+      var keys = await getGoogleJwks(true);
+      if (!keys || keys.length === 0) throw new Error('No signing keys returned');
+      return keys.length + ' signing keys fetched';
+    });
+    await runStep('Login route redirects to Google', 'auth', async function() {
+      var port = process.env.PORT || 5000;
+      var r = await fetch('http://localhost:' + port + '/api/auth/google', { redirect: 'manual' });
+      if (r.status !== 302) throw new Error('Expected 302 redirect, got HTTP ' + r.status);
+      var loc = r.headers.get('location') || '';
+      if (loc.indexOf('https://accounts.google.com/o/oauth2/v2/auth') !== 0) throw new Error('Redirects to unexpected URL: ' + loc.slice(0, 80));
+      if (loc.indexOf('state=') === -1) throw new Error('Redirect is missing the CSRF state parameter');
+      return '302 to accounts.google.com with state parameter';
+    });
+    await runStep('User + login-event columns for Google', 'auth', async function() {
+      var u = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'google_id'");
+      if (u.rows.length === 0) throw new Error('users.google_id column missing');
+      var l = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'login_events' AND column_name = 'google_id'");
+      if (l.rows.length === 0) throw new Error('login_events.google_id column missing');
+      return 'users.google_id + login_events.google_id exist';
     });
 
     // === Category 2: Database ===
