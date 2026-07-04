@@ -4269,31 +4269,7 @@
     try {
       if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
       var cfg = authConfig;
-      if (cfg && cfg.replitAuthEnabled) {
-        btnGoogle.classList.remove('hidden');
-        loginDivider.classList.remove('hidden');
-        btnGoogle.addEventListener('click', function() {
-          hideAuthError();
-          if (inIframe()) {
-            var w = window.open('/api/auth/replit/login', '_blank');
-            if (!w) {
-              showAuthError('Popup blocked. Please allow popups, or open the app in its own browser tab and try again.');
-              return;
-            }
-            showAuthError('Google sign-in opened in a new tab. Finish there — this page will log you in automatically.');
-            var tries = 0;
-            var iv = setInterval(function() {
-              tries++;
-              if (tries > 100) { clearInterval(iv); return; }
-              fetch('/api/auth/me').then(function(r) {
-                if (r.ok) { clearInterval(iv); r.json().then(function(user) { showApp(user); }); }
-              }).catch(function() {});
-            }, 3000);
-          } else {
-            window.location.href = '/api/auth/replit/login';
-          }
-        });
-      } else if (cfg && cfg.clerkEnabled) {
+      if (cfg && cfg.clerkEnabled) {
         btnGoogle.classList.remove('hidden');
         loginDivider.classList.remove('hidden');
         btnGoogle.addEventListener('click', function() {
@@ -4303,6 +4279,13 @@
           } else {
             startClerkGoogle();
           }
+        });
+      } else if (cfg && cfg.replitAuthEnabled) {
+        btnGoogle.classList.remove('hidden');
+        loginDivider.classList.remove('hidden');
+        btnGoogle.addEventListener('click', function() {
+          hideAuthError();
+          window.location.href = '/api/auth/replit/login';
         });
       }
     } catch (e) {
