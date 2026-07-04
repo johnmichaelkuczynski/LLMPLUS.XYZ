@@ -4982,6 +4982,59 @@ app.post('/api/diagnostic/run', async function(req, res) {
       return 'HTTP 200 from ' + VENICE_MODEL;
     });
 
+    // === Category 3.5: Google Login (Clerk) ===
+    var _feKids = null;
+    await runStep('Clerk keys configured', 'auth', async function() {
+      if (!CLERK_PUBLISHABLE_KEY) throw new Error('CLERK_PUBLISHABLE_KEY not set');
+      if (!CLERK_SECRET_KEY) throw new Error('CLERK_SECRET_KEY not set');
+      if (CLERK_SECRET_KEY.indexOf('sk_') !== 0) throw new Error('Secret key does not start with sk_');
+      return 'publishable + secret present';
+    });
+    await runStep('Clerk publishable key reachable (JWKS)', 'auth', async function() {
+      var api = clerkFrontendApi();
+      if (!api) throw new Error('Could not derive Clerk domain from publishable key');
+      var r = await fetch('https://' + api + '/.well-known/jwks.json');
+      if (!r.ok) throw new Error('Frontend JWKS HTTP ' + r.status);
+      var data = await r.json();
+      _feKids = (data.keys || []).map(function(k) { return k.kid; });
+      if (!_feKids.length) throw new Error('No signing keys returned');
+      return api + ' OK';
+    });
+    await runStep('Clerk secret key valid', 'auth', async function() {
+      var r = await fetch('https://api.clerk.com/v1/jwks', { headers: { Authorization: 'Bearer ' + CLERK_SECRET_KEY } });
+      if (r.status === 401) throw new Error('Secret key rejected (HTTP 401)');
+      if (!r.ok) throw new Error('Backend JWKS HTTP ' + r.status);
+      var data = await r.json();
+      var beKids = (data.keys || []).map(function(k) { return k.kid; });
+      if (!beKids.length) throw new Error('No backend signing keys returned');
+      if (_feKids && !_feKids.some(function(k) { return beKids.indexOf(k) !== -1; })) {
+        throw new Error('KEY MISMATCH: publishable and secret keys are from DIFFERENT Clerk apps — this breaks login. Copy BOTH keys from the same Clerk app.');
+      }
+      return 'valid & matches publishable key';
+    });
+    await runStep('Google sign-in enabled in Clerk', 'auth', async function() {
+      var api = clerkFrontendApi();
+      if (!api) throw new Error('Clerk not configured');
+      var url = 'https://' + api + '/v1/environment?__clerk_api_version=2021-02-05&_clerk_js_version=5.0.0&_clerk_key=' + encodeURIComponent(CLERK_PUBLISHABLE_KEY);
+      var r = await fetch(url);
+      if (!r.ok) throw new Error('Environment HTTP ' + r.status);
+      var env = await r.json();
+      var social = (env.user_settings && env.user_settings.social) || {};
+      if (!social.oauth_google || !social.oauth_google.enabled) {
+        throw new Error('Google is NOT enabled in this Clerk app — enable it under Social Connections → Google');
+      }
+      return 'oauth_google enabled';
+    });
+    await runStep('Login endpoint rejects bad token', 'auth', async function() {
+      var r = await fetch('http://127.0.0.1:' + PORT + '/api/auth/clerk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'not-a-real-token' })
+      });
+      if (r.status !== 401) throw new Error('Expected HTTP 401 for bad token, got ' + r.status);
+      return 'HTTP 401 as expected';
+    });
+
     // === Category 4: Functional (CRUD round-trip) ===
     var testProjectId = null;
     var testSessionId = null;

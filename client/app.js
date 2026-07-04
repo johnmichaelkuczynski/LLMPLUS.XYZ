@@ -3986,7 +3986,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', auth: 'Google Login (Clerk)', func: 'Functional CRUD', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;
