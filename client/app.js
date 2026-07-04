@@ -4199,7 +4199,18 @@
         exchangeClerkSession();
         return;
       }
-      window.Clerk.mountSignIn(document.getElementById('clerk-signin'), {});
+      window.Clerk.mountSignIn(document.getElementById('clerk-signin'), {
+        appearance: {
+          elements: {
+            header: { display: 'none' },
+            dividerRow: { display: 'none' },
+            form: { display: 'none' },
+            footer: { display: 'none' },
+            footerAction: { display: 'none' },
+            alternativeMethods: { display: 'none' }
+          }
+        }
+      });
       window.Clerk.addListener(function(state) {
         if (state.user && state.session) exchangeClerkSession();
       });
