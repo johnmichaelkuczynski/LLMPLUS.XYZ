@@ -3668,7 +3668,6 @@
   });
 
   var appEl = document.getElementById('app');
-  var userDisplay = document.getElementById('user-display');
 
   var auditPanel = document.getElementById('audit-panel');
   var auditBody = document.getElementById('audit-result-body');
@@ -4103,7 +4102,6 @@
 
   function showApp(user) {
     appEl.classList.remove('hidden');
-    userDisplay.textContent = user.username;
     window.__userName = user.username || '';
     setGreeting();
     loadProjects();

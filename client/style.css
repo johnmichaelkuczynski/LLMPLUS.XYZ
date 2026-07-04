@@ -139,38 +139,13 @@ html, body {
   border-radius: 8px;
 }
 
-.user-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: #1e293b;
-  border-radius: 10px;
-  margin: 8px 12px 4px;
-}
 
-.user-bar-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e2e8f0;
-}
 
-.user-bar-logout {
-  font-size: 12px;
-  font-weight: 500;
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
-  border: none;
-  cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-family: inherit;
-}
 
-.user-bar-logout:hover {
-  color: #fff;
-  background: #dc2626;
-}
+
+
+
+
 
 #app {
   display: flex;
@@ -2756,8 +2731,6 @@ html, body{
 }
 #btn-new-project:hover, #btn-new-session:hover{ background:var(--c-accent-hover) !important; border-color:var(--c-accent-hover) !important; }
 
-.user-bar-name{ color:var(--c-text-dim); }
-.user-bar-logout{ color:var(--c-text-mute); }
 
 /* ---- Main / topbar ---- */
 .main{ background:var(--c-bg); }
