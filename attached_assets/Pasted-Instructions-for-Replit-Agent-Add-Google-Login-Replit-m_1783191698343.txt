@@ -1,0 +1,56 @@
+Instructions for Replit Agent: Add Google Login (Replit-managed Clerk)
+Add Google login to this app using Replit-managed Clerk. Follow these instructions exactly — they come from a working implementation in another project, plus fixes for failures seen in real migration attempts.
+
+DO NOT USE REPLIT AUTH — this is a hard requirement
+The user wants Google login via Clerk. Do NOT use Replit Auth (replit-auth skill, OpenID "Sign in with Replit", or anything that shows a " would like to access your Replit account" / "Log in secured by Replit" consent screen). That system makes end users log in with a Replit account, which is wrong for this app.
+
+If the app currently shows that "access your Replit account" screen, Replit Auth is installed and must be fully removed as part of Step 0: delete its auth routes, its middleware, its session table usage, and any <a href="/api/login">-style entry points. Replace all of it with the Clerk flow described below.
+Do not keep both systems side by side. One auth system: Replit-managed Clerk.
+STEP 0 — Clean up any existing Clerk setup FIRST
+If this app already has any Clerk wiring (a manually created Clerk account, hard-coded pk_live/pk_test keys, links to accounts.*.dev or any Clerk-hosted page, <RedirectToSignIn>, or Clerk env vars set by hand):
+
+Remove all of it before provisioning Replit-managed Clerk. Delete manually-set Clerk env vars/secrets, remove hosted-portal redirects, and strip old ClerkProvider config. A half-migrated setup where old keys or hosted-portal URLs survive is the #1 cause of broken results.
+After cleanup, provision fresh via the clerk-auth skill (Step 1 below). The skill's setupClerkWhitelabelAuth() sets CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, and VITE_CLERK_PUBLISHABLE_KEY automatically. Never hand-edit these three secrets afterward, and make sure no code references the OLD keys anywhere (grep for pk_test, pk_live, accounts. and remove leftovers).
+Note for the user: switching tenants means fresh user accounts — old logins will not carry over.
+THE #1 FAILURE MODE — read this before writing any code
+Symptom: after signing in, the user lands on a dark Clerk page saying "Welcome, — You are signed in. Now, it's time to connect Clerk to your application. START BUILDING."
+
+Cause: the app is sending users to Clerk's hosted Account Portal (an accounts.*.dev page on Clerk's own site) instead of rendering sign-in inside the app. After authenticating, Clerk has nowhere to send them back to, so it shows its own placeholder.
+
+The fix (mandatory architecture):
+
+The app must render Clerk's <SignIn /> and <SignUp /> components on its own routes (/sign-in, /sign-up) with routing="path" and explicit path props.
+<ClerkProvider> must receive signInUrl and signUpUrl pointing at those in-app routes.
+Never link, redirect, or fall back to any accounts.*.dev URL, and never use <RedirectToSignIn> pointed at the hosted portal.
+Sign-in/sign-up buttons in the app navigate to /sign-in and /sign-up — nowhere else.
+If at any point the browser URL leaves the app's own domain during login (other than Google's own consent screen), the wiring is wrong. Stop and fix it.
+
+Core setup
+Read and follow the clerk-auth skill (.local/skills/clerk-auth/SKILL.md and its references/setup-and-customization.md). Do NOT wire Clerk from memory or generic Clerk docs — Replit-managed Clerk is configured differently from a normal Clerk account. Copy the canonical code snippets verbatim; adapt styling only.
+Provision with the skill's setupClerkWhitelabelAuth(). Google sign-in comes enabled by default alongside email/password. Never ask the user for Clerk API keys and never open the Clerk dashboard.
+There is no Google Cloud Console setup and no OAuth client ID creation. If you find yourself doing either, you are on the wrong path — re-read the skill.
+Server requirements (order matters)
+Mount the Clerk proxy middleware before any body parsers (it streams raw bytes).
+Mount clerkMiddleware() before the API routes, resolving the publishable key from the request host as the skill shows.
+Gate every protected API route with requireAuth middleware checking getAuth(req); return 401 with no session.
+CORS: never cors({ credentials: true, origin: true }). With cookie auth that's a security hole. Allowlist: the app's domains from REPLIT_DOMAINS, plus REPLIT_DEV_DOMAIN, plus localhost. Reject everything else.
+Web auth is cookie-based. Do NOT add Authorization: Bearer, getToken(), or setAuthTokenGetter to the web client. 401s mean middleware-order/cookie problems, not missing tokens.
+Frontend requirements
+Use publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) from @clerk/react/internal, and pass proxyUrl unconditionally, exactly as the skill shows.
+Sign-in and sign-up routes MUST tolerate sub-paths (e.g. /sign-in/*?) so Google's OAuth callback (/sign-in/sso-callback) resolves. If Google login 404s mid-flow, this is why.
+Keep / public: signed-out visitors see a landing page with Sign in / Create account buttons; signed-in users see the app. Never redirect / straight to /sign-in.
+Wrap every other app route in a Protected gate that redirects signed-out users to /.
+UX requirements (these caused real confusion — do not skip)
+Put the account section (user name/email + Sign out) at the bottom of the sidebar or somewhere always visible at any window width — never only at the far right of a top bar, where it gets pushed off-screen.
+Show a Sign in button in that same spot when signed out.
+Verify before claiming success (all of these)
+Anonymous curl to a protected API route returns 401.
+Signed-out visit to / shows the landing page; /sign-in shows the "Continue with Google" button (screenshot both).
+The entire login flow stays on the app's own domain (except Google's consent screen). No accounts.*.dev page ever appears.
+After signing in, the user lands back inside the app, not on any Clerk page.
+CORS: a foreign Origin gets no Access-Control-Allow-Origin back; the app's own dev domain is allowed.
+Warn the user proactively
+If already signed in, they will never see the login screen — that means it works. Test in an incognito/private window to see it as a new visitor.
+Dev uses pk_test keys and shows a "Development mode" badge on the login card — normal; it disappears when published. Do not "fix" the dev-keys console warning.
+Dev and production have separate user accounts. Accounts created in preview don't exist on the published site.
+If the app is already published, it must be republished for login to appear live.
