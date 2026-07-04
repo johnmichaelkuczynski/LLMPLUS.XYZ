@@ -37,5 +37,13 @@ password path. Username/password login is untouched. The `/api` guard already sk
 `/api/auth/*`, so the login/callback routes are public. `req.session.save()` before
 redirecting (PgSession persists async — redirect can outrun the write otherwise).
 
+**Client priority (Google button):** even when Clerk IS configured, prefer the Replit
+OIDC path in `initAuthProviders` (check `replitAuthEnabled` BEFORE `clerkEnabled`). The
+Clerk browser flow (`authenticateWithRedirect` + `clerk.accounts.dev` script) loops or
+dies behind VPN/iframe and produces "Authentication failed" with NO server-side log
+(fails before hitting `/api/auth/clerk`). The OIDC redirect is a plain server 302 — no
+browser script to block. Inside the Replit preview iframe, open `/api/auth/replit/login`
+in a NEW TAB and poll `/api/auth/me` (Google refuses to run OAuth in an iframe).
+
 **Non-blocking hardening ideas (not done):** `req.session.regenerate()` on login to
 prevent session fixation; canonical allowed-domain config instead of raw Host.
