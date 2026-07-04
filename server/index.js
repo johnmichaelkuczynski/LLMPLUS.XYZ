@@ -140,29 +140,11 @@ app.post('/api/auth/logout', function(req, res) {
   });
 });
 
-var DEFAULT_USER_ID = null;
-async function ensureDefaultUser() {
-  if (DEFAULT_USER_ID) {
-    return { id: DEFAULT_USER_ID, username: 'JMK' };
-  }
-  var r = await pool.query("SELECT id, username FROM users WHERE username = 'JMK'");
-  if (r.rows.length === 0) {
-    r = await pool.query("INSERT INTO users (username) VALUES ('JMK') RETURNING id, username");
-  }
-  DEFAULT_USER_ID = r.rows[0].id;
-  return r.rows[0];
-}
-
-app.get('/api/auth/me', async function(req, res) {
-  try {
-    if (!(req.session && req.session.userId)) {
-      var u = await ensureDefaultUser();
-      req.session.userId = u.id;
-      req.session.username = u.username;
-    }
+app.get('/api/auth/me', function(req, res) {
+  if (req.session && req.session.userId) {
     res.json({ id: req.session.userId, username: req.session.username });
-  } catch (e) {
-    res.status(500).json({ error: 'auth init failed' });
+  } else {
+    res.status(401).json({ error: 'Not authenticated' });
   }
 });
 
@@ -354,14 +336,7 @@ function requireAuth(req, res, next) {
     req.userId = req.session.userId;
     return next();
   }
-  ensureDefaultUser().then(function(u) {
-    req.session.userId = u.id;
-    req.session.username = u.username;
-    req.userId = u.id;
-    next();
-  }).catch(function() {
-    res.status(500).json({ error: 'auth init failed' });
-  });
+  res.status(401).json({ error: 'Not authenticated' });
 }
 
 app.use('/api', function(req, res, next) {
