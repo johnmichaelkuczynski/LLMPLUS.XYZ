@@ -10,66 +10,6 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from './db.js';
 
-const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY;
-function pickClerkSecret() {
-  var candidates = [process.env.CLERK_API_KEY, process.env.CLERK_SECRET_KEY];
-  for (var i = 0; i < candidates.length; i++) {
-    var v = (candidates[i] || '').trim();
-    if (!v) continue;
-    var m = v.match(/sk_[A-Za-z0-9_]+/);
-    if (m) return m[0];
-  }
-  return process.env.CLERK_SECRET_KEY;
-}
-const CLERK_SECRET_KEY = pickClerkSecret();
-function clerkConfigured() { return !!(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY); }
-function clerkFrontendApi() {
-  if (!CLERK_PUBLISHABLE_KEY) return null;
-  var parts = CLERK_PUBLISHABLE_KEY.split('_');
-  var encoded = parts[2] || '';
-  try { return Buffer.from(encoded, 'base64').toString('utf8').replace(/\$+$/, ''); }
-  catch (e) { return null; }
-}
-function b64urlToBuf(s) {
-  s = String(s).replace(/-/g, '+').replace(/_/g, '/');
-  while (s.length % 4) s += '=';
-  return Buffer.from(s, 'base64');
-}
-var _jwksCache = { api: null, keys: null, fetchedAt: 0 };
-async function getClerkJwks() {
-  var api = clerkFrontendApi();
-  if (!api) throw new Error('Clerk not configured');
-  if (_jwksCache.keys && _jwksCache.api === api && (Date.now() - _jwksCache.fetchedAt) < 3600000) return _jwksCache.keys;
-  var r = await fetch('https://' + api + '/.well-known/jwks.json');
-  if (!r.ok) throw new Error('JWKS fetch failed: ' + r.status);
-  var data = await r.json();
-  _jwksCache = { api: api, keys: data.keys || [], fetchedAt: Date.now() };
-  return _jwksCache.keys;
-}
-async function verifyClerkToken(token) {
-  var segs = String(token || '').split('.');
-  if (segs.length !== 3) throw new Error('malformed token');
-  var header = JSON.parse(b64urlToBuf(segs[0]).toString('utf8'));
-  var payload = JSON.parse(b64urlToBuf(segs[1]).toString('utf8'));
-  var keys = await getClerkJwks();
-  var jwk = keys.find(function(k) { return k.kid === header.kid; });
-  if (!jwk) throw new Error('signing key not found');
-  var pub = crypto.createPublicKey({ key: jwk, format: 'jwk' });
-  var ok = crypto.verify('RSA-SHA256', Buffer.from(segs[0] + '.' + segs[1]), pub, b64urlToBuf(segs[2]));
-  if (!ok) throw new Error('invalid signature');
-  var now = Math.floor(Date.now() / 1000);
-  if (payload.exp && now > payload.exp + 5) throw new Error('token expired');
-  if (payload.nbf && now < payload.nbf - 5) throw new Error('token not yet valid');
-  return payload;
-}
-async function getClerkUser(userId) {
-  var r = await fetch('https://api.clerk.com/v1/users/' + encodeURIComponent(userId), {
-    headers: { Authorization: 'Bearer ' + CLERK_SECRET_KEY }
-  });
-  if (!r.ok) throw new Error('Clerk user fetch failed: ' + r.status);
-  return r.json();
-}
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -177,63 +117,8 @@ app.get('/api/auth/me', function(req, res) {
 
 app.get('/api/auth/config', function(req, res) {
   res.json({
-    clerkEnabled: clerkConfigured(),
-    clerkPublishableKey: clerkConfigured() ? CLERK_PUBLISHABLE_KEY : null,
     replitAuthEnabled: replitAuthEnabled()
   });
-});
-
-app.post('/api/auth/clerk', async function(req, res) {
-  try {
-    if (!clerkConfigured()) return res.status(503).json({ error: 'Clerk is not configured' });
-    var token = req.body && req.body.token;
-    if (!token) return res.status(400).json({ error: 'Missing token' });
-
-    var payload = await verifyClerkToken(token);
-    var clerkId = payload.sub;
-    if (!clerkId) return res.status(401).json({ error: 'Invalid token' });
-
-    var profile = await getClerkUser(clerkId);
-    var primaryId = profile.primary_email_address_id;
-    var emails = profile.email_addresses || [];
-    var primary = emails.find(function(e) { return e.id === primaryId; }) || emails[0];
-    var email = ((primary && primary.email_address) || '').toLowerCase();
-    var displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim()
-      || profile.username
-      || (email ? email.split('@')[0] : 'user');
-
-    var user = null;
-    var byClerk = await pool.query('SELECT id, username FROM users WHERE clerk_id = $1', [clerkId]);
-    if (byClerk.rows.length > 0) {
-      user = byClerk.rows[0];
-    } else if (email) {
-      var byEmail = await pool.query('SELECT id, username FROM users WHERE LOWER(email) = $1', [email]);
-      if (byEmail.rows.length > 0) {
-        user = byEmail.rows[0];
-        await pool.query('UPDATE users SET clerk_id = $1 WHERE id = $2', [clerkId, user.id]);
-      }
-    }
-    if (!user) {
-      var base = (displayName || 'user').replace(/\s+/g, '').slice(0, 40) || 'user';
-      var username = base;
-      var suffix = 0;
-      while (true) {
-        var exists = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (exists.rows.length === 0) break;
-        suffix++;
-        username = base + suffix;
-      }
-      var ins = await pool.query('INSERT INTO users (username, email, clerk_id) VALUES ($1, $2, $3) RETURNING id, username', [username, email, clerkId]);
-      user = ins.rows[0];
-    }
-
-    req.session.userId = user.id;
-    req.session.username = user.username;
-    res.json({ id: user.id, username: user.username });
-  } catch (err) {
-    console.error('Clerk auth error:', err.message);
-    res.status(401).json({ error: 'Authentication failed' });
-  }
 });
 
 // ---- Replit Auth (OpenID Connect) — first-party Google/GitHub/email sign-in ----
@@ -272,8 +157,7 @@ app.get('/api/auth/replit/login', function(req, res) {
       redirect_uri: oidcRedirectUri(req),
       state: state,
       code_challenge: challenge,
-      code_challenge_method: 'S256',
-      prompt: 'login'
+      code_challenge_method: 'S256'
     });
     res.redirect(REPLIT_OIDC.authEndpoint + '?' + params.toString());
   });
@@ -5009,57 +4893,24 @@ app.post('/api/diagnostic/run', async function(req, res) {
       return 'HTTP 200 from ' + VENICE_MODEL;
     });
 
-    // === Category 3.5: Google Login (Clerk) ===
-    var _feKids = null;
-    await runStep('Clerk keys configured', 'auth', async function() {
-      if (!CLERK_PUBLISHABLE_KEY) throw new Error('CLERK_PUBLISHABLE_KEY not set');
-      if (!CLERK_SECRET_KEY) throw new Error('CLERK_SECRET_KEY not set');
-      if (CLERK_SECRET_KEY.indexOf('sk_') !== 0) throw new Error('Secret key does not start with sk_');
-      return 'publishable + secret present';
+    // === Category 3.5: Google Login (Replit Auth) ===
+    await runStep('Replit Auth configured', 'auth', async function() {
+      if (!replitAuthEnabled()) throw new Error('REPL_ID not set — Replit Auth unavailable');
+      return 'REPL_ID present';
     });
-    await runStep('Clerk publishable key reachable (JWKS)', 'auth', async function() {
-      var api = clerkFrontendApi();
-      if (!api) throw new Error('Could not derive Clerk domain from publishable key');
-      var r = await fetch('https://' + api + '/.well-known/jwks.json');
-      if (!r.ok) throw new Error('Frontend JWKS HTTP ' + r.status);
-      var data = await r.json();
-      _feKids = (data.keys || []).map(function(k) { return k.kid; });
-      if (!_feKids.length) throw new Error('No signing keys returned');
-      return api + ' OK';
+    await runStep('Replit sign-in service reachable', 'auth', async function() {
+      var r = await fetch('https://replit.com/oidc/.well-known/openid-configuration');
+      if (!r.ok) throw new Error('OIDC discovery HTTP ' + r.status);
+      var cfg = await r.json();
+      if (!cfg.authorization_endpoint) throw new Error('No authorization endpoint in discovery document');
+      return 'discovery OK';
     });
-    await runStep('Clerk secret key valid', 'auth', async function() {
-      var r = await fetch('https://api.clerk.com/v1/jwks', { headers: { Authorization: 'Bearer ' + CLERK_SECRET_KEY } });
-      if (r.status === 401) throw new Error('Secret key rejected (HTTP 401)');
-      if (!r.ok) throw new Error('Backend JWKS HTTP ' + r.status);
-      var data = await r.json();
-      var beKids = (data.keys || []).map(function(k) { return k.kid; });
-      if (!beKids.length) throw new Error('No backend signing keys returned');
-      if (_feKids && !_feKids.some(function(k) { return beKids.indexOf(k) !== -1; })) {
-        throw new Error('KEY MISMATCH: publishable and secret keys are from DIFFERENT Clerk apps — this breaks login. Copy BOTH keys from the same Clerk app.');
-      }
-      return 'valid & matches publishable key';
-    });
-    await runStep('Google sign-in enabled in Clerk', 'auth', async function() {
-      var api = clerkFrontendApi();
-      if (!api) throw new Error('Clerk not configured');
-      var url = 'https://' + api + '/v1/environment?__clerk_api_version=2021-02-05&_clerk_js_version=5.0.0&_clerk_key=' + encodeURIComponent(CLERK_PUBLISHABLE_KEY);
-      var r = await fetch(url);
-      if (!r.ok) throw new Error('Environment HTTP ' + r.status);
-      var env = await r.json();
-      var social = (env.user_settings && env.user_settings.social) || {};
-      if (!social.oauth_google || !social.oauth_google.enabled) {
-        throw new Error('Google is NOT enabled in this Clerk app — enable it under Social Connections → Google');
-      }
-      return 'oauth_google enabled';
-    });
-    await runStep('Login endpoint rejects bad token', 'auth', async function() {
-      var r = await fetch('http://127.0.0.1:' + PORT + '/api/auth/clerk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: 'not-a-real-token' })
-      });
-      if (r.status !== 401) throw new Error('Expected HTTP 401 for bad token, got ' + r.status);
-      return 'HTTP 401 as expected';
+    await runStep('Login endpoint redirects to Replit', 'auth', async function() {
+      var r = await fetch('http://127.0.0.1:' + PORT + '/api/auth/replit/login', { redirect: 'manual' });
+      if (r.status !== 302) throw new Error('Expected HTTP 302 redirect, got ' + r.status);
+      var loc = r.headers.get('location') || '';
+      if (loc.indexOf('https://replit.com/oidc/auth') !== 0) throw new Error('Unexpected redirect target: ' + loc.slice(0, 80));
+      return 'HTTP 302 to replit.com';
     });
 
     // === Category 4: Functional (CRUD round-trip) ===
@@ -5205,8 +5056,7 @@ initDB().then(function() {
       ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
       ' VENICE=' + (VENICE_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
-    var _csk = CLERK_SECRET_KEY || '';
-    console.log('Clerk secret key: ' + (_csk ? (_csk.indexOf('sk_') === 0 ? 'VALID FORMAT' : 'INVALID FORMAT (does not start with sk_)') : 'MISSING'));
+    console.log('Google login: ' + (replitAuthEnabled() ? 'ENABLED (Replit Auth)' : 'DISABLED (REPL_ID missing)'));
   });
 }).catch(function(err) {
   console.error('Failed to initialize database:', err);

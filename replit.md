@@ -55,6 +55,8 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 
 ## Multi-User Authentication
 - Username/password auth (no email), bcryptjs hashing, express-session with 30-day cookie
+- **Google login via Replit Auth (server-side OIDC)**: "Continue with Google" button hits `GET /api/auth/replit/login` (PKCE, hand-rolled with built-in crypto + fetch, `client_id = REPL_ID`, no packages) → Replit consent screen (supports Google) → `GET /api/auth/replit/callback` upserts user by `replit_id`/email and sets the same session as password login. In the preview iframe the client opens the flow in a new tab and polls `/api/auth/me`. Clerk was fully removed (July 2026) — do not re-add it.
+- Session cookie: `SameSite=None; Secure` on https (works inside preview iframe; requires `trust proxy`), `Lax` on plain http localhost (keeps R1 harness working). Non-GET `/api/*` requests with a foreign Origin are rejected (CSRF guard); CORS uses a domain allowlist.
 - Login screen shown on load; on success, main app loads
 - JMK user: special case, any password works (password_hash is NULL)
 - All data (projects, global_documents, document_jobs) filtered by user_id from session

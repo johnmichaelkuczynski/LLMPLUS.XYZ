@@ -3986,7 +3986,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', auth: 'Google Login (Clerk)', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', auth: 'Google Login (Replit)', func: 'Functional CRUD', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;
@@ -4141,73 +4141,17 @@
   var authConfig = null;
   var pendingAuthError = null;
 
-  function clerkFrontendDomain(publishableKey) {
-    var parts = (publishableKey || '').split('_');
-    try {
-      return atob(parts[2] || '').replace(/\$+$/, '');
-    } catch (e) { return null; }
-  }
-
-  var _clerkScriptPromise = null;
-
-  function loadClerkJs(publishableKey) {
-    if (_clerkScriptPromise) return _clerkScriptPromise;
-    _clerkScriptPromise = new Promise(function(resolve, reject) {
-      if (window.Clerk) return resolve(window.Clerk);
-      var domain = clerkFrontendDomain(publishableKey);
-      if (!domain) return reject(new Error('Invalid Clerk key'));
-      var done = false;
-      var s = document.createElement('script');
-      s.src = 'https://' + domain + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
-      s.async = true;
-      s.crossOrigin = 'anonymous';
-      s.setAttribute('data-clerk-publishable-key', publishableKey);
-      s.onload = function() {
-        if (done) return;
-        done = true;
-        if (window.Clerk) { resolve(window.Clerk); }
-        else { _clerkScriptPromise = null; reject(new Error('Google sign-in library failed to load. Please refresh and try again.')); }
-      };
-      s.onerror = function() { if (!done) { done = true; _clerkScriptPromise = null; reject(new Error('Could not load Google sign-in. Your network may be blocking clerk.accounts.dev — try disabling VPN/ad-block.')); } };
-      document.head.appendChild(s);
-      setTimeout(function() { if (!done) { done = true; _clerkScriptPromise = null; reject(new Error('Google sign-in timed out loading. Your network may be blocking clerk.accounts.dev.')); } }, 20000);
-    });
-    return _clerkScriptPromise;
-  }
-
-  async function getClerk(publishableKey) {
-    var Clerk = await loadClerkJs(publishableKey);
-    if (!Clerk) throw new Error('Google sign-in failed to initialize. Please refresh and try again.');
-    if (!Clerk.loaded) await Clerk.load({});
-    return Clerk;
-  }
-
-  async function completeClerkLogin(Clerk) {
-    if (!Clerk.session) throw new Error('Google sign-in did not complete. Please try again.');
-    var token = await Clerk.session.getToken();
-    if (!token) throw new Error('Google sign-in did not complete. Please try again.');
-    var r = await fetch('/api/auth/clerk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: token })
-    });
-    var data = await r.json().catch(function() { return {}; });
-    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
-    window.history.replaceState({}, '', window.location.pathname);
-    showApp(data);
-  }
-
   function inIframe() {
     try { return window.self !== window.top; } catch (e) { return true; }
   }
 
   function startGoogleInNewTab() {
-    var w = window.open(window.location.origin + '/?start_google=1', '_blank');
+    var w = window.open(window.location.origin + '/api/auth/replit/login', '_blank');
     if (!w) {
       showAuthError('Popup blocked. Please allow popups for this site, or open the app in its own browser tab and try again.');
       return;
     }
-    showAuthError('Google sign-in opened in a new tab. Finish signing in there — this page will log you in automatically.');
+    showAuthError('Sign-in opened in a new tab. Finish signing in there — this page will log you in automatically.');
     var tries = 0;
     var iv = setInterval(function() {
       tries++;
@@ -4221,65 +4165,11 @@
     }, 3000);
   }
 
-  async function startClerkGoogle() {
-    var cfg = authConfig || {};
-    btnGoogle.disabled = true;
-    var origSpan = btnGoogle.querySelector('span');
-    var origText = origSpan ? origSpan.textContent : '';
-    if (origSpan) origSpan.textContent = 'Connecting…';
-    try {
-      var Clerk = await getClerk(cfg.clerkPublishableKey);
-      if (Clerk.session) { await completeClerkLogin(Clerk); return; }
-      await Clerk.client.signIn.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: window.location.origin + '/?sso=clerk',
-        redirectUrlComplete: window.location.origin + '/?sso=done'
-      });
-    } catch (e) {
-      console.error('[auth] Clerk Google sign-in failed:', e);
-      showAuthError(e.message || 'Google sign-in failed');
-      btnGoogle.disabled = false;
-      if (origSpan) origSpan.textContent = origText;
-    }
-  }
-
-  async function handleClerkReturn(cfg) {
-    var params = new URLSearchParams(window.location.search);
-    var sso = params.get('sso');
-    if (!sso || !cfg || !cfg.clerkEnabled) return false;
-    showLogin();
-    showAuthError('Finishing Google sign-in…');
-    try {
-      var Clerk = await getClerk(cfg.clerkPublishableKey);
-      if (sso === 'clerk') {
-        await Clerk.handleRedirectCallback({
-          redirectUrl: window.location.origin + '/?sso=clerk',
-          redirectUrlComplete: window.location.origin + '/?sso=done'
-        });
-        // handleRedirectCallback normally navigates to redirectUrlComplete;
-        // if it resolved without navigating and a session exists, finish here.
-        if (Clerk.session) { await completeClerkLogin(Clerk); return true; }
-        // No session and no navigation — don't leave the user stuck on
-        // "Finishing Google sign-in…"; fall back to the normal login screen.
-        pendingAuthError = 'Google sign-in did not complete. Please try again.';
-        window.history.replaceState({}, '', window.location.pathname);
-        return false;
-      }
-      await completeClerkLogin(Clerk);
-      return true;
-    } catch (e) {
-      console.error('[auth] Clerk callback failed:', e);
-      pendingAuthError = e.message || 'Google sign-in failed';
-      window.history.replaceState({}, '', window.location.pathname);
-      return false;
-    }
-  }
-
   async function initAuthProviders() {
     try {
       if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
       var cfg = authConfig;
-      if (cfg && cfg.clerkEnabled) {
+      if (cfg && cfg.replitAuthEnabled) {
         btnGoogle.classList.remove('hidden');
         loginDivider.classList.remove('hidden');
         btnGoogle.addEventListener('click', function() {
@@ -4287,15 +4177,8 @@
           if (inIframe()) {
             startGoogleInNewTab();
           } else {
-            startClerkGoogle();
+            window.location.href = '/api/auth/replit/login';
           }
-        });
-      } else if (cfg && cfg.replitAuthEnabled) {
-        btnGoogle.classList.remove('hidden');
-        loginDivider.classList.remove('hidden');
-        btnGoogle.addEventListener('click', function() {
-          hideAuthError();
-          window.location.href = '/api/auth/replit/login';
         });
       }
     } catch (e) {
@@ -4315,23 +4198,6 @@
     try {
       if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
     } catch (e) { /* ignore */ }
-    try {
-      var startParams = new URLSearchParams(window.location.search);
-      if (startParams.get('start_google') && authConfig && authConfig.clerkEnabled) {
-        window.history.replaceState({}, '', window.location.pathname);
-        showLogin();
-        initAuthProviders();
-        startClerkGoogle();
-        return;
-      }
-    } catch (e) { /* ignore */ }
-    var handled = false;
-    try {
-      if (new URLSearchParams(window.location.search).get('sso')) {
-        handled = await handleClerkReturn(authConfig);
-      }
-    } catch (e) { /* ignore */ }
-    if (handled) { initAuthProviders(); return; }
     showLogin();
     initAuthProviders();
     if (pendingAuthError) {

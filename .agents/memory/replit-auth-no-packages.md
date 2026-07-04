@@ -37,19 +37,21 @@ password path. Username/password login is untouched. The `/api` guard already sk
 `/api/auth/*`, so the login/callback routes are public. `req.session.save()` before
 redirecting (PgSession persists async — redirect can outrun the write otherwise).
 
-**DO NOT use Replit OIDC as the end-user "Continue with Google" button for a COMMERCIAL
-app.** Replit OIDC shows a "…would like to access your Replit account / Log in secured by
-Replit" consent screen — it forces the app's customers to have Replit accounts, which is
-unacceptable. It's fine only for internal/admin login. For real end-user Google sign-in
-use Clerk (brokers Google OAuth with its own dev keys, no per-app Google Cloud client
-needed) OR direct Google OAuth (needs GOOGLE client id/secret from the user). Keep
-`clerkEnabled` checked BEFORE `replitAuthEnabled` in `initAuthProviders`.
+**CLERK IS PERMANENTLY REMOVED (July 2026, user demand: "rip it out").** After repeated
+Clerk failures (mismatched key pairs from different Clerk apps, iframe cookie issues, VPN
+blocking clerk.accounts.dev JS), the user ordered all Clerk code deleted. Do NOT re-add
+Clerk or ask for Clerk keys. The "Continue with Google" button now points at the
+server-side Replit OIDC flow (`/api/auth/replit/login`); username/password login is
+visible again (also required by the R1 Playwright harness which fills `#auth-username`).
+Caveat: Replit OIDC shows a Replit consent screen and requires a Replit account — the
+user accepted this tradeoff. Only revisit if the user explicitly asks for
+non-Replit Google sign-in (then: direct Google OAuth with their own client id/secret).
 
-**Clerk "Authentication failed" root cause:** the 401 from `/api/auth/clerk` was almost
-always a bad `CLERK_SECRET_KEY` value (name glued to value, or literal placeholder text)
-making `getClerkUser()` 401 upstream. `pickClerkSecret()` regex-extracts `sk_[A-Za-z0-9_]+`
-so paste format no longer matters; confirm via startup log "Clerk secret key: VALID FORMAT"
-and a live `GET https://api.clerk.com/v1/users?limit=1` returning 200.
+**Iframe/preview login gotcha:** any cookie-session login is invisible inside the Replit
+preview iframe unless the session cookie is `SameSite=None; Secure` (needs
+`trust proxy`). Keep the per-request cookie mutation (secure requests → None/Secure,
+plain http localhost → Lax so the R1 harness still works) plus the Origin-allowlist CSRF
+guard on non-GET `/api/*` — SameSite=None without that guard is a CSRF hole.
 
 **Non-blocking hardening ideas (not done):** `req.session.regenerate()` on login to
 prevent session fixation; canonical allowed-domain config instead of raw Host.
