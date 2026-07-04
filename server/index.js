@@ -72,8 +72,8 @@ async function getDefaultUserId() {
 }
 
 // ─── Clerk (Google login) — server-side token verification, no Clerk backend SDK ───
-var CLERK_PK = process.env.CLERK_PUBLISHABLE_KEY || '';
-var CLERK_SECRET = process.env.CLERK_SECRET_KEY || '';
+var CLERK_PK = (process.env.CLERK_PUBLISHABLE_KEY || '').trim();
+var CLERK_SECRET = (process.env.CLERK_SECRET_KEY || '').trim();
 
 function clerkFapiDomain() {
   var m = CLERK_PK.match(/^pk_(test|live)_(.+)$/);
