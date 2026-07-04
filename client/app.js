@@ -3667,24 +3667,8 @@
     if (e.target === els.projectModal) els.projectModal.classList.remove('active');
   });
 
-  var loginScreen = document.getElementById('login-screen');
   var appEl = document.getElementById('app');
-  var authUsername = document.getElementById('auth-username');
-  var authPassword = document.getElementById('auth-password');
-  var authError = document.getElementById('auth-error');
-  var btnLogin = document.getElementById('btn-login');
-  var btnRegister = document.getElementById('btn-register');
-  var btnLogout = document.getElementById('btn-logout');
   var userDisplay = document.getElementById('user-display');
-
-  function showAuthError(msg) {
-    authError.textContent = msg;
-    authError.classList.remove('hidden');
-  }
-
-  function hideAuthError() {
-    authError.classList.add('hidden');
-  }
 
   var auditPanel = document.getElementById('audit-panel');
   var auditBody = document.getElementById('audit-result-body');
@@ -4118,7 +4102,6 @@
   });
 
   function showApp(user) {
-    loginScreen.classList.add('hidden');
     appEl.classList.remove('hidden');
     userDisplay.textContent = user.username;
     window.__userName = user.username || '';
@@ -4127,86 +4110,18 @@
     updateReminderDot();
   }
 
-  function showLogin() {
-    appEl.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    authUsername.value = '';
-    authPassword.value = '';
-    hideAuthError();
-    authUsername.focus();
-  }
-
   async function checkAuth() {
     try {
       var r = await fetch('/api/auth/me');
       if (r.ok) {
-        var user = await r.json();
-        showApp(user);
+        showApp(await r.json());
         return;
       }
-    } catch (e) { /* fall through to login */ }
-    showLogin();
+      notify('Could not start the app. Please refresh.', 'error');
+    } catch (e) {
+      notify('Could not start the app. Please refresh.', 'error');
+    }
   }
-
-  btnLogin.addEventListener('click', async function() {
-    hideAuthError();
-    var u = authUsername.value.trim();
-    var p = authPassword.value;
-    if (!u) { showAuthError('Enter a username'); return; }
-    try {
-      var r = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      var data = await r.json();
-      if (r.ok) {
-        showApp(data);
-      } else {
-        showAuthError(data.error || 'Login failed');
-      }
-    } catch (e) {
-      showAuthError('Connection error');
-    }
-  });
-
-  btnRegister.addEventListener('click', async function() {
-    hideAuthError();
-    var u = authUsername.value.trim();
-    var p = authPassword.value;
-    if (!u) { showAuthError('Enter a username'); return; }
-    if (!p || p.length < 4) { showAuthError('Password must be at least 4 characters'); return; }
-    try {
-      var r = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      var data = await r.json();
-      if (r.ok) {
-        showApp(data);
-      } else {
-        showAuthError(data.error || 'Registration failed');
-      }
-    } catch (e) {
-      showAuthError('Connection error');
-    }
-  });
-
-  authPassword.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') btnLogin.click();
-  });
-  authUsername.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') authPassword.focus();
-  });
-  authUsername.addEventListener('input', function() {
-    var val = authUsername.value.trim().toLowerCase();
-    if (val === 'jmk') {
-      authPassword.value = 'autologin';
-    } else if (authPassword.value === 'autologin') {
-      authPassword.value = '';
-    }
-  });
 
   document.getElementById('btn-profile-me').addEventListener('click', async function() {
     var btn = this;
@@ -4300,20 +4215,6 @@
       btn.innerHTML = '&#128100; Profile Me';
       notify('Profile error: ' + err.message, 'error');
     }
-  });
-
-  btnLogout.addEventListener('click', async function() {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch (e) {}
-    state.projects = [];
-    state.sessions = [];
-    state.currentProject = null;
-    state.currentSession = null;
-    els.projectList.innerHTML = '';
-    els.sessionList.innerHTML = '';
-    els.messages.innerHTML = '';
-    showLogin();
   });
 
   // === Compare Stances ===

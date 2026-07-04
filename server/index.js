@@ -59,59 +59,27 @@ app.use('/api', function(req, res, next) {
 });
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
 
-app.post('/api/auth/register', async function(req, res) {
-  try {
-    var username = (req.body.username || '').trim();
-    var password = req.body.password || '';
-    if (!username || username.length < 2 || username.length > 50) return res.status(400).json({ error: 'Username must be 2-50 characters' });
-    if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
-    var existing = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-    if (existing.rows.length > 0) return res.status(409).json({ error: 'Username already taken' });
-    var hash = await bcrypt.hash(password, 10);
-    var result = await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username', [username, hash]);
-    req.session.userId = result.rows[0].id;
-    req.session.username = result.rows[0].username;
-    res.json({ id: result.rows[0].id, username: result.rows[0].username });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+var DEFAULT_USERNAME = 'JMK';
+var defaultUserId = null;
+async function getDefaultUserId() {
+  if (defaultUserId) return defaultUserId;
+  var r = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [DEFAULT_USERNAME]);
+  if (r.rows.length === 0) {
+    r = await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, NULL) RETURNING id', [DEFAULT_USERNAME]);
   }
-});
+  defaultUserId = r.rows[0].id;
+  return defaultUserId;
+}
 
-app.post('/api/auth/login', async function(req, res) {
+app.get('/api/auth/me', async function(req, res) {
   try {
-    var username = (req.body.username || '').trim();
-    var password = req.body.password || '';
-    if (!username) return res.status(400).json({ error: 'Username is required' });
-    var result = await pool.query('SELECT id, username, password_hash FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid username or password' });
-    var user = result.rows[0];
-    if (user.username.toLowerCase() === 'jmk') {
-      req.session.userId = user.id;
-      req.session.username = user.username;
-      return res.json({ id: user.id, username: user.username });
+    if (!req.session.userId) {
+      req.session.userId = await getDefaultUserId();
+      req.session.username = DEFAULT_USERNAME;
     }
-    if (!user.password_hash) return res.status(401).json({ error: 'Invalid username or password' });
-    var valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid username or password' });
-    req.session.userId = user.id;
-    req.session.username = user.username;
-    res.json({ id: user.id, username: user.username });
+    res.json({ id: req.session.userId, username: req.session.username });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/auth/logout', function(req, res) {
-  req.session.destroy(function() {
-    res.json({ ok: true });
-  });
-});
-
-app.get('/api/auth/me', function(req, res) {
-  if (req.session && req.session.userId) {
-    res.json({ id: req.session.userId, username: req.session.username });
-  } else {
-    res.status(401).json({ error: 'Not authenticated' });
   }
 });
 
@@ -120,7 +88,14 @@ function requireAuth(req, res, next) {
     req.userId = req.session.userId;
     return next();
   }
-  res.status(401).json({ error: 'Not authenticated' });
+  getDefaultUserId().then(function(id) {
+    req.session.userId = id;
+    req.session.username = DEFAULT_USERNAME;
+    req.userId = id;
+    next();
+  }).catch(function(err) {
+    res.status(500).json({ error: err.message });
+  });
 }
 
 app.use('/api', function(req, res, next) {

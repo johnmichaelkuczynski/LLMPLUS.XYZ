@@ -1285,19 +1285,11 @@ async function f14_diagnostic(page, context) {
 
 // ─── Login ─────────────────────────────────────────────────────────────────
 async function login(page) {
-  state.status = 'logging in';
+  state.status = 'loading app';
   await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#login-form', { timeout: 10000 });
-  await page.fill('#login-username, [data-testid="input-username"], input[type="text"]', R1_USERNAME).catch(async ()=>{
-    await page.fill('input[type="text"]', R1_USERNAME);
-  });
-  await page.fill('#login-password, [data-testid="input-password"], input[type="password"]', R1_PASSWORD);
-  const loginP = page.waitForResponse(r => r.url().endsWith('/api/auth/login'), { timeout: 15000 });
-  await page.click('#btn-login');
-  const r = await loginP;
-  if (r.status() >= 400) { throw new Error(`Login failed: ${r.status()}`); }
+  // Login was removed from the app — it auto-starts with the default user.
   await page.waitForSelector('#chat-input', { timeout: 15000 });
-  log('Logged in as', R1_USERNAME);
+  log('App loaded (no login required)');
 }
 
 // ─── Report generation ─────────────────────────────────────────────────────

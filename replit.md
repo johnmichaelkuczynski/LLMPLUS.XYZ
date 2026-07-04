@@ -53,17 +53,12 @@ package.json      - Dependencies (express, pg, dotenv, cors, body-parser, multer
 - **System Diagnostic**: Teal "🧪 Diagnostic" button in the topbar runs a full self-check that streams results live: (1) **Environment** — verifies all 6 env vars are present (4 LLM keys + Vision + session secret); (2) **Database** — pings DB and verifies all 10 required tables exist; (3) **External LLM APIs** — sends a 1-token ping to Anthropic, OpenAI, DeepSeek, and xAI to confirm reachability and HTTP 200; (4) **Functional CRUD** — creates a test project + session + global document + reminder, exercises ownership verification, tractatus tree round-trip, staleness query, and system-prompt builder; (5) **Cleanup** — deletes everything created during the test so user data is untouched. Each step is reported as PASS/FAIL with timing. The check focuses on formal plumbing, not answer quality. API: `POST /api/diagnostic/run` (SSE).
 - **Context Management**: Chat messages truncated to 8K chars each, last 16 messages sent, total context capped at 100K chars, cross-session context capped at 10K chars (6 msgs/session, 400 chars each). System prompt size logged to console for monitoring.
 
-## Multi-User Authentication
-- Username/password auth ONLY (no email), bcryptjs hashing, express-session with 30-day cookie
-- **NO Google/social login. Clerk AND Replit OIDC were both fully ripped out (July 2026) at the user's explicit demand ("RIP IT OUT. DO NOT REBUILD."). Do NOT re-add any Google/social/OAuth login unless the user explicitly asks for it.**
-- Session cookie: `SameSite=None; Secure` on https (works inside preview iframe; requires `trust proxy`), `Lax` on plain http localhost (keeps R1 harness working). Non-GET `/api/*` requests with a foreign Origin are rejected (CSRF guard); CORS uses a domain allowlist.
-- Login screen shown on load; on success, main app loads
-- JMK user: special case, any password works (password_hash is NULL)
-- All data (projects, global_documents, document_jobs) filtered by user_id from session
-- Sessions, project_documents, tractatus_archive scoped through their project FK
-- Auth routes: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/me
-- requireAuth middleware protects all /api/* except /auth/*
-- New users start with empty state; complete data isolation between users
+## Authentication: NONE (login fully removed July 2026)
+- **There is NO login of any kind. Clerk, Replit OIDC, AND the username/password login screen were ALL ripped out at the user's explicit, repeated demand ("RIP OUT LOGIN. DO NOT REBUILD."). Do NOT re-add any login screen or auth UI unless the user explicitly asks for it.**
+- The app auto-starts as the default user **JMK**: `GET /api/auth/me` and the `requireAuth` middleware both auto-create a session for JMK (user row auto-created if missing, password_hash NULL). All existing user_id scoping in queries is unchanged — everything simply runs as JMK.
+- Removed routes: POST /api/auth/register, /api/auth/login, /api/auth/logout (all 404 now). No Sign Out button.
+- Session cookie: `SameSite=None; Secure` on https (requires `trust proxy`), `Lax` on plain http localhost. Non-GET `/api/*` requests with a foreign Origin are rejected (CSRF guard); CORS uses a domain allowlist.
+- R1 harness (tools/r1/run.mjs) no longer logs in — it just loads the app and waits for `#chat-input`.
 
 ## Database Tables
 users (id UUID, username, password_hash nullable), projects (with user_id FK, tractatus_tier, parent_project_id for memory hierarchy), sessions, project_documents, global_documents (with user_id FK), document_jobs (with user_id FK), document_chunks, tractatus_archive, user_analytics (user_id UNIQUE, profile_tree JSONB, exchange_count, last_updated), profile_snapshots (user_id, profile_text, word_count, created_at)
@@ -74,7 +69,7 @@ users (id UUID, username, password_hash nullable), projects (with user_id FK, tr
 - Anthropic key prefers Replit AI integration (AI_INTEGRATIONS_ANTHROPIC_API_KEY/_BASE_URL) with fallback to ANTHROPIC_API_KEY
 - Kill switch: stop button or Escape aborts the client fetch; server detects disconnect (res/req close), cancels upstream model streams, saves partial transcript with "[Stopped by user]"
 - Transcript saves use an atomic JSONB append to avoid lost updates
-- R1 Beta Test workflow (tools/r1/run.mjs) needs user JMK (password r1test) in the DB; recreate it if the dev database is reset
+- R1 Beta Test workflow (tools/r1/run.mjs) no longer needs credentials; the app auto-creates the JMK user on first request even after a database reset
 
 ## Environment Variables
 - ANTHROPIC_API_KEY: Claude API key
