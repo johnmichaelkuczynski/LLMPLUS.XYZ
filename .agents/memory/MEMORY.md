@@ -1,3 +1,3 @@
 - [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
-- [Replit Auth no packages](replit-auth-no-packages.md) — VPNs block Clerk's browser JS; do Google login server-side via Replit OIDC (PKCE, built-in crypto+fetch, REPL_ID public client), no new packages.
+- [No social login](replit-auth-no-packages.md) — user permanently ripped out Clerk AND Replit OIDC; username/password only, never re-add social login uninvited. Iframe cookie gotchas inside.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.

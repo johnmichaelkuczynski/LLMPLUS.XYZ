@@ -115,133 +115,6 @@ app.get('/api/auth/me', function(req, res) {
   }
 });
 
-app.get('/api/auth/config', function(req, res) {
-  res.json({
-    replitAuthEnabled: replitAuthEnabled()
-  });
-});
-
-// ---- Replit Auth (OpenID Connect) — first-party Google/GitHub/email sign-in ----
-var REPLIT_OIDC = {
-  authEndpoint: 'https://replit.com/oidc/auth',
-  tokenEndpoint: 'https://replit.com/oidc/token',
-  userinfoEndpoint: 'https://replit.com/oidc/me'
-};
-function replitAuthEnabled() { return !!process.env.REPL_ID; }
-function b64url(buf) {
-  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function oidcRedirectUri(req) {
-  return 'https://' + req.get('host') + '/api/auth/replit/callback';
-}
-function decodeJwtPayload(jwt) {
-  try {
-    var part = (jwt || '').split('.')[1];
-    if (!part) return null;
-    var json = Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-    return JSON.parse(json);
-  } catch (e) { return null; }
-}
-
-app.get('/api/auth/replit/login', function(req, res) {
-  if (!replitAuthEnabled()) return res.status(503).send('Replit Auth is not configured');
-  var verifier = b64url(crypto.randomBytes(48));
-  var challenge = b64url(crypto.createHash('sha256').update(verifier).digest());
-  var state = b64url(crypto.randomBytes(24));
-  req.session.oidc = { verifier: verifier, state: state };
-  req.session.save(function() {
-    var params = new URLSearchParams({
-      client_id: process.env.REPL_ID,
-      response_type: 'code',
-      scope: 'openid profile email offline_access',
-      redirect_uri: oidcRedirectUri(req),
-      state: state,
-      code_challenge: challenge,
-      code_challenge_method: 'S256'
-    });
-    res.redirect(REPLIT_OIDC.authEndpoint + '?' + params.toString());
-  });
-});
-
-app.get('/api/auth/replit/callback', async function(req, res) {
-  try {
-    if (!replitAuthEnabled()) return res.status(503).send('Replit Auth is not configured');
-    var saved = req.session.oidc || {};
-    if (req.query.error) {
-      return res.redirect('/?auth_error=' + encodeURIComponent(req.query.error_description || req.query.error));
-    }
-    var code = req.query.code;
-    var state = req.query.state;
-    if (!code || !state || state !== saved.state) {
-      return res.redirect('/?auth_error=' + encodeURIComponent('Invalid sign-in state, please try again'));
-    }
-
-    var body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: oidcRedirectUri(req),
-      client_id: process.env.REPL_ID,
-      code_verifier: saved.verifier || ''
-    });
-    var tokenResp = await fetch(REPLIT_OIDC.tokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString()
-    });
-    if (!tokenResp.ok) {
-      var t = await tokenResp.text();
-      console.error('Replit Auth token exchange failed:', tokenResp.status, t.slice(0, 300));
-      return res.redirect('/?auth_error=' + encodeURIComponent('Token exchange failed'));
-    }
-    var tokens = await tokenResp.json();
-    var claims = decodeJwtPayload(tokens.id_token) || {};
-    if (!claims.sub && tokens.access_token) {
-      try {
-        var ui = await fetch(REPLIT_OIDC.userinfoEndpoint, { headers: { Authorization: 'Bearer ' + tokens.access_token } });
-        if (ui.ok) claims = await ui.json();
-      } catch (e) { /* ignore */ }
-    }
-    var replitId = claims.sub;
-    if (!replitId) return res.redirect('/?auth_error=' + encodeURIComponent('No user id returned from Replit'));
-    var email = (claims.email || '').toLowerCase();
-    var displayName = [claims.first_name, claims.last_name].filter(Boolean).join(' ').trim()
-      || claims.name || claims.username || (email ? email.split('@')[0] : 'user');
-
-    var user = null;
-    var byReplit = await pool.query('SELECT id, username FROM users WHERE replit_id = $1', [replitId]);
-    if (byReplit.rows.length > 0) {
-      user = byReplit.rows[0];
-    } else if (email) {
-      var byEmail = await pool.query('SELECT id, username FROM users WHERE LOWER(email) = $1', [email]);
-      if (byEmail.rows.length > 0) {
-        user = byEmail.rows[0];
-        await pool.query('UPDATE users SET replit_id = $1 WHERE id = $2', [replitId, user.id]);
-      }
-    }
-    if (!user) {
-      var base = (displayName || 'user').replace(/\s+/g, '').slice(0, 40) || 'user';
-      var username = base;
-      var suffix = 0;
-      while (true) {
-        var exists = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (exists.rows.length === 0) break;
-        suffix++;
-        username = base + suffix;
-      }
-      var ins = await pool.query('INSERT INTO users (username, email, replit_id) VALUES ($1, $2, $3) RETURNING id, username', [username, email, replitId]);
-      user = ins.rows[0];
-    }
-
-    delete req.session.oidc;
-    req.session.userId = user.id;
-    req.session.username = user.username;
-    req.session.save(function() { res.redirect('/'); });
-  } catch (err) {
-    console.error('Replit Auth callback error:', err.message);
-    res.redirect('/?auth_error=' + encodeURIComponent('Sign-in failed'));
-  }
-});
-
 function requireAuth(req, res, next) {
   if (req.session && req.session.userId) {
     req.userId = req.session.userId;
@@ -4893,26 +4766,6 @@ app.post('/api/diagnostic/run', async function(req, res) {
       return 'HTTP 200 from ' + VENICE_MODEL;
     });
 
-    // === Category 3.5: Google Login (Replit Auth) ===
-    await runStep('Replit Auth configured', 'auth', async function() {
-      if (!replitAuthEnabled()) throw new Error('REPL_ID not set — Replit Auth unavailable');
-      return 'REPL_ID present';
-    });
-    await runStep('Replit sign-in service reachable', 'auth', async function() {
-      var r = await fetch('https://replit.com/oidc/.well-known/openid-configuration');
-      if (!r.ok) throw new Error('OIDC discovery HTTP ' + r.status);
-      var cfg = await r.json();
-      if (!cfg.authorization_endpoint) throw new Error('No authorization endpoint in discovery document');
-      return 'discovery OK';
-    });
-    await runStep('Login endpoint redirects to Replit', 'auth', async function() {
-      var r = await fetch('http://127.0.0.1:' + PORT + '/api/auth/replit/login', { redirect: 'manual' });
-      if (r.status !== 302) throw new Error('Expected HTTP 302 redirect, got ' + r.status);
-      var loc = r.headers.get('location') || '';
-      if (loc.indexOf('https://replit.com/oidc/auth') !== 0) throw new Error('Unexpected redirect target: ' + loc.slice(0, 80));
-      return 'HTTP 302 to replit.com';
-    });
-
     // === Category 4: Functional (CRUD round-trip) ===
     var testProjectId = null;
     var testSessionId = null;
@@ -5056,7 +4909,6 @@ initDB().then(function() {
       ' GROK=' + (XAI_API_KEY ? 'SET' : 'MISSING') +
       ' VENICE=' + (VENICE_API_KEY ? 'SET' : 'MISSING') +
       ' VISION=' + (process.env.GOOGLE_CLOUD_VISION_API_KEY ? 'SET' : 'MISSING'));
-    console.log('Google login: ' + (replitAuthEnabled() ? 'ENABLED (Replit Auth)' : 'DISABLED (REPL_ID missing)'));
   });
 }).catch(function(err) {
   console.error('Failed to initialize database:', err);

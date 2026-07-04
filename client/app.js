@@ -3986,7 +3986,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', auth: 'Google Login (Replit)', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;
@@ -4136,56 +4136,6 @@
     authUsername.focus();
   }
 
-  var btnGoogle = document.getElementById('btn-google');
-  var loginDivider = document.getElementById('login-divider');
-  var authConfig = null;
-  var pendingAuthError = null;
-
-  function inIframe() {
-    try { return window.self !== window.top; } catch (e) { return true; }
-  }
-
-  function startGoogleInNewTab() {
-    var w = window.open(window.location.origin + '/api/auth/replit/login', '_blank');
-    if (!w) {
-      showAuthError('Popup blocked. Please allow popups for this site, or open the app in its own browser tab and try again.');
-      return;
-    }
-    showAuthError('Sign-in opened in a new tab. Finish signing in there — this page will log you in automatically.');
-    var tries = 0;
-    var iv = setInterval(function() {
-      tries++;
-      if (tries > 100) { clearInterval(iv); return; }
-      fetch('/api/auth/me').then(function(r) {
-        if (r.ok) {
-          clearInterval(iv);
-          r.json().then(function(user) { showApp(user); });
-        }
-      }).catch(function() {});
-    }, 3000);
-  }
-
-  async function initAuthProviders() {
-    try {
-      if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
-      var cfg = authConfig;
-      if (cfg && cfg.replitAuthEnabled) {
-        btnGoogle.classList.remove('hidden');
-        loginDivider.classList.remove('hidden');
-        btnGoogle.addEventListener('click', function() {
-          hideAuthError();
-          if (inIframe()) {
-            startGoogleInNewTab();
-          } else {
-            window.location.href = '/api/auth/replit/login';
-          }
-        });
-      }
-    } catch (e) {
-      console.error('[auth] provider init failed (username/password login still works):', e);
-    }
-  }
-
   async function checkAuth() {
     try {
       var r = await fetch('/api/auth/me');
@@ -4195,23 +4145,7 @@
         return;
       }
     } catch (e) { /* fall through to login */ }
-    try {
-      if (!authConfig) authConfig = await (await fetch('/api/auth/config')).json();
-    } catch (e) { /* ignore */ }
     showLogin();
-    initAuthProviders();
-    if (pendingAuthError) {
-      showAuthError(pendingAuthError);
-      pendingAuthError = null;
-    }
-    try {
-      var params = new URLSearchParams(window.location.search);
-      var authErr = params.get('auth_error');
-      if (authErr) {
-        showAuthError(authErr);
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    } catch (e) { /* ignore */ }
   }
 
   btnLogin.addEventListener('click', async function() {
