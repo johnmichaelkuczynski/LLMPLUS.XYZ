@@ -1,0 +1,30 @@
+Instructions for Replit Agent: Add Google Login (Replit-managed Clerk)
+Add Google login to this app using Replit-managed Clerk authentication. Follow these instructions exactly — they are based on a working implementation in another project.
+
+Core setup
+Read and follow the clerk-auth skill (.local/skills/clerk-auth/SKILL.md and its references/setup-and-customization.md). Do NOT wire Clerk from memory or from generic Clerk documentation — Replit-managed Clerk is configured differently from a normal Clerk account. Copy the canonical code snippets from the skill verbatim, then adapt styling only.
+Provision auth with the skill's setupClerkWhitelabelAuth() flow. This automatically creates the Clerk tenant and sets the secrets (CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, VITE_CLERK_PUBLISHABLE_KEY). Never ask me for Clerk API keys, never create a Clerk account manually, and never hand-edit these secrets. Google sign-in comes enabled by default alongside email/password.
+There is no Google Cloud Console setup, no OAuth client ID creation, and no Clerk dashboard work needed. If you find yourself doing any of those, you are on the wrong path — stop and re-read the skill.
+Server requirements (order matters)
+Mount the Clerk proxy middleware before any body parsers (it streams raw bytes).
+Mount clerkMiddleware() before the API routes, resolving the publishable key from the request host as shown in the skill.
+Gate every protected API route with a requireAuth middleware that checks getAuth(req) and returns 401 when there is no session.
+CORS: never use cors({ credentials: true, origin: true }). With cookie-based auth, reflecting arbitrary origins is a security hole. Build an allowlist instead: the app's own domains from REPLIT_DOMAINS, plus REPLIT_DEV_DOMAIN, plus localhost. Reject everything else.
+Web auth is cookie-based. Do NOT add Authorization: Bearer headers, getToken(), or setAuthTokenGetter to the web client — if you see 401s, fix middleware order and cookies, not tokens.
+Frontend requirements
+Use publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) from @clerk/react/internal, and pass proxyUrl unconditionally, exactly as the skill shows.
+Sign-in and sign-up routes MUST be wildcard-tolerant (e.g. /sign-in/*? in wouter) so Google's OAuth callback sub-paths (/sign-in/sso-callback) work. If Google login redirects to a 404, this is why.
+Keep / public: signed-out visitors see a landing page with "Sign in" / "Create account" buttons; signed-in users see the app. Never redirect / straight to /sign-in.
+Wrap every other app route in a Protected gate that redirects signed-out users to /.
+UX requirements (these caused real confusion — do not skip)
+Put the account section (user name/email + Sign out button) at the bottom of the sidebar or another spot that is always visible at any window width. Do not put Sign out only at the far right of a top bar — it gets pushed off-screen on narrow windows and the user cannot find it.
+Also show a Sign in button in that same spot when signed out.
+Testing and verification (do all of these before telling me it works)
+Verify an anonymous request to a protected API route returns 401 (e.g. curl).
+Verify a signed-out visit to / shows the landing page and /sign-in shows the "Continue with Google" button (screenshot it).
+Verify CORS: a request with a foreign Origin header must get no Access-Control-Allow-Origin back; the app's own dev domain must be allowed.
+Things to warn me about (tell me these proactively)
+If I'm already signed in, I will never see the login screen — that means it's working, not broken. Tell me to test in an incognito/private window to see the login as a new visitor would.
+Dev uses pk_test keys and shows a "Development mode" badge on the login card — this is normal and disappears automatically when published. Do not "fix" the dev-keys console warning.
+Development and production have separate user accounts. Accounts created in the preview do not exist on the published site.
+If the app is already published, it must be republished for login to appear on the live site.
