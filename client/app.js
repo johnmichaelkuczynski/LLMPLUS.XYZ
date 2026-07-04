@@ -4113,6 +4113,8 @@
       userDisplay.textContent = user.username;
       userBar.classList.remove('hidden');
     }
+    var adminBtn = document.getElementById('btn-administrative');
+    if (adminBtn) adminBtn.classList.toggle('hidden', !(user && user.isOwner));
     window.__userName = user.username || '';
     setGreeting();
     loadProjects();
@@ -4208,6 +4210,10 @@
 
   document.getElementById('btn-open-signin-tab').addEventListener('click', function() {
     window.open(window.location.href, '_blank');
+  });
+
+  document.getElementById('btn-administrative').addEventListener('click', function() {
+    window.location.href = '/administrative';
   });
 
   btnLogout.addEventListener('click', async function() {

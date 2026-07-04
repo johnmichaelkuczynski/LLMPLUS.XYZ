@@ -141,27 +141,215 @@ app.post('/api/auth/clerk', async function(req, res) {
     var token = (req.body && req.body.token) || '';
     if (!token) return res.status(400).json({ error: 'Missing token' });
     var claims = await verifyClerkToken(token);
-    // Personal app: the JMK workspace is bound to ONE Clerk account.
-    // First successful Google sign-in claims it; any other Clerk account is rejected.
-    var userId = await getDefaultUserId();
-    var bind = await pool.query(
-      'UPDATE users SET clerk_id = $1 WHERE id = $2 AND (clerk_id IS NULL OR clerk_id = $1) RETURNING id',
-      [claims.sub, userId]
+    var profile = (await fetchClerkProfile(claims.sub)) || { email: '', name: '' };
+
+    // The FIRST Clerk account to sign in claims the owner (JMK) workspace.
+    // Every other Google account gets its own separate user + empty workspace.
+    var ownerId = await getDefaultUserId();
+    var user = null;
+    var claim = await pool.query(
+      'UPDATE users SET clerk_id = $1, email = COALESCE(NULLIF($2, \'\'), email) WHERE id = $3 AND (clerk_id IS NULL OR clerk_id = $1) RETURNING id, username',
+      [claims.sub, profile.email, ownerId]
     );
-    if (bind.rows.length === 0) {
-      return res.status(403).json({ error: 'This app belongs to a different Google account.' });
+    if (claim.rows.length > 0) {
+      user = claim.rows[0];
+    } else {
+      var r = await pool.query('SELECT id, username FROM users WHERE clerk_id = $1', [claims.sub]);
+      if (r.rows.length > 0) {
+        user = r.rows[0];
+      } else {
+        var base = (profile.email || ('user_' + claims.sub.slice(-8))).slice(0, 60);
+        var candidate = base;
+        var n = 1;
+        while (true) {
+          var ex = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [candidate]);
+          if (ex.rows.length === 0) break;
+          n++;
+          candidate = base.slice(0, 55) + '_' + n;
+        }
+        var ins = await pool.query(
+          'INSERT INTO users (username, password_hash, clerk_id, email) VALUES ($1, NULL, $2, $3) RETURNING id, username',
+          [candidate, claims.sub, profile.email]
+        );
+        user = ins.rows[0];
+      }
     }
+
+    try {
+      await pool.query(
+        'INSERT INTO login_events (user_id, clerk_id, email, name) VALUES ($1, $2, $3, $4)',
+        [user.id, claims.sub, profile.email, profile.name]
+      );
+    } catch (e) { console.error('Failed to record login event:', e.message); }
+
+    var isOwnerLogin = (user.id === ownerId) || (profile.email === 'johnmichaelkuczynski@gmail.com');
     req.session.regenerate(function(err) {
       if (err) return res.status(500).json({ error: 'Session error' });
-      req.session.userId = userId;
-      req.session.username = DEFAULT_USERNAME;
+      req.session.userId = user.id;
+      req.session.username = user.username;
       req.session.via = 'clerk';
       req.session.save(function() {
-        res.json({ id: userId, username: DEFAULT_USERNAME, via: 'clerk' });
+        res.json({ id: user.id, username: user.username, via: 'clerk', isOwner: isOwnerLogin });
       });
     });
   } catch (err) {
     res.status(401).json({ error: 'Authentication failed: ' + err.message });
+  }
+});
+
+async function fetchClerkProfile(clerkId) {
+  try {
+    var resp = await fetch('https://api.clerk.com/v1/users/' + encodeURIComponent(clerkId), {
+      headers: { 'Authorization': 'Bearer ' + CLERK_SECRET }
+    });
+    if (!resp.ok) return null;
+    var u = await resp.json();
+    var email = '';
+    if (Array.isArray(u.email_addresses) && u.email_addresses.length > 0) {
+      var primary = null;
+      for (var i = 0; i < u.email_addresses.length; i++) {
+        if (u.email_addresses[i].id === u.primary_email_address_id) { primary = u.email_addresses[i]; break; }
+      }
+      email = ((primary || u.email_addresses[0]).email_address || '').toLowerCase();
+    }
+    var name = (((u.first_name || '') + ' ' + (u.last_name || '')).trim());
+    return { email: email, name: name };
+  } catch (e) {
+    console.error('Clerk profile fetch failed:', e.message);
+    return null;
+  }
+}
+
+// ─── Administrative page (visitor log) — OWNER ONLY ───
+var ADMIN_PASSWORD = '1234';
+var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
+
+async function isOwnerSession(req) {
+  if (!req.session || !req.session.userId) return false;
+  var ownerId = await getDefaultUserId();
+  if (req.session.userId === ownerId) return true;
+  var r = await pool.query('SELECT email FROM users WHERE id = $1', [req.session.userId]);
+  return !!(r.rows[0] && (r.rows[0].email || '').toLowerCase() === OWNER_EMAIL);
+}
+
+app.get('/administrative', async function(req, res) {
+  if (!(await isOwnerSession(req))) return res.status(404).send('Not found');
+  res.sendFile(path.join(__dirname, '..', 'client', 'admin.html'));
+});
+
+var adminAttempts = {};
+app.post('/api/admin/login', async function(req, res) {
+  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  var ip = req.ip || 'unknown';
+  var a = adminAttempts[ip] || { count: 0, until: 0 };
+  if (Date.now() < a.until) {
+    return res.status(429).json({ error: 'Too many attempts. Try again in a minute.' });
+  }
+  var pw = String((req.body && req.body.password) || '');
+  if (pw !== ADMIN_PASSWORD) {
+    a.count++;
+    if (a.count >= 5) { a.until = Date.now() + 60000; a.count = 0; }
+    adminAttempts[ip] = a;
+    return res.status(401).json({ error: 'Wrong password' });
+  }
+  delete adminAttempts[ip];
+  var keep = { userId: req.session.userId, username: req.session.username, via: req.session.via };
+  req.session.regenerate(function(err) {
+    if (err) return res.status(500).json({ error: 'Session error' });
+    req.session.userId = keep.userId;
+    req.session.username = keep.username;
+    req.session.via = keep.via;
+    req.session.isAdmin = true;
+    req.session.save(function() { res.json({ ok: true }); });
+  });
+});
+
+app.post('/api/admin/logout', async function(req, res) {
+  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  if (req.session) {
+    req.session.isAdmin = false;
+    req.session.save(function() { res.json({ ok: true }); });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/visits', async function(req, res) {
+  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  if (!req.session.isAdmin) return res.status(401).json({ error: 'Admin login required' });
+  try {
+    var events = await pool.query(
+      'SELECT email, name, created_at FROM login_events ORDER BY created_at DESC LIMIT 500'
+    );
+    var visitors = await pool.query(
+      `SELECT COALESCE(NULLIF(email, ''), '(no email)') AS email,
+              MAX(name) AS name,
+              COUNT(*)::int AS visits,
+              MIN(created_at) AS first_visit,
+              MAX(created_at) AS last_visit
+       FROM login_events
+       GROUP BY COALESCE(NULLIF(email, ''), '(no email)')
+       ORDER BY MAX(created_at) DESC`
+    );
+    var stats = await pool.query(
+      `SELECT
+         COUNT(*)::int AS signins_all,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id))::int AS visitors_all,
+         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS signins_day,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS visitors_day,
+         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS signins_month,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS visitors_month,
+         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS signins_year,
+         COUNT(DISTINCT COALESCE(NULLIF(email, ''), clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS visitors_year
+       FROM login_events`
+    );
+    var seriesDay = await pool.query(
+      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
+       FROM generate_series(date_trunc('hour', NOW()) - INTERVAL '23 hours', date_trunc('hour', NOW()), '1 hour') gs
+       LEFT JOIN (
+         SELECT date_trunc('hour', created_at) AS h, COUNT(*) AS c
+         FROM login_events WHERE created_at > NOW() - INTERVAL '24 hours' GROUP BY 1
+       ) t ON t.h = gs ORDER BY gs`
+    );
+    var seriesMonth = await pool.query(
+      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
+       FROM generate_series(date_trunc('day', NOW()) - INTERVAL '29 days', date_trunc('day', NOW()), '1 day') gs
+       LEFT JOIN (
+         SELECT date_trunc('day', created_at) AS d, COUNT(*) AS c
+         FROM login_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY 1
+       ) t ON t.d = gs ORDER BY gs`
+    );
+    var seriesYear = await pool.query(
+      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
+       FROM generate_series(date_trunc('month', NOW()) - INTERVAL '11 months', date_trunc('month', NOW()), '1 month') gs
+       LEFT JOIN (
+         SELECT date_trunc('month', created_at) AS m, COUNT(*) AS c
+         FROM login_events WHERE created_at > NOW() - INTERVAL '365 days' GROUP BY 1
+       ) t ON t.m = gs ORDER BY gs`
+    );
+    var seriesAll = await pool.query(
+      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
+       FROM generate_series(
+         COALESCE((SELECT date_trunc('month', MIN(created_at)) FROM login_events), date_trunc('month', NOW())),
+         date_trunc('month', NOW()), '1 month') gs
+       LEFT JOIN (
+         SELECT date_trunc('month', created_at) AS m, COUNT(*) AS c
+         FROM login_events GROUP BY 1
+       ) t ON t.m = gs ORDER BY gs`
+    );
+    res.json({
+      events: events.rows,
+      visitors: visitors.rows,
+      stats: stats.rows[0],
+      series: {
+        day: seriesDay.rows,
+        month: seriesMonth.rows,
+        year: seriesYear.rows,
+        all: seriesAll.rows
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -179,13 +367,13 @@ function isLocalPlainHttp(req) {
 app.get('/api/auth/me', async function(req, res) {
   try {
     if (req.session && req.session.userId) {
-      return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto' });
+      return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto', isOwner: await isOwnerSession(req) });
     }
     if (isLocalPlainHttp(req)) {
       req.session.userId = await getDefaultUserId();
       req.session.username = DEFAULT_USERNAME;
       req.session.via = 'auto';
-      return res.json({ id: req.session.userId, username: req.session.username, via: 'auto' });
+      return res.json({ id: req.session.userId, username: req.session.username, via: 'auto', isOwner: true });
     }
     res.status(401).json({ error: 'Not signed in' });
   } catch (err) {
@@ -214,6 +402,7 @@ function requireAuth(req, res, next) {
 
 app.use('/api', function(req, res, next) {
   if (req.path.startsWith('/auth/')) return next();
+  if (req.path.startsWith('/admin/')) return next();
   requireAuth(req, res, next);
 });
 
@@ -357,6 +546,18 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
     } catch (e) { /* columns may already exist */ }
+    try {
+      await client.query(`CREATE TABLE IF NOT EXISTS login_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID,
+        clerk_id TEXT,
+        email TEXT,
+        name TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_created_at ON login_events (created_at)");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_email ON login_events (email)");
+    } catch (e) { console.error('login_events table init failed:', e.message); }
     try {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id UUID");
       await client.query("ALTER TABLE global_documents ADD COLUMN IF NOT EXISTS user_id UUID");
