@@ -74,9 +74,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-app.use(cors());
+var allowedOrigins = (function() {
+  var origins = new Set();
+  (process.env.REPLIT_DOMAINS || '').split(',').forEach(function(d) { d = d.trim(); if (d) origins.add('https://' + d); });
+  if (process.env.REPLIT_DEV_DOMAIN) origins.add('https://' + process.env.REPLIT_DEV_DOMAIN);
+  origins.add('http://localhost:5000');
+  origins.add('http://127.0.0.1:5000');
+  return origins;
+})();
+app.use(cors({
+  origin: function(origin, cb) {
+    if (!origin || allowedOrigins.has(origin)) return cb(null, true);
+    return cb(null, false);
+  }
+}));
 app.use(bodyParser.json({ limit: '50mb' }));
 var PgSession = connectPgSimple(session);
 app.use(session({
@@ -88,8 +102,21 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'llmplus-dev-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }
+  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: 'lax' }
 }));
+app.use(function(req, res, next) {
+  if (req.secure && req.session && req.session.cookie) {
+    req.session.cookie.sameSite = 'none';
+    req.session.cookie.secure = true;
+  }
+  next();
+});
+app.use('/api', function(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  var origin = req.headers.origin;
+  if (origin && !allowedOrigins.has(origin)) return res.status(403).json({ error: 'Cross-site request blocked' });
+  next();
+});
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
 
 app.post('/api/auth/register', async function(req, res) {
