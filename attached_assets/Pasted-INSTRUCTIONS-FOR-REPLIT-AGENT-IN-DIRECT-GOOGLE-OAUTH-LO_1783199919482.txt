@@ -1,0 +1,170 @@
+INSTRUCTIONS FOR REPLIT AGENT: IN, DIRECT GOOGLE OAUTH LOGIN
+NO CLERK. NO REPLIT AUTH. NO THIRD-PARTY AUTH SERVICE OF ANY KIND.
+
+The owner has ONE shared Google OAuth client. Its credentials are stored in
+his Replit Account Vault as GOOGLE_OAUTH_CLIENT_ID and
+GOOGLE_OAUTH_CLIENT_SECRET and are REUSED across all of his apps. Your job
+is to wire THIS app to that client. You never generate credentials and you
+never send the owner to create new ones.
+
+=====================================================
+THE SIX NON-NEGOTIABLE RULES
+=====================================================
+
+RULE 1. USE THE SHARED GOOGLE OAUTH CREDENTIALS.
+Request GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET via the
+secrets panel. The owner's Account Vault will auto-fill them - that is
+correct and intended. Do NOT ask him to create new credentials, do NOT
+send him to any dashboard to make keys. The same client is shared by all
+his apps on purpose.
+
+RULE 2. NO AUTH SERVICE MIDDLEMEN.
+Do not install or suggest Clerk, Auth0, Firebase Auth, Supabase Auth,
+NextAuth hosted, or Replit Auth. Implement Google OAuth 2.0 / OpenID
+Connect directly (passport-google-oauth20, openid-client, or hand-rolled
+authorization-code flow) with server-side sessions (cookie sessions backed
+by the app database or a session store).
+
+RULE 3. GOOGLE IS THE ONLY LOGIN. NO OTHER LOGIN IS PERMITTED.
+No email/password, no phone, no username. The sign-in surface shows exactly
+one thing: a "Sign in with Google" button.
+
+RULE 4. GOOGLE LOGIN WORKS FOR THE GENERAL PUBLIC. PERIOD.
+Any person with any Google account can sign in on the published site. No
+invitations, no allowlists for regular users, no Replit account, no
+waitlist. (If the Google Cloud consent screen is in "Testing" mode it only
+allows listed test users - tell the owner to set it to "In production" in
+Google Cloud Console -> APIs & Services -> OAuth consent screen if public
+sign-in is blocked.)
+
+RULE 5. LOGIN IS TWO CLICKS AT MOST, THEN THE USER IS IN THE APP.
+Click 1: the "Sign in with Google" button on the landing page - it
+navigates DIRECTLY to /api/auth/google, which 302-redirects to Google's
+OAuth URL. No intermediate sign-in page.
+Click 2: the user picks their Google account on Google's chooser.
+After the callback they land INSIDE the app. No extra confirmations, no
+"continue" screens. Five-click flows are a failure.
+
+RULE 6. ADMIN TAB FOR THE OWNER ONLY.
+When the signed-in user's email is johnmichaelkuczynski@gmail.com, the app
+shows an extra tab named "Administrative". It contains login data: total
+users, a list of users with last sign-in time, and GRAPHS (sign-ins per
+day, new users per day). No other user may see this tab or fetch its data.
+Enforce on the SERVER (admin middleware that checks the session's email),
+not just by hiding the tab in the UI. Record a login event server-side
+(userId, email, timestamp) on every successful OAuth callback; store the
+events in the app's database; chart them.
+
+=====================================================
+STEP 0 - DELETE ALL EXISTING AUTH
+=====================================================
+
+1. Remove Replit Auth entirely if present (routes, middleware, session
+   tables, /api/login links, anything showing "Log in secured by Replit").
+2. Remove Clerk entirely if present: uninstall @clerk/* packages, delete
+   ClerkProvider wiring, clerkMiddleware, sign-in components. Delete every
+   CLERK_* secret in this app's Secrets panel (CLERK_SECRET_KEY,
+   CLERK_PUBLISHABLE_KEY, VITE_CLERK_PUBLISHABLE_KEY). Grep the code for
+   pk_test, pk_live, sk_test, sk_live, "clerk", "accounts." and remove any
+   hard-coded keys or hosted URLs.
+3. Remove any other auth experiments (passport strategies other than
+   Google, magic links, etc.).
+
+=====================================================
+STEP 1 - CREDENTIALS
+=====================================================
+
+1. Request these secrets via the secrets panel:
+     GOOGLE_OAUTH_CLIENT_ID
+     GOOGLE_OAUTH_CLIENT_SECRET
+     SESSION_SECRET   (any long random string; also in the vault)
+   The owner's Account Vault auto-fills them. Accept the auto-fill.
+2. Compute this app's TWO callback URLs and PRINT THEM CLEARLY for the
+   owner in chat:
+     Development:  https://<REPLIT_DEV_DOMAIN>/api/auth/google/callback
+     Production:   https://<published domain>/api/auth/google/callback
+   (Read REPLIT_DEV_DOMAIN and REPLIT_DOMAINS from the environment. If the
+   app is served under a base path, include it.)
+3. Tell the owner EXACTLY this, once:
+   "Add these two URLs to Authorized redirect URIs on your OAuth client in
+   Google Cloud Console -> APIs & Services -> Credentials -> (your OAuth
+   2.0 Client ID). Paste both, hit Save. That is the only manual step."
+   Do not proceed to 'verified/complete' claims until he confirms, but DO
+   finish building everything meanwhile.
+
+=====================================================
+ARCHITECTURE (MANDATORY)
+=====================================================
+
+- Server routes:
+    GET  /api/auth/google           -> 302 to Google's auth URL
+                                       (scope: openid email profile,
+                                        prompt=select_account,
+                                        state parameter for CSRF)
+    GET  /api/auth/google/callback  -> exchange code for tokens, verify the
+                                       ID token, upsert the user (googleId,
+                                       email, name, avatar) in the app DB,
+                                       create the session, INSERT a login
+                                       event row, then redirect to "/".
+    POST /api/auth/logout           -> destroy session, redirect to "/".
+    GET  /api/auth/me               -> current user JSON or 401.
+- Sessions: httpOnly, secure, sameSite=lax cookies; session store in the
+  app's database (e.g. connect-pg-simple) or signed cookie sessions.
+  SESSION_SECRET from secrets. No JWTs in localStorage, no Bearer headers.
+- The landing page "Sign in with Google" button is a plain link/form to
+  /api/auth/google (Rule 5) - never a client-side popup library.
+- The root path "/" stays public: signed-out visitors see a landing page
+  with ONE "Sign in with Google" button; all other routes are gated:
+  client redirects signed-out users to "/", server returns 401 from every
+  protected /api route without a session.
+- CORS: NEVER cors({ credentials: true, origin: true }). Allowlist only
+  the app's own domains (REPLIT_DOMAINS, REPLIT_DEV_DOMAIN, localhost).
+- Admin endpoints (Rule 6): requireAdmin middleware on top of requireAuth
+  rejects with 403 unless the session email is
+  johnmichaelkuczynski@gmail.com. All /api/admin/* routes (user list,
+  login-event aggregates for the graphs) use it.
+
+=====================================================
+UX
+=====================================================
+
+- Account section (user name/avatar + Sign out) at the bottom of the
+  sidebar or somewhere always visible at every window width - never only
+  in a top bar's right corner.
+- Same spot shows "Sign in with Google" when signed out.
+- Use the standard Google "G" logo on the button.
+
+=====================================================
+VERIFY BEFORE CLAIMING SUCCESS - ALL OF THESE
+=====================================================
+
+1. No CLERK_* secrets remain; no @clerk/* or Replit Auth code remains.
+2. Anonymous curl to a protected API route returns 401.
+3. The landing page shows ONLY "Sign in with Google" - no email, no
+   password fields anywhere (screenshot it).
+4. Clicking the button 302s straight to accounts.google.com (check with
+   curl -I). Two clicks total: button -> Google account chooser -> in.
+5. The callback upserts the user, records a login event, and lands the
+   user inside the app.
+6. The exact dev + production callback URLs were printed for the owner to
+   paste into Google Cloud Console.
+7. Admin: signed in as johnmichaelkuczynski@gmail.com, the
+   "Administrative" tab appears with user list + sign-in graphs
+   (screenshot it). Any other session: tab absent AND curl to any
+   /api/admin/* route returns 403.
+
+=====================================================
+TELL THE USER
+=====================================================
+
+- The one manual step per app: paste the two printed callback URLs into
+  the Google Cloud Console redirect-URI list of the shared OAuth client
+  (up to ~100 URIs per client; if full, create a second client in the
+  same project and store its keys as new vault entries).
+- Test in an incognito window - if already signed in, they won't see the
+  login screen (that means it works).
+- If the app was already published, it must be REPUBLISHED for the new
+  login to go live.
+- If Google shows "access blocked" for the public, the OAuth consent
+  screen is in Testing mode - switch it to "In production" in Google
+  Cloud Console (one-time, affects all apps sharing the client).
