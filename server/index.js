@@ -226,6 +226,7 @@ var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
 
 async function isOwnerSession(req) {
   if (!req.session || !req.session.userId) return false;
+  if (req.session.via !== 'clerk' && !isLocalPlainHttp(req)) return false;
   var ownerId = await getDefaultUserId();
   if (req.session.userId === ownerId) return true;
   var r = await pool.query('SELECT email FROM users WHERE id = $1', [req.session.userId]);
@@ -366,7 +367,7 @@ function isLocalPlainHttp(req) {
 
 app.get('/api/auth/me', async function(req, res) {
   try {
-    if (req.session && req.session.userId) {
+    if (req.session && req.session.userId && (req.session.via === 'clerk' || isLocalPlainHttp(req))) {
       return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto', isOwner: await isOwnerSession(req) });
     }
     if (isLocalPlainHttp(req)) {
@@ -382,7 +383,7 @@ app.get('/api/auth/me', async function(req, res) {
 });
 
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId) {
+  if (req.session && req.session.userId && (req.session.via === 'clerk' || isLocalPlainHttp(req))) {
     req.userId = req.session.userId;
     return next();
   }
