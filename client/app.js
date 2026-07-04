@@ -4148,7 +4148,6 @@
     } catch (e) { return null; }
   }
 
-  var _clerkInstance = null;
   var _clerkScriptPromise = null;
 
   function loadClerkJs(publishableKey) {
@@ -4162,7 +4161,13 @@
       s.src = 'https://' + domain + '/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
       s.async = true;
       s.crossOrigin = 'anonymous';
-      s.onload = function() { if (!done) { done = true; resolve(window.Clerk); } };
+      s.setAttribute('data-clerk-publishable-key', publishableKey);
+      s.onload = function() {
+        if (done) return;
+        done = true;
+        if (window.Clerk) { resolve(window.Clerk); }
+        else { _clerkScriptPromise = null; reject(new Error('Google sign-in library failed to load. Please refresh and try again.')); }
+      };
       s.onerror = function() { if (!done) { done = true; _clerkScriptPromise = null; reject(new Error('Could not load Google sign-in. Your network may be blocking clerk.accounts.dev — try disabling VPN/ad-block.')); } };
       document.head.appendChild(s);
       setTimeout(function() { if (!done) { done = true; _clerkScriptPromise = null; reject(new Error('Google sign-in timed out loading. Your network may be blocking clerk.accounts.dev.')); } }, 20000);
@@ -4171,13 +4176,10 @@
   }
 
   async function getClerk(publishableKey) {
-    if (_clerkInstance && _clerkInstance.loaded) return _clerkInstance;
-    var Loaded = await loadClerkJs(publishableKey);
-    if (!_clerkInstance) {
-      _clerkInstance = (typeof Loaded === 'function') ? new Loaded(publishableKey) : Loaded;
-    }
-    if (!_clerkInstance.loaded) await _clerkInstance.load({ signInUrl: '/', signUpUrl: '/' });
-    return _clerkInstance;
+    var Clerk = await loadClerkJs(publishableKey);
+    if (!Clerk) throw new Error('Google sign-in failed to initialize. Please refresh and try again.');
+    if (!Clerk.loaded) await Clerk.load({});
+    return Clerk;
   }
 
   async function completeClerkLogin(Clerk) {
