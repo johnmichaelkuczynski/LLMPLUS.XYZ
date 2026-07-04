@@ -4195,22 +4195,36 @@
       }
       await loadClerkJs(cfg);
       await window.Clerk.load();
+      if (window.location.pathname === '/sso-callback') {
+        document.getElementById('btn-google-signin').classList.add('hidden');
+        document.getElementById('signin-wait').classList.remove('hidden');
+        try {
+          await window.Clerk.handleRedirectCallback({ redirectUrlComplete: '/' });
+        } catch (e) {
+          window.history.replaceState({}, '', '/');
+        }
+      }
       if (window.Clerk.user && window.Clerk.session) {
         exchangeClerkSession();
         return;
       }
-      window.Clerk.mountSignIn(document.getElementById('clerk-signin'), {
-        appearance: {
-          elements: {
-            header: { display: 'none' },
-            dividerRow: { display: 'none' },
-            form: { display: 'none' },
-            footer: { display: 'none' },
-            footerAction: { display: 'none' },
-            alternativeMethods: { display: 'none' }
-          }
+      var googleBtn = document.getElementById('btn-google-signin');
+      googleBtn.classList.remove('hidden');
+      googleBtn.onclick = function() {
+        if (inIframe()) {
+          window.open(window.location.origin + '/', '_blank');
+          return;
         }
-      });
+        googleBtn.disabled = true;
+        window.Clerk.client.signIn.authenticateWithRedirect({
+          strategy: 'oauth_google',
+          redirectUrl: '/sso-callback',
+          redirectUrlComplete: '/'
+        }).catch(function(e) {
+          googleBtn.disabled = false;
+          authErrMsg('Google sign-in could not start: ' + e.message);
+        });
+      };
       window.Clerk.addListener(function(state) {
         if (state.user && state.session) exchangeClerkSession();
       });

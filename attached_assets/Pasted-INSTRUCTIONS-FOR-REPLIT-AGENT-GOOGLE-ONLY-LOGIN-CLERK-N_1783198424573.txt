@@ -1,0 +1,199 @@
+INSTRUCTIONS FOR REPLIT AGENT: GOOGLE-ONLY LOGIN (CLERK)
+NEW PER-APP CREDENTIALS. PRODUCTION KEYS ON THE LIVE SITE.
+
+=====================================================
+THE SIX NON-NEGOTIABLE RULES
+=====================================================
+
+RULE 1. GENERATE AND USE NEW CLERK CREDENTIALS FOR THIS APP.
+Never reuse keys from any other app. If any Clerk keys already exist in this
+app's Secrets, assume they were copied from another app: DELETE them and
+generate new ones for THIS app. One app = its own credentials. No exceptions.
+
+RULE 2. THE LIVE (PUBLISHED) SITE MUST RUN ON REAL CLERK PRODUCTION
+CREDENTIALS, NOT TEST CREDENTIALS.
+pk_test_ / sk_test_ keys are for the development preview only. The published
+site must run on pk_live_ / sk_live_ production credentials with no limits
+and no "Development mode" badge. Do not declare this task finished until the
+production-credential step (below) is done or explicitly scheduled with the
+user for publish time.
+
+RULE 3. GOOGLE IS THE ONLY LOGIN. NO OTHER LOGIN IS PERMITTED.
+No email/password, no phone, no other provider. The sign-in card shows
+exactly one thing: a "Continue with Google" button. If an email field
+appears, the provider configuration is wrong - fix the configuration, never
+hide fields with CSS.
+
+RULE 4. GOOGLE LOGIN WORKS FOR THE GENERAL PUBLIC. PERIOD.
+Any person with any Google account can sign in on the published site. No
+invitations, no allowlists for regular users, no Replit account, no waitlist
+mode. If Clerk's "Restricted" sign-up mode is on, turn it off.
+
+RULE 5. LOGIN IS TWO CLICKS AT MOST, THEN THE USER IS IN THE APP.
+Click 1: the "Sign in with Google" button on the landing page. This button
+must launch Google OAuth DIRECTLY - use Clerk's
+authenticateWithRedirect({ strategy: "oauth_google", ... }) on the button,
+NOT a navigation to a separate sign-in page first.
+Click 2: the user picks their Google account on Google's chooser.
+After that they land INSIDE the app. No intermediate pages, no extra
+confirmations, no "continue" screens. Five-click flows are a failure.
+
+RULE 6. ADMIN TAB FOR THE OWNER ONLY.
+When the signed-in user's email is johnmichaelkuczynski@gmail.com, the app
+shows an extra tab named "Administrative". It contains login data: total
+users, a list of users with last sign-in time, and GRAPHS (sign-ins per day,
+new users per day). No other user may see this tab or fetch its data.
+Enforce on the SERVER (admin middleware that checks the Clerk session's
+email), not just by hiding the tab in the UI. Record a login event
+server-side (userId, email, timestamp) when a session starts; store events
+in the app's database; chart them.
+
+=====================================================
+DO NOT USE REPLIT AUTH
+=====================================================
+
+Do NOT use Replit Auth (the replit-auth skill, "Sign in with Replit", or
+anything showing "would like to access your Replit account" or "Log in
+secured by Replit"). If that screen appears anywhere in this app, Replit
+Auth is installed - remove it completely (routes, middleware, session
+tables, /api/login links) as part of Step 0.
+
+=====================================================
+STEP 0 - DELETE ALL EXISTING AUTH AND ALL EXISTING KEYS
+=====================================================
+
+1. Remove Replit Auth entirely if present.
+2. Delete every CLERK_* secret already in this app's Secrets panel
+   (CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, VITE_CLERK_PUBLISHABLE_KEY, or
+   similar). They are likely copied from another app and will not work here.
+   Also grep the code for pk_test, pk_live, sk_test, sk_live, "accounts."
+   and remove any hard-coded keys or Clerk-hosted URLs.
+3. Remove any old Clerk wiring: hand-rolled ClerkProvider config,
+   RedirectToSignIn, hosted-portal links.
+
+=====================================================
+STEP 1 - GENERATE NEW CREDENTIALS FOR THIS APP
+=====================================================
+
+PATH A - REPLIT-MANAGED CLERK (use if available in this workspace):
+
+1. Read and follow the clerk-auth skill (.local/skills/clerk-auth/SKILL.md
+   plus references/setup-and-customization.md). Copy its canonical snippets
+   verbatim.
+2. Run setupClerkWhitelabelAuth(). This GENERATES NEW credentials for THIS
+   app and installs them automatically. Never ask the user for keys; never
+   open the Clerk dashboard.
+3. Configure providers per the skill so Google is the ONLY sign-in method
+   (disable email/password).
+4. Production credentials: Replit-managed Clerk swaps to production
+   credentials AUTOMATICALLY when the app is published. Tell the user
+   explicitly: "Publishing switches this app to production login
+   credentials automatically - the test keys never touch the live site."
+
+PATH B - OWN CLERK ACCOUNT (only if Replit-managed Clerk is unavailable):
+
+1. Have the user go to dashboard.clerk.com and click Create application -
+   a NEW application for THIS app (never reuse another app's application).
+   Enable Google only; disable email, phone, username, everything else.
+2. Request CLERK_SECRET_KEY and VITE_CLERK_PUBLISHABLE_KEY via the secrets
+   panel; the user copies the NEW application's keys from its API Keys page.
+3. Development builds run on that application's pk_test_ / sk_test_ pair
+   (normal and required for preview).
+4. Production credentials - required before/at launch: in the Clerk
+   dashboard for THIS application, switch Development -> Production. Clerk
+   will ask for the site's domain and issue pk_live_ / sk_live_ keys. Put
+   those live keys in the production environment secrets (keep test keys
+   for development). For production Google login, Clerk's production
+   instance requires the user to add their own Google OAuth credentials in
+   the Clerk dashboard (Clerk's setup page walks through it - free). The
+   task is NOT complete for launch until the published site runs on the
+   pk_live_ pair.
+
+=====================================================
+ARCHITECTURE (MANDATORY)
+=====================================================
+
+- Two-click flow (Rule 5): the landing page's "Sign in with Google" button
+  calls Clerk's authenticateWithRedirect({ strategy: "oauth_google",
+  redirectUrl: "/sign-in/sso-callback", redirectUrlComplete: "/" }) via
+  useSignIn().signIn - it does NOT navigate to a sign-in page. Mount
+  AuthenticateWithRedirectCallback (or the SignIn component) at /sign-in/*
+  so the OAuth callback resolves.
+- Keep /sign-in and /sign-up routes as fallbacks with routing="path" and
+  explicit path props. With Google-only configuration both show just the
+  Google button.
+- ClerkProvider gets signInUrl="/sign-in" and signUpUrl="/sign-up".
+- NEVER link or redirect to any accounts.*.dev URL and never use
+  RedirectToSignIn to the hosted portal. If the browser ever leaves the
+  app's own domain during login (other than Google's consent screen), the
+  wiring is wrong - stop and fix.
+- (Path A only) Frontend key via publishableKeyFromHost(
+  window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
+  from @clerk/react/internal plus unconditional proxyUrl, exactly as the
+  skill shows. (Path B: plain publishableKey prop.)
+- Sign-in/sign-up routes must tolerate sub-paths (/sign-in/*) so Google's
+  OAuth callback (/sign-in/sso-callback) resolves.
+- The root path "/" stays public: signed-out visitors see a landing page
+  with ONE "Sign in with Google" button; all other routes are gated and
+  redirect signed-out users to "/".
+
+=====================================================
+SERVER
+=====================================================
+
+- (Path A only) Clerk proxy middleware before any body parsers.
+- clerkMiddleware() before API routes; every protected route gated by
+  requireAuth checking getAuth(req); return 401 without a session.
+- CORS: NEVER cors({ credentials: true, origin: true }). Allowlist only the
+  app's own domains (REPLIT_DOMAINS, REPLIT_DEV_DOMAIN, localhost).
+- Cookie-based auth: no Authorization Bearer headers, no getToken() in the
+  web client.
+- Admin endpoints (Rule 6): a requireAdmin middleware on top of requireAuth
+  that loads the Clerk user for the session and rejects with 403 unless
+  their primary email is johnmichaelkuczynski@gmail.com. All /api/admin/*
+  routes (user list, login-event aggregates for the graphs) use it.
+
+=====================================================
+UX
+=====================================================
+
+- Account section (user name + Sign out) at the bottom of the sidebar or
+  somewhere always visible at every window width - never only in a top
+  bar's right corner.
+- Same spot shows "Sign in with Google" when signed out.
+
+=====================================================
+VERIFY BEFORE CLAIMING SUCCESS - ALL OF THESE
+=====================================================
+
+1. This app's Clerk keys are NEW (generated in Step 1), not copied -
+   confirm the old ones were deleted.
+2. Anonymous curl to a protected API route returns 401.
+3. /sign-in shows ONLY "Continue with Google" - no email, no password, no
+   phone (screenshot it).
+4. Full login flow stays on the app's domain (except Google's consent
+   screen); no accounts.*.dev, no Replit-branded login screen, ever.
+5. After signing in, the user lands inside the app, not on a Clerk page.
+6. Production credentials are handled: Path A - confirmed automatic at
+   publish; Path B - production instance created and pk_live_ / sk_live_
+   keys set for production, or the user has explicitly deferred that to
+   publish time.
+7. Two clicks: from a signed-out landing page, count the clicks to get into
+   the app: button -> Google account chooser -> in. If there is any third
+   click or intermediate screen, fix the flow before claiming success.
+8. Admin tab: signed in as johnmichaelkuczynski@gmail.com, the
+   "Administrative" tab appears and shows user list + sign-in graphs
+   (screenshot it). Signed in as ANY other account, the tab is absent AND a
+   direct curl to an /api/admin/* route with that session returns 403.
+
+=====================================================
+TELL THE USER
+=====================================================
+
+- Test in an incognito window - if already signed in, they won't see the
+  login screen (that means it works).
+- The "Development mode" badge exists only on the preview with test keys;
+  the published site on production credentials has no badge and no limits.
+- Dev and production keep separate user accounts.
+- If the app was already published, it must be REPUBLISHED for the new
+  login to go live.

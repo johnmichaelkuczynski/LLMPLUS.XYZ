@@ -240,7 +240,7 @@ app.get('/administrative', async function(req, res) {
 
 var adminAttempts = {};
 app.post('/api/admin/login', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
   var ip = req.ip || 'unknown';
   var a = adminAttempts[ip] || { count: 0, until: 0 };
   if (Date.now() < a.until) {
@@ -266,7 +266,7 @@ app.post('/api/admin/login', async function(req, res) {
 });
 
 app.post('/api/admin/logout', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
   if (req.session) {
     req.session.isAdmin = false;
     req.session.save(function() { res.json({ ok: true }); });
@@ -276,7 +276,7 @@ app.post('/api/admin/logout', async function(req, res) {
 });
 
 app.get('/api/admin/visits', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(404).json({ error: 'Not found' });
+  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
   if (!req.session.isAdmin) return res.status(401).json({ error: 'Admin login required' });
   try {
     var events = await pool.query(

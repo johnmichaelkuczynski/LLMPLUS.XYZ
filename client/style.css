@@ -2874,3 +2874,12 @@ html, body{
 .login-iframe-note .login-btn { margin-top: 8px; }
 .login-iframe-hint { margin-top: 8px; font-size: 12px; color: #8a8577; }
 #clerk-signin { display: flex; justify-content: center; }
+
+.login-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px 16px; font-size: 15px; font-weight: 600;
+  background: #fff; color: #333; border: 1px solid #dadce0; border-radius: 8px;
+  cursor: pointer; transition: background 0.15s, box-shadow 0.15s;
+}
+.login-google-btn:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+#signin-wait { background: #eef6ee; color: #1a6b2f; border: 1px solid #bfe3c8; }
