@@ -4100,25 +4100,12 @@
     } catch (e) {}
   });
 
-  // Optional login: the app is always visible; Google sign-in personalizes the workspace.
+  // Mandatory login: without Google sign-in only the login gate is visible.
   document.getElementById('btn-administrative').addEventListener('click', function() {
     window.location.href = '/administrative';
   });
 
-  function renderAuthUI(auth) {
-    var signinBtn = document.getElementById('btn-google-signin');
-    var chip = document.getElementById('user-chip');
-    var chipName = document.getElementById('user-chip-name');
-    if (auth && auth.authenticated && auth.user) {
-      signinBtn.classList.add('hidden');
-      chip.classList.remove('hidden');
-      chipName.textContent = auth.user.displayName || auth.user.username || auth.user.email || 'Signed in';
-      window.__userName = auth.user.displayName || auth.user.username || '';
-    } else {
-      chip.classList.add('hidden');
-      signinBtn.classList.remove('hidden');
-    }
-  }
+  var ADMIN_EMAIL = 'johnmichaelkuczynski@gmail.com';
 
   async function fetchAuthState() {
     try {
@@ -4128,12 +4115,13 @@
     return { authenticated: false, user: null };
   }
 
-  document.getElementById('btn-google-signin').addEventListener('click', function() {
+  document.getElementById('btn-gate-signin').addEventListener('click', function() {
     var inIframe = false;
     try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
     if (inIframe) {
       // Google blocks OAuth inside iframes (Replit preview) — open a tab and poll for completion.
       var w = window.open('/auth/google', '_blank');
+      document.getElementById('gate-waiting').classList.remove('hidden');
       var poll = setInterval(async function() {
         var auth = await fetchAuthState();
         if (auth.authenticated) {
@@ -4153,19 +4141,32 @@
     window.location.reload();
   });
 
+  // Login is REQUIRED: without Google sign-in, only the login gate is shown.
   async function checkAuth() {
-    appEl.classList.remove('hidden');
     var auth = await fetchAuthState();
-    renderAuthUI(auth);
-    if (!auth.authenticated) {
-      try {
-        var r = await fetch('/api/auth/me');
-        if (r.ok) {
-          var user = await r.json();
-          window.__userName = user.username || '';
-        }
-      } catch (e) {}
+    var gate = document.getElementById('login-gate');
+    if (!auth.authenticated || !auth.user) {
+      appEl.classList.add('hidden');
+      gate.classList.remove('hidden');
+      return;
     }
+    gate.classList.add('hidden');
+    appEl.classList.remove('hidden');
+
+    var chip = document.getElementById('user-chip');
+    chip.classList.remove('hidden');
+    document.getElementById('user-chip-name').textContent =
+      auth.user.displayName || auth.user.username || auth.user.email || 'Signed in';
+    window.__userName = auth.user.displayName || auth.user.username || '';
+
+    // Administrative button only appears for the owner
+    var adminBtn = document.getElementById('btn-administrative');
+    if ((auth.user.email || '').toLowerCase() === ADMIN_EMAIL) {
+      adminBtn.classList.remove('hidden');
+    } else {
+      adminBtn.classList.add('hidden');
+    }
+
     setGreeting();
     loadProjects();
     updateReminderDot();

@@ -73,12 +73,14 @@
     <div class="stats-grid" id="stats-grid">
       <div class="stat-card"><div class="stat-label">All time</div><div class="stat-num" id="stat-all" data-testid="stat-all">–</div></div>
       <div class="stat-card"><div class="stat-label">Last 24 hours</div><div class="stat-num" id="stat-day" data-testid="stat-day">–</div></div>
+      <div class="stat-card"><div class="stat-label">Last week</div><div class="stat-num" id="stat-week" data-testid="stat-week">–</div></div>
       <div class="stat-card"><div class="stat-label">Last month</div><div class="stat-num" id="stat-month" data-testid="stat-month">–</div></div>
       <div class="stat-card"><div class="stat-label">Last year</div><div class="stat-num" id="stat-year" data-testid="stat-year">–</div></div>
     </div>
 
     <div class="charts-grid">
       <div class="chart-card"><div class="chart-title">Last 24 hours (sign-ins per hour)</div><div class="chart" id="chart-day"></div></div>
+      <div class="chart-card"><div class="chart-title">Last week (sign-ins per day)</div><div class="chart" id="chart-week"></div></div>
       <div class="chart-card"><div class="chart-title">Last month (sign-ins per day)</div><div class="chart" id="chart-month"></div></div>
       <div class="chart-card"><div class="chart-title">Last year (sign-ins per month)</div><div class="chart" id="chart-year"></div></div>
       <div class="chart-card"><div class="chart-title">All time</div><div class="chart" id="chart-all"></div></div>
@@ -157,11 +159,13 @@
     var s = data.stats || {};
     document.getElementById('stat-all').textContent = s.allTime == null ? '0' : s.allTime;
     document.getElementById('stat-day').textContent = s.last24Hours == null ? '0' : s.last24Hours;
+    document.getElementById('stat-week').textContent = s.lastWeek == null ? '0' : s.lastWeek;
     document.getElementById('stat-month').textContent = s.lastMonth == null ? '0' : s.lastMonth;
     document.getElementById('stat-year').textContent = s.lastYear == null ? '0' : s.lastYear;
 
     var series = data.series || {};
     renderChart('chart-day', series.last24Hours);
+    renderChart('chart-week', series.lastWeek);
     renderChart('chart-month', series.lastMonth);
     renderChart('chart-year', series.lastYear);
     renderChart('chart-all', series.allTime);
