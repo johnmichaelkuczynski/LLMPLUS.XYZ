@@ -67,19 +67,14 @@ app.get('/administrative', function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'client', 'admin.html'));
 });
 
-// The app is fully open (login is optional): signed-in Google users work in
-// their own workspace; anonymous visitors use the default JMK workspace.
+// Login is REQUIRED: only signed-in Google users may use the app.
+// The owner's Google account (matched by email) maps to the JMK workspace.
 function requireAuth(req, res, next) {
   if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.id) {
     req.userId = req.user.id;
     return next();
   }
-  getDefaultUserId().then(function(id) {
-    req.userId = id;
-    next();
-  }).catch(function(err) {
-    res.status(500).json({ error: err.message });
-  });
+  res.status(401).json({ error: 'Sign in with Google required' });
 }
 
 app.use('/api', function(req, res, next) {

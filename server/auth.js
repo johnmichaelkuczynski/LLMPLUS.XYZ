@@ -288,6 +288,7 @@ export function setupAuth(app) {
     try {
       const now = Date.now();
       const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
       const yearAgo = new Date(now - 365 * 24 * 60 * 60 * 1000);
 
@@ -300,6 +301,7 @@ export function setupAuth(app) {
       const stats = {
         allTime: times.length,
         last24Hours: times.filter((t) => t >= dayAgo.getTime()).length,
+        lastWeek: times.filter((t) => t >= weekAgo.getTime()).length,
         lastMonth: times.filter((t) => t >= monthAgo.getTime()).length,
         lastYear: times.filter((t) => t >= yearAgo.getTime()).length,
       };
@@ -324,6 +326,8 @@ export function setupAuth(app) {
       const series = {
         last24Hours: buildSeries(now - 24 * HOUR, HOUR, 24, (d) =>
           d.toLocaleTimeString("en-US", { hour: "numeric", hour12: true })),
+        lastWeek: buildSeries(now - 7 * DAY, DAY, 7, (d) =>
+          d.toLocaleDateString("en-US", { weekday: "short", day: "numeric" })),
         lastMonth: buildSeries(now - 30 * DAY, DAY, 30, (d) =>
           d.toLocaleDateString("en-US", { month: "short", day: "numeric" })),
         lastYear: buildSeries(now - 365 * DAY, 365 / 12 * DAY, 12, (d) =>
