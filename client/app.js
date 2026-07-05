@@ -4158,9 +4158,23 @@
   });
 
   // Login is REQUIRED: without Google sign-in, only the login gate is shown.
+  // In the Replit DEV PREVIEW only, the server exposes /api/auth/dev-login
+  // (absent in production) so the owner can debug without the OAuth dance.
+  var isDevHost = /\.replit\.dev$|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
   async function checkAuth() {
     var auth = await fetchAuthState();
     var gate = document.getElementById('login-gate');
+    if ((!auth.authenticated || !auth.user) && isDevHost) {
+      try {
+        var dl = await fetch('/api/auth/dev-login');
+        if (dl.ok) auth = await fetchAuthState();
+      } catch (e) {}
+      if ((!auth.authenticated || !auth.user) && !sessionStorage.getItem('devLoginTried')) {
+        sessionStorage.setItem('devLoginTried', '1');
+        window.location.href = '/api/auth/dev-login';
+        return;
+      }
+    }
     if (!auth.authenticated || !auth.user) {
       appEl.classList.add('hidden');
       gate.classList.remove('hidden');

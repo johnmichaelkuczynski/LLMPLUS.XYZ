@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from './db.js';
 import { setupAuth } from './auth.js';
+import { storage } from './storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +42,43 @@ app.use(function(req, res, next) {
   }
   next();
 });
+
+// ─── DEV-ONLY auto-login for the Replit preview. The route is NOT registered
+// in production: it requires BOTH (a) REPLIT_DEPLOYMENT unset (Replit sets it
+// in published deployments) AND (b) NODE_ENV !== 'production' (npm start sets
+// production). It also only answers when the request's Host is the workspace
+// dev domain or localhost, and every use is logged.
+var IS_DEPLOYMENT = !!process.env.REPLIT_DEPLOYMENT || process.env.NODE_ENV === 'production';
+if (!IS_DEPLOYMENT) {
+  app.get('/api/auth/dev-login', async function(req, res) {
+    var host = String(req.hostname || '').toLowerCase();
+    var devDomain = String(process.env.REPLIT_DEV_DOMAIN || '').toLowerCase();
+    var hostOk = (devDomain && host === devDomain) || host === 'localhost' || host === '127.0.0.1';
+    if (!hostOk) return res.status(404).json({ error: 'Not found' });
+    console.log('[DEV] dev-login used from ' + (req.ip || 'unknown IP') + ' host=' + host);
+    try {
+      var ownerEmail = 'johnmichaelkuczynski@gmail.com';
+      var user = await storage.getUserByEmail(ownerEmail);
+      if (!user) {
+        // Fall back to the JMK workspace user and stamp the owner email on it.
+        var r = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', ['JMK']);
+        if (r.rows.length === 0) {
+          r = await pool.query('INSERT INTO users (username, password_hash, email) VALUES ($1, NULL, $2) RETURNING id', ['JMK', ownerEmail]);
+        } else {
+          await pool.query('UPDATE users SET email = COALESCE(email, $2) WHERE id = $1', [r.rows[0].id, ownerEmail]);
+        }
+        user = await storage.getUserById(r.rows[0].id);
+      }
+      req.login(user, function(err) {
+        if (err) return res.status(500).json({ error: 'Dev login failed: ' + err.message });
+        res.redirect('/');
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Dev login failed: ' + e.message });
+    }
+  });
+  console.log('[DEV] Preview auto-login enabled at /api/auth/dev-login (disabled in production)');
+}
 app.use('/api', function(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   var origin = req.headers.origin;
