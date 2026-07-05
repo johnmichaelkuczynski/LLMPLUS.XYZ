@@ -12,17 +12,17 @@ export function setupAuth(app) {
     (v || "").replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, "").trim();
 
   // Google OAuth client credentials (owner-provided).
-  // GOOGLE_LOGIN_* names take priority — reusable across the owner's apps and
-  // free of collisions with stale account-vault entries under older GOOGLE_* names.
+  // GOOGLE_CLIENT_ID/SECRET (the owner's current Replit secrets) take priority;
+  // older GOOGLE_LOGIN_* / GOOGLE_OAUTH_* names are legacy fallbacks only.
   const clientID = sanitizeSecret(
-    process.env.GOOGLE_LOGIN_CLIENT_ID ||
-      process.env.GOOGLE_OAUTH_CLIENT_ID ||
-      process.env.GOOGLE_CLIENT_ID
+    process.env.GOOGLE_CLIENT_ID ||
+      process.env.GOOGLE_LOGIN_CLIENT_ID ||
+      process.env.GOOGLE_OAUTH_CLIENT_ID
   );
   const clientSecret = sanitizeSecret(
-    process.env.GOOGLE_LOGIN_CLIENT_SECRET ||
-      process.env.GOOGLE_OAUTH_CLIENT_SECRET ||
-      process.env.GOOGLE_CLIENT_SECRET
+    process.env.GOOGLE_CLIENT_SECRET ||
+      process.env.GOOGLE_LOGIN_CLIENT_SECRET ||
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET
   );
 
   const googleEnabled = !!(clientID && clientSecret);
