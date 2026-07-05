@@ -1260,17 +1260,25 @@ app.post('/api/chat', async function(req, res) {
     }
     msgs.push({ role: 'user', content: userContent });
 
-    var requestedWords = extractRequestedWordCount(userOwnWords);
+    var targetWords = parseInt(req.body.targetWords, 10);
+    if (!(targetWords >= 10 && targetWords <= 30000)) targetWords = 0;
+    var requestedWords = targetWords || extractRequestedWordCount(userOwnWords);
     var fullText = '';
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
                           responseLength === 'normal' ? 4096 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
-    var maxContinuations = responseLength === 'concise' ? 2 :
+    var maxContinuations = responseLength === 'concise' ? 1 :
                            responseLength === 'normal' ? 4 :
                            responseLength === 'detailed' ? 10 : 40;
     if (requestedWords > 0) {
-      lengthMaxTokens = MAX_TOKENS;
-      maxContinuations = 40;
+      // Cap tokens near the target so the model physically cannot run wildly long.
+      // ~1.3-1.5 tokens per English word; x2.0 gives room to reach 120% of target but not far past it.
+      var estTokens = Math.ceil(requestedWords * 2.0) + 120;
+      lengthMaxTokens = Math.min(MAX_TOKENS, Math.max(256, estTokens));
+      maxContinuations = Math.min(40, Math.ceil(estTokens / lengthMaxTokens) + 1);
+      systemPrompt += '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + requestedWords + ' WORDS (error margin 20%).** The user explicitly requested a response of ' + requestedWords + ' words. Acceptable range: ' + Math.round(requestedWords * 0.8) + ' to ' + Math.round(requestedWords * 1.2) + ' words. Plan your response to land inside that range: do NOT stop far short, and do NOT run past it. No filler padding; no cutting essential content. This target overrides every other length instruction in this prompt.';
+    } else if (responseLength === 'concise') {
+      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. Everything above notwithstanding, your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words even for complex questions. Never produce essays, multi-section documents, or long lists of caveats in this mode.';
     }
     var continuationCount = 0;
 
@@ -1426,14 +1434,18 @@ app.post('/api/chat', async function(req, res) {
       var currentWords = countWords(fullText);
       var needsMore = false;
 
-      if (lastResult.stopReason === 'max_tokens') {
-        if (responseLength === 'concise' && continuationCount >= 1) {
-          console.log('[Chat] stopping: concise mode, already continued once');
+      if (requestedWords > 0 && currentWords >= requestedWords * 1.2) {
+        console.log('[Chat] stopping: upper bound reached (' + currentWords + '/' + requestedWords + ' words, max ' + Math.round(requestedWords * 1.2) + ')');
+      } else if (lastResult.stopReason === 'max_tokens') {
+        if (responseLength === 'concise' && requestedWords === 0) {
+          console.log('[Chat] stopping: concise mode, no continuations');
+        } else if (requestedWords > 0 && currentWords >= requestedWords * 0.8) {
+          console.log('[Chat] stopping: within 20% margin of target (' + currentWords + '/' + requestedWords + ')');
         } else {
           needsMore = true;
           console.log('[Chat] continuing: max_tokens hit');
         }
-      } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.75) {
+      } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.8) {
         needsMore = true;
         console.log('[Chat] continuing: end_turn but only ' + currentWords + '/' + requestedWords + ' words');
       } else if (lastResult.stopReason === 'end_turn' && requestedWords === 0 && isLongform && currentWords < 3000 && continuationCount === 1) {
@@ -1462,9 +1474,9 @@ app.post('/api/chat', async function(req, res) {
         continuePrompt += '3. Move to ENTIRELY NEW topics, arguments, evidence, and analysis that have NOT been covered.\n';
         continuePrompt += '4. Do NOT restate the same point with different wording — that is padding, not substance.\n';
         continuePrompt += '5. Do NOT add meta-commentary like "Continuing from where I left off."\n';
-        continuePrompt += '6. Write at LEAST ' + Math.min(remaining, 4000) + ' more words of genuinely NEW content.\n';
+        continuePrompt += '6. Write approximately ' + Math.min(remaining, 4000) + ' more words of genuinely NEW content, then STOP.\n';
         continuePrompt += '7. Do NOT conclude or summarize until the target word count is reached.\n';
-        continuePrompt += '8. Use ALL available tokens.';
+        continuePrompt += '8. HARD LIMIT: the finished document must NOT exceed ' + Math.round(requestedWords * 1.2) + ' total words. Wrap up cleanly before that point.';
       } else {
         continuePrompt = 'You are writing a comprehensive document. Progress: approximately ' + currentWords + ' words so far.\n\n';
         continuePrompt += 'SECTIONS ALREADY WRITTEN (DO NOT REPEAT):\n' + sectionOutline + '\n\n';
@@ -1479,6 +1491,10 @@ app.post('/api/chat', async function(req, res) {
         { role: 'user', content: continuePrompt }
       ];
 
+      if (requestedWords > 0) {
+        var remainingToUpper = Math.max(0, Math.round(requestedWords * 1.2) - currentWords);
+        lengthMaxTokens = Math.min(lengthMaxTokens, Math.max(256, Math.ceil(remainingToUpper * 2.0) + 120));
+      }
       var lastResult = await streamOneCall(continuationMsgs);
       fullText += lastResult.segmentText;
       continuationCount++;
@@ -1589,6 +1605,19 @@ app.post('/api/chat/compare', async function(req, res) {
     var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA, auditLessonsCmp, pinnedCmpCtx);
     var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB, auditLessonsCmp, pinnedCmpCtx);
 
+    var cmpTargetWords = parseInt(req.body.targetWords, 10);
+    if (!(cmpTargetWords >= 10 && cmpTargetWords <= 30000)) cmpTargetWords = 0;
+    if (cmpTargetWords === 0) cmpTargetWords = extractRequestedWordCount(userOwnWords);
+    if (cmpTargetWords > 0) {
+      var cmpLenNote = '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + cmpTargetWords + ' WORDS (error margin 20%).** Acceptable range: ' + Math.round(cmpTargetWords * 0.8) + ' to ' + Math.round(cmpTargetWords * 1.2) + ' words. Land inside that range — do NOT stop far short, do NOT run past it. This overrides every other length instruction.';
+      systemA += cmpLenNote;
+      systemB += cmpLenNote;
+    } else if (responseLength === 'concise') {
+      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE IS ON. Your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words. Never produce essays or multi-section documents in this mode.';
+      systemA += cmpConciseNote;
+      systemB += cmpConciseNote;
+    }
+
     var msgs = [];
     var recent = transcript.slice(-16);
     var totalChars = 0;
@@ -1607,8 +1636,11 @@ app.post('/api/chat/compare', async function(req, res) {
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
                           responseLength === 'normal' ? 4096 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
+    if (cmpTargetWords > 0) {
+      lengthMaxTokens = Math.min(MAX_TOKENS, Math.max(256, Math.ceil(cmpTargetWords * 2.0) + 120));
+    }
 
-    console.log('[Compare] stanceA=' + stanceA + ' stanceB=' + stanceB + ' model=' + modelChoice + ' length=' + responseLength);
+    console.log('[Compare] stanceA=' + stanceA + ' stanceB=' + stanceB + ' model=' + modelChoice + ' length=' + responseLength + ' targetWords=' + cmpTargetWords);
 
     var writeLock = Promise.resolve();
     function safeSend(obj) {

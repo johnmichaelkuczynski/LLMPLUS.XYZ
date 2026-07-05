@@ -13,6 +13,14 @@
     model: 'claude'
   };
 
+  function getTargetWords() {
+    var el = document.getElementById('target-words-input');
+    if (!el) return 0;
+    var n = parseInt(el.value, 10);
+    if (!(n >= 10 && n <= 30000)) return 0;
+    return n;
+  }
+
   var els = {
     projectList: document.getElementById('project-list'),
     sessionList: document.getElementById('session-list'),
@@ -1313,7 +1321,8 @@
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
           stance: state.stance,
-          model: state.model
+          model: state.model,
+          targetWords: getTargetWords()
         }),
         signal: state.abortController.signal
       });
@@ -2735,6 +2744,13 @@
       state.responseLength = btn.getAttribute('data-length');
     });
   });
+
+  var twInput = document.getElementById('target-words-input');
+  if (twInput) {
+    twInput.addEventListener('input', function() {
+      twInput.classList.toggle('has-value', !!getTargetWords());
+    });
+  }
 
   document.querySelectorAll('.rf-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -4361,7 +4377,8 @@
           stanceB: stanceB,
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
-          model: state.model
+          model: state.model,
+          targetWords: getTargetWords()
         }),
         signal: compareAbort.signal
       });

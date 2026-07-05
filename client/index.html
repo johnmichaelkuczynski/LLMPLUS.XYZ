@@ -186,6 +186,8 @@
           <button class="rl-btn active" data-length="normal" data-testid="rl-normal" title="Balanced responses">Normal</button>
           <button class="rl-btn" data-length="detailed" data-testid="rl-detailed" title="Thorough, in-depth responses">Detailed</button>
           <button class="rl-btn" data-length="exhaustive" data-testid="rl-exhaustive" title="Maximum depth, use all available tokens">Exhaustive</button>
+          <input type="number" id="target-words-input" data-testid="input-target-words" class="target-words-input" min="10" max="30000" step="10" placeholder="Words #" title="Exact word count for the response (within 20%). Overrides the length buttons. Leave blank for automatic.">
+
           <span class="rl-divider"></span>
           <span class="rl-label">Format:</span>
           <button class="rf-btn active" data-format="prose" data-testid="rf-prose" title="Full developed prose paragraphs">Prose</button>
@@ -487,6 +489,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=26"></script>
+  <script src="/app.js?v=27"></script>
 </body>
 </html>

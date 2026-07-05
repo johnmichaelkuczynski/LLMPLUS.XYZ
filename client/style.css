@@ -736,6 +736,28 @@ html, body {
   white-space: nowrap;
 }
 
+.target-words-input {
+  width: 74px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #6b7280;
+  line-height: 1.4;
+  outline: none;
+}
+.target-words-input:focus {
+  border-color: #6366f1;
+  color: #111827;
+}
+.target-words-input.has-value {
+  border-color: #6366f1;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 600;
+}
+
 .rl-btn {
   font-size: 11px;
   padding: 3px 10px;
