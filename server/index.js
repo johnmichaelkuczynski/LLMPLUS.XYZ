@@ -71,193 +71,15 @@ async function getDefaultUserId() {
   return defaultUserId;
 }
 
-// ─── Google OAuth 2.0 (direct, no third-party auth service) ───
-var GOOGLE_CLIENT_ID = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
-var GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
-
-function googleEnabled() { return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET); }
-
-function requestBaseUrl(req) {
-  var candidate = (req.secure ? 'https' : 'http') + '://' + req.get('host');
-  if (allowedOrigins.has(candidate)) return candidate;
-  // Host header not on the allowlist — fall back to the canonical app domain.
-  if (process.env.REPLIT_DEV_DOMAIN) return 'https://' + process.env.REPLIT_DEV_DOMAIN;
-  var domains = (process.env.REPLIT_DOMAINS || '').split(',');
-  if (domains[0] && domains[0].trim()) return 'https://' + domains[0].trim();
-  return candidate;
-}
-
-var googleJwksCache = { keys: null, fetchedAt: 0 };
-async function getGoogleJwks(force) {
-  if (!force && googleJwksCache.keys && Date.now() - googleJwksCache.fetchedAt < 3600000) return googleJwksCache.keys;
-  var resp = await fetch('https://www.googleapis.com/oauth2/v3/certs');
-  if (!resp.ok) throw new Error('Could not fetch Google signing keys (' + resp.status + ')');
-  var data = await resp.json();
-  googleJwksCache = { keys: data.keys || [], fetchedAt: Date.now() };
-  return googleJwksCache.keys;
-}
-
-async function verifyGoogleIdToken(token) {
-  var parts = String(token).split('.');
-  if (parts.length !== 3) throw new Error('Malformed token');
-  var header, payload;
-  try {
-    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
-    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-  } catch (e) {
-    throw new Error('Malformed token');
-  }
-  if (header.alg !== 'RS256') throw new Error('Unexpected token algorithm');
-  var keys = await getGoogleJwks(false);
-  var jwk = null;
-  for (var i = 0; i < keys.length; i++) { if (keys[i].kid === header.kid) { jwk = keys[i]; break; } }
-  if (!jwk) {
-    keys = await getGoogleJwks(true);
-    for (var j = 0; j < keys.length; j++) { if (keys[j].kid === header.kid) { jwk = keys[j]; break; } }
-  }
-  if (!jwk) throw new Error('Unknown signing key');
-  var pubKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
-  var ok = crypto.verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]), pubKey, Buffer.from(parts[2], 'base64url'));
-  if (!ok) throw new Error('Invalid token signature');
-  var now = Math.floor(Date.now() / 1000);
-  if (!payload.exp || payload.exp < now - 5) throw new Error('Token expired');
-  if (!payload.sub) throw new Error('Token has no subject');
-  if (payload.iss !== 'https://accounts.google.com' && payload.iss !== 'accounts.google.com') throw new Error('Token issued by wrong provider');
-  if (payload.aud !== GOOGLE_CLIENT_ID) throw new Error('Token issued for a different app');
-  return payload;
-}
-
-app.get('/api/auth/config', function(req, res) {
-  res.json({ googleEnabled: googleEnabled() });
-});
-
-app.get('/api/auth/google', function(req, res) {
-  if (!googleEnabled()) return res.status(503).send('Google login is not configured');
-  var state = crypto.randomBytes(24).toString('hex');
-  req.session.oauthState = state;
-  req.session.save(function(err) {
-    if (err) return res.status(500).send('Session error');
-    var params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: requestBaseUrl(req) + '/api/auth/google/callback',
-      response_type: 'code',
-      scope: 'openid email profile',
-      prompt: 'select_account',
-      state: state
-    });
-    res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString());
-  });
-});
-
-app.get('/api/auth/google/callback', async function(req, res) {
-  function fail(msg) {
-    if (!res.headersSent) res.redirect('/?auth_error=' + encodeURIComponent(msg));
-  }
-  try {
-    if (!googleEnabled()) return fail('Google login is not configured');
-    if (req.query.error) return fail('Google sign-in was cancelled');
-    var state = String(req.query.state || '');
-    if (!state || !req.session || state !== req.session.oauthState) {
-      return fail('Sign-in session expired. Please try again.');
-    }
-    delete req.session.oauthState;
-    var code = String(req.query.code || '');
-    if (!code) return fail('Missing authorization code');
-
-    var tokenResp = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code: code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: requestBaseUrl(req) + '/api/auth/google/callback',
-        grant_type: 'authorization_code'
-      }).toString()
-    });
-    var tokenData = null;
-    try { tokenData = await tokenResp.json(); } catch (e) { tokenData = {}; }
-    if (!tokenResp.ok || !tokenData.id_token) {
-      console.error('Google token exchange failed:', tokenResp.status, JSON.stringify(tokenData || {}).slice(0, 300));
-      return fail('Google sign-in failed during token exchange');
-    }
-    var claims = await verifyGoogleIdToken(tokenData.id_token);
-    var email = String(claims.email || '').toLowerCase();
-    var name = String(claims.name || '').trim();
-
-    // The owner's Google account (OWNER_EMAIL) claims the JMK workspace and keeps
-    // all existing projects. Every other Google account gets its own user + workspace.
-    var ownerId = await getDefaultUserId();
-    var user = null;
-    if (email === OWNER_EMAIL && claims.email_verified === true) {
-      var claim = await pool.query(
-        'UPDATE users SET google_id = $1, email = $2 WHERE id = $3 RETURNING id, username',
-        [claims.sub, email, ownerId]
-      );
-      user = claim.rows[0];
-    } else {
-      var r = await pool.query('SELECT id, username FROM users WHERE google_id = $1', [claims.sub]);
-      if (r.rows.length > 0) {
-        user = r.rows[0];
-      } else {
-        var base = (email || ('user_' + String(claims.sub).slice(-8))).slice(0, 60);
-        var candidate = base;
-        var n = 1;
-        while (true) {
-          var ex = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [candidate]);
-          if (ex.rows.length === 0) break;
-          n++;
-          candidate = base.slice(0, 55) + '_' + n;
-        }
-        var ins = await pool.query(
-          'INSERT INTO users (username, password_hash, google_id, email) VALUES ($1, NULL, $2, $3) RETURNING id, username',
-          [candidate, claims.sub, email]
-        );
-        user = ins.rows[0];
-      }
-    }
-
-    try {
-      await pool.query(
-        'INSERT INTO login_events (user_id, google_id, email, name) VALUES ($1, $2, $3, $4)',
-        [user.id, claims.sub, email, name]
-      );
-    } catch (e) { console.error('Failed to record login event:', e.message); }
-
-    req.session.regenerate(function(err) {
-      if (err) return fail('Session error');
-      req.session.userId = user.id;
-      req.session.username = user.username;
-      req.session.via = 'google';
-      req.session.save(function() { res.redirect('/'); });
-    });
-  } catch (err) {
-    console.error('Google callback error:', err.message);
-    fail('Sign-in failed: ' + err.message);
-  }
-});
-
-// ─── Administrative page (visitor log) — OWNER ONLY ───
+// ─── Administrative page (visitor log) — password protected ───
 var ADMIN_PASSWORD = '1234';
-var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
 
-async function isOwnerSession(req) {
-  if (!req.session || !req.session.userId) return false;
-  if (req.session.via !== 'google' && !isLocalPlainHttp(req)) return false;
-  var ownerId = await getDefaultUserId();
-  if (req.session.userId === ownerId) return true;
-  var r = await pool.query('SELECT email FROM users WHERE id = $1', [req.session.userId]);
-  return !!(r.rows[0] && (r.rows[0].email || '').toLowerCase() === OWNER_EMAIL);
-}
-
-app.get('/administrative', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(404).send('Not found');
+app.get('/administrative', function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'client', 'admin.html'));
 });
 
 var adminAttempts = {};
 app.post('/api/admin/login', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
   var ip = req.ip || 'unknown';
   var a = adminAttempts[ip] || { count: 0, until: 0 };
   if (Date.now() < a.until) {
@@ -283,7 +105,6 @@ app.post('/api/admin/login', async function(req, res) {
 });
 
 app.post('/api/admin/logout', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
   if (req.session) {
     req.session.isAdmin = false;
     req.session.save(function() { res.json({ ok: true }); });
@@ -293,8 +114,7 @@ app.post('/api/admin/logout', async function(req, res) {
 });
 
 app.get('/api/admin/visits', async function(req, res) {
-  if (!(await isOwnerSession(req))) return res.status(403).json({ error: 'Forbidden' });
-  if (!req.session.isAdmin) return res.status(401).json({ error: 'Admin login required' });
+  if (!req.session || !req.session.isAdmin) return res.status(401).json({ error: 'Admin login required' });
   try {
     var events = await pool.query(
       'SELECT email, name, created_at FROM login_events ORDER BY created_at DESC LIMIT 500'
@@ -371,55 +191,35 @@ app.get('/api/admin/visits', async function(req, res) {
   }
 });
 
-app.post('/api/auth/logout', function(req, res) {
-  req.session.destroy(function() {
-    res.json({ ok: true });
-  });
-});
-
-// Plain-http localhost (R1 harness, curl during dev) keeps the automatic JMK session.
-function isLocalPlainHttp(req) {
-  return !req.secure && (req.hostname === 'localhost' || req.hostname === '127.0.0.1');
-}
-
+// No login system: every visitor uses the default workspace automatically.
 app.get('/api/auth/me', async function(req, res) {
   try {
-    if (req.session && req.session.userId && (req.session.via === 'google' || isLocalPlainHttp(req))) {
-      return res.json({ id: req.session.userId, username: req.session.username, via: req.session.via || 'auto', isOwner: await isOwnerSession(req) });
-    }
-    if (isLocalPlainHttp(req)) {
-      req.session.userId = await getDefaultUserId();
-      req.session.username = DEFAULT_USERNAME;
-      req.session.via = 'auto';
-      return res.json({ id: req.session.userId, username: req.session.username, via: 'auto', isOwner: true });
-    }
-    res.status(401).json({ error: 'Not signed in' });
+    var id = await getDefaultUserId();
+    res.json({ id: id, username: DEFAULT_USERNAME, via: 'auto', isOwner: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId && (req.session.via === 'google' || isLocalPlainHttp(req))) {
-    req.userId = req.session.userId;
-    return next();
-  }
-  if (isLocalPlainHttp(req)) {
-    getDefaultUserId().then(function(id) {
+  getDefaultUserId().then(function(id) {
+    req.userId = id;
+    if (req.session) {
       req.session.userId = id;
       req.session.username = DEFAULT_USERNAME;
-      req.userId = id;
-      next();
-    }).catch(function(err) {
-      res.status(500).json({ error: err.message });
-    });
-    return;
-  }
-  res.status(401).json({ error: 'Not signed in' });
+    }
+    next();
+  }).catch(function(err) {
+    res.status(500).json({ error: err.message });
+  });
 }
 
 app.use('/api', function(req, res, next) {
-  if (req.path.startsWith('/auth/')) return next();
+  if (req.path.startsWith('/auth/')) {
+    // Only /api/auth/me exists now; removed login routes must 404, not fall through to the SPA.
+    if (req.path === '/auth/me') return next();
+    return res.status(404).json({ error: 'Not found' });
+  }
   if (req.path.startsWith('/admin/')) return next();
   requireAuth(req, res, next);
 });
@@ -4999,55 +4799,6 @@ app.post('/api/diagnostic/run', async function(req, res) {
     await runStep('SESSION_SECRET present', 'env', async function() {
       if (!process.env.SESSION_SECRET) throw new Error('Not set');
       return 'set';
-    });
-
-    // === Category 1b: Google Login ===
-    await runStep('Google OAuth credentials present', 'auth', async function() {
-      if (!GOOGLE_CLIENT_ID) throw new Error('GOOGLE_OAUTH_CLIENT_ID not set');
-      if (!GOOGLE_CLIENT_SECRET) throw new Error('GOOGLE_OAUTH_CLIENT_SECRET not set');
-      return 'client id + secret set';
-    });
-    await runStep('Google accepts this client (credential check)', 'auth', async function() {
-      var r = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          code: 'diagnostic-dummy-code',
-          client_id: GOOGLE_CLIENT_ID,
-          client_secret: GOOGLE_CLIENT_SECRET,
-          redirect_uri: 'https://localhost/api/auth/google/callback',
-          grant_type: 'authorization_code'
-        }).toString()
-      });
-      var data = null;
-      try { data = await r.json(); } catch (e) { data = {}; }
-      if (data && data.error === 'invalid_client') throw new Error('Google rejected the client credentials (invalid_client) — check GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET');
-      if (data && (data.error === 'invalid_grant' || data.error === 'invalid_request' || data.error === 'redirect_uri_mismatch')) {
-        return 'credentials accepted by Google (dummy code correctly rejected as ' + data.error + ')';
-      }
-      if (!r.ok) throw new Error('Unexpected response from Google token endpoint: HTTP ' + r.status + ' ' + JSON.stringify(data || {}).slice(0, 120));
-      return 'token endpoint reachable';
-    });
-    await runStep('Google signing keys (JWKS) reachable', 'auth', async function() {
-      var keys = await getGoogleJwks(true);
-      if (!keys || keys.length === 0) throw new Error('No signing keys returned');
-      return keys.length + ' signing keys fetched';
-    });
-    await runStep('Login route redirects to Google', 'auth', async function() {
-      var port = process.env.PORT || 5000;
-      var r = await fetch('http://localhost:' + port + '/api/auth/google', { redirect: 'manual' });
-      if (r.status !== 302) throw new Error('Expected 302 redirect, got HTTP ' + r.status);
-      var loc = r.headers.get('location') || '';
-      if (loc.indexOf('https://accounts.google.com/o/oauth2/v2/auth') !== 0) throw new Error('Redirects to unexpected URL: ' + loc.slice(0, 80));
-      if (loc.indexOf('state=') === -1) throw new Error('Redirect is missing the CSRF state parameter');
-      return '302 to accounts.google.com with state parameter';
-    });
-    await runStep('User + login-event columns for Google', 'auth', async function() {
-      var u = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'google_id'");
-      if (u.rows.length === 0) throw new Error('users.google_id column missing');
-      var l = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'login_events' AND column_name = 'google_id'");
-      if (l.rows.length === 0) throw new Error('login_events.google_id column missing');
-      return 'users.google_id + login_events.google_id exist';
     });
 
     // === Category 2: Database ===

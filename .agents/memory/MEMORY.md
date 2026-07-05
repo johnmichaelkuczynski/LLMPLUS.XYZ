@@ -1,3 +1,3 @@
 - [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
-- [Clerk login without packages](replit-auth-no-packages.md) — in-app clerk-js via script tag, server verifies JWT with builtin crypto/JWKS; auto-JMK only on plain-http localhost; no Clerk npm packages ever.
+- [Login churn — currently NO login](replit-auth-no-packages.md) — user has ripped login out repeatedly; as of Jul 2026 every visitor gets the JMK workspace. Proven no-package Google OAuth patterns inside if it returns.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.

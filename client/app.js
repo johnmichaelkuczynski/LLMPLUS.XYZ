@@ -3969,7 +3969,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', auth: 'Google Login', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;
@@ -4100,115 +4100,23 @@
     } catch (e) {}
   });
 
-  var loginScreen = document.getElementById('login-screen');
-  var authError = document.getElementById('auth-error');
-  var userBar = document.getElementById('user-bar');
-  var userDisplay = document.getElementById('user-display');
-  var btnLogout = document.getElementById('btn-logout');
-
-  function showApp(user) {
-    loginScreen.classList.add('hidden');
-    appEl.classList.remove('hidden');
-    if (user && user.via === 'google') {
-      userDisplay.textContent = user.username;
-      userBar.classList.remove('hidden');
-    }
-    var adminBtn = document.getElementById('btn-administrative');
-    if (adminBtn) adminBtn.classList.toggle('hidden', !(user && user.isOwner));
-    window.__userName = user.username || '';
-    setGreeting();
-    loadProjects();
-    updateReminderDot();
-  }
-
-  function authErrMsg(msg) {
-    authError.textContent = msg;
-    authError.classList.remove('hidden');
-  }
-
-  function inIframe() {
-    try { return window.self !== window.top; } catch (e) { return true; }
-  }
-
-  var mePollTimer = null;
-  function startMePolling() {
-    if (mePollTimer) return;
-    mePollTimer = setInterval(async function() {
-      try {
-        var r = await fetch('/api/auth/me');
-        if (r.ok) {
-          clearInterval(mePollTimer);
-          mePollTimer = null;
-          showApp(await r.json());
-        }
-      } catch (e) { /* keep polling */ }
-    }, 3000);
-  }
-
-  async function showLogin() {
-    appEl.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    authError.classList.add('hidden');
-    var params = new URLSearchParams(window.location.search);
-    if (params.get('auth_error')) {
-      authErrMsg(params.get('auth_error'));
-      window.history.replaceState({}, '', '/');
-    }
-    try {
-      var cfg = await (await fetch('/api/auth/config')).json();
-      if (!cfg.googleEnabled) {
-        authErrMsg('Sign-in is not configured on the server.');
-        return;
-      }
-      var googleBtn = document.getElementById('btn-google-signin');
-      googleBtn.classList.remove('hidden');
-      googleBtn.onclick = function() {
-        if (inIframe()) {
-          window.open(window.location.origin + '/api/auth/google', '_blank');
-          startMePolling();
-          return;
-        }
-        googleBtn.disabled = true;
-        window.location.href = '/api/auth/google';
-      };
-      if (inIframe()) {
-        document.getElementById('login-iframe-note').classList.remove('hidden');
-        startMePolling();
-      }
-    } catch (e) {
-      authErrMsg('Could not load sign-in: ' + e.message);
-    }
-  }
-
-  document.getElementById('btn-open-signin-tab').addEventListener('click', function() {
-    window.open(window.location.origin + '/api/auth/google', '_blank');
-    startMePolling();
-  });
-
+  // No login system: the app starts directly.
   document.getElementById('btn-administrative').addEventListener('click', function() {
     window.location.href = '/administrative';
   });
 
-  btnLogout.addEventListener('click', async function() {
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
-    window.location.reload();
-  });
-
   async function checkAuth() {
+    appEl.classList.remove('hidden');
     try {
       var r = await fetch('/api/auth/me');
       if (r.ok) {
-        showApp(await r.json());
-        return;
+        var user = await r.json();
+        window.__userName = user.username || '';
       }
-      if (r.status === 401) {
-        showLogin();
-        return;
-      }
-      notify('Could not start the app. Please refresh.', 'error');
-    } catch (e) {
-      notify('Could not start the app. Please refresh.', 'error');
-    }
+    } catch (e) {}
+    setGreeting();
+    loadProjects();
+    updateReminderDot();
   }
 
   document.getElementById('btn-profile-me').addEventListener('click', async function() {

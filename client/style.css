@@ -12,132 +12,19 @@ html, body {
   overflow: hidden;
 }
 
-.login-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 50%, #f0fdf4 100%);
-}
 
-.login-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 48px 40px;
-  width: 360px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  text-align: center;
-}
 
-.login-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 4px;
-}
 
-.login-subtitle {
-  font-size: 14px;
-  color: #9ca3af;
-  margin-bottom: 28px;
-}
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
-.login-input {
-  padding: 12px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.15s;
-}
 
-.login-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-}
 
-.login-btn {
-  padding: 12px;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-  background: #2563eb;
-  color: #fff;
-}
 
-.login-btn:hover {
-  background: #1d4ed8;
-}
 
-.login-btn-alt {
-  background: transparent;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-}
 
-.login-btn-alt:hover {
-  background: #f9fafb;
-  color: #374151;
-}
 
-.login-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 12px;
-  margin: 4px 0;
-}
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #e5e7eb;
-}
-.login-divider span {
-  padding: 0 10px;
-}
 
-.login-btn-google {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: #fff;
-  color: #3c4043;
-  border: 1px solid #dadce0;
-}
-.login-btn-google:hover {
-  background: #f8faff;
-  border-color: #c6d4f0;
-}
-.login-btn-google svg {
-  flex-shrink: 0;
-}
-.login-btn-google[disabled] {
-  opacity: 0.6;
-  cursor: default;
-}
 
-.login-error {
-  color: #dc2626;
-  font-size: 13px;
-  text-align: left;
-  padding: 8px 12px;
-  background: #fef2f2;
-  border-radius: 8px;
-}
 
 
 
@@ -2834,52 +2721,7 @@ html, body{
 .rs-compare-btn:hover{ background:#f7ece7; color:var(--c-accent-hover); border-color:var(--c-accent-hover); }
 
 /* ---- Login screen warm tint ---- */
-.login-screen{ background:linear-gradient(135deg,#f7f4ec 0%, #faf9f5 50%, #f3efe4 100%); }
-.login-title{ color:var(--c-head); }
-.login-input:focus{ border-color:var(--c-accent); box-shadow:0 0 0 3px rgba(201,100,66,0.12); }
-.login-btn{ background:var(--c-accent); }
-.login-btn:hover{ background:var(--c-accent-hover); }
-.login-btn-alt{ background:transparent; color:var(--c-text); border:1px solid var(--c-border); }
-.login-btn-alt:hover{ background:var(--c-side-hover); }
-.login-btn-google{ background:#fff; color:#3c4043; border:1px solid #dadce0; }
-.login-btn-google:hover{ background:#f7f4ec; border-color:var(--c-border); }
 
-.user-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--c-border, #e5e0d5);
-  margin-top: 8px;
-}
-.user-bar-name {
-  font-size: 12px;
-  color: #8a8577;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.user-bar-logout {
-  background: none;
-  border: 1px solid #d8d2c4;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #6b6657;
-  cursor: pointer;
-}
-.user-bar-logout:hover { background: #f3efe4; }
-.login-iframe-note { margin-top: 14px; text-align: center; font-size: 13px; color: #6b6657; }
-.login-iframe-note .login-btn { margin-top: 8px; }
-.login-iframe-hint { margin-top: 8px; font-size: 12px; color: #8a8577; }
 #clerk-signin { display: flex; justify-content: center; }
 
-.login-google-btn {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%; padding: 12px 16px; font-size: 15px; font-weight: 600;
-  background: #fff; color: #333; border: 1px solid #dadce0; border-radius: 8px;
-  cursor: pointer; transition: background 0.15s, box-shadow 0.15s;
-}
-.login-google-btn:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
 #signin-wait { background: #eef6ee; color: #1a6b2f; border: 1px solid #bfe3c8; }

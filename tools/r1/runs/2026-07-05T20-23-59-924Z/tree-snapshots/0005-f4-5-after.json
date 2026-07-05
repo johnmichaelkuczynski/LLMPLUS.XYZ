@@ -1,0 +1,16 @@
+{
+  "1.0": "DOCUMENT: Comparative planetary science - size relationships in the solar system",
+  "1.1": "QUESTION: Is the Earth's moon larger in diameter than the planet Mercury?",
+  "1.2": "ASSERTS: The Moon is remarkably large relative to its parent planet Earth",
+  "1.3": "ASSERTS: The unusually large size ratio of Moon-to-Earth has implications for formation theories",
+  "1.1.1": "RESOLVED: REJECTS: The Moon is larger in diameter than Mercury",
+  "1.1.2": "ASSERTS: Mercury diameter approximately 4,880 kilometers",
+  "1.1.3": "ASSERTS: Moon diameter approximately 3,474 kilometers",
+  "1.1.4": "ASSERTS: Mercury is approximately 1.4 times larger than the Moon in absolute diameter",
+  "1.2.1": "ASSERTS: Moon ranks as fifth-largest moon in the solar system",
+  "1.2.2": "ASSERTS: Larger moons than Earth's Moon: Ganymede, Titan, Callisto, and Io",
+  "1.2.3": "ASSERTS: Moon has largest diameter-to-planet ratio of any major moon in the solar system",
+  "1.2.4": "ASSERTS: Moon diameter is approximately one-quarter of Earth's diameter",
+  "1.3.1": "ASSERTS: Giant impact hypothesis is the leading explanation for Moon formation",
+  "1.3.2": "ASSERTS: The Earth-Moon system is distinctive by solar system standards"
+}
