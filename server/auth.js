@@ -109,7 +109,7 @@ export function setupAuth(app) {
         const prodDomain = (process.env.REPLIT_DOMAINS || "")
           .split(",")[0]
           ?.trim();
-        return `https://${prodDomain || "llm-plus.replit.app"}${CALLBACK_PATH}`;
+        return `https://${prodDomain || "llmplus.ink"}${CALLBACK_PATH}`;
       }
       if (process.env.REPLIT_DEV_DOMAIN) {
         return `https://${process.env.REPLIT_DEV_DOMAIN}${CALLBACK_PATH}`;
@@ -126,7 +126,9 @@ export function setupAuth(app) {
       [
         ...(process.env.REPLIT_DOMAINS || "").split(",").map((d) => d.trim()),
         process.env.REPLIT_DEV_DOMAIN || "",
-        "llm-plus.replit.app",
+        "llmplus.ink",
+        "www.llmplus.ink",
+        "llmplusxyz.replit.app",
         "localhost:5000",
       ]
         .filter(Boolean)
