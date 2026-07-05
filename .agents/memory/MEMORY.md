@@ -1,3 +1,4 @@
 - [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
-- [Login churn — currently NO login](replit-auth-no-packages.md) — user has ripped login out repeatedly; as of Jul 2026 every visitor gets the JMK workspace. Proven no-package Google OAuth patterns inside if it returns.
+- [Login churn — now MANDATORY Google login](replit-auth-no-packages.md) — after repeated rip-outs, mandatory Google OAuth (canonical auth.js) is live and working as of Jul 5 2026; owner email claims the JMK workspace.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.
+- [Google OAuth client mismatch](google-oauth-client-mismatch.md) — redirect_uri_mismatch with a "registered" URI usually means wrong OAuth client; same-project client IDs share the numeric prefix, so compare full IDs.
