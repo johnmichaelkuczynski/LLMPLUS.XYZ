@@ -15,11 +15,11 @@
   h1 .accent { color: #c05b3c; }
   .sub { color: #8a8577; font-size: 14px; margin-bottom: 28px; }
   .card { background: #fff; border: 1px solid #e5e0d5; border-radius: 12px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
-  .login-box { max-width: 380px; margin: 80px auto 0; text-align: center; }
-  .login-box input { width: 100%; padding: 12px 14px; border: 1px solid #d8d2c4; border-radius: 8px; font-size: 15px; margin: 16px 0 12px; font-family: inherit; }
+  .login-box { max-width: 420px; margin: 80px auto 0; text-align: center; }
   .btn { background: #c05b3c; color: #fff; border: none; border-radius: 8px; padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn:hover { background: #a94e33; }
-  .err { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .btn-google { background: #fff; color: #333; border: 1px solid #dadce0; }
+  .btn-google:hover { background: #f8f8f8; }
   .hidden { display: none; }
   h2 { font-size: 16px; margin: 28px 0 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -34,7 +34,6 @@
   .stat-card { background: #fff; border: 1px solid #e5e0d5; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
   .stat-label { font-size: 12px; color: #8a8577; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
   .stat-num { font-size: 30px; font-weight: 700; color: #c05b3c; margin-top: 4px; }
-  .stat-sub { font-size: 12px; color: #8a8577; margin-top: 2px; }
   .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px; }
   @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
   .chart-card { background: #fff; border: 1px solid #e5e0d5; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
@@ -49,13 +48,13 @@
 </head>
 <body>
 <div class="wrap">
-  <div id="gate" class="login-box card">
+  <div id="gate" class="login-box card hidden">
     <h1>LLM <span class="accent">Plus</span></h1>
-    <p class="sub">Administrative access</p>
-    <input type="password" id="admin-pass" placeholder="Password" data-testid="input-admin-password" autofocus>
-    <br>
-    <button class="btn" id="btn-admin-login" data-testid="btn-admin-login">Enter</button>
-    <div class="err" id="gate-err" data-testid="text-admin-error"></div>
+    <p class="sub" style="margin-bottom:8px">Administrative access</p>
+    <p style="font-size:13px;color:#6b6657;margin-bottom:18px">This page is restricted to the site owner. Sign in with the owner's Google account to view visitor data.</p>
+    <button class="btn btn-google" id="btn-google-signin" data-testid="btn-google-signin">
+      <svg width="16" height="16" viewBox="0 0 48 48" style="vertical-align:-3px;margin-right:6px"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>
+    <div style="margin-top:16px"><button class="link" id="btn-gate-back" data-testid="btn-gate-back">Back to app</button></div>
   </div>
 
   <div id="panel" class="hidden">
@@ -72,31 +71,24 @@
     </div>
 
     <div class="stats-grid" id="stats-grid">
-      <div class="stat-card"><div class="stat-label">All time</div><div class="stat-num" id="stat-all" data-testid="stat-all">–</div><div class="stat-sub" id="stat-all-sub"></div></div>
-      <div class="stat-card"><div class="stat-label">Last 24 hours</div><div class="stat-num" id="stat-day" data-testid="stat-day">–</div><div class="stat-sub" id="stat-day-sub"></div></div>
-      <div class="stat-card"><div class="stat-label">Last month</div><div class="stat-num" id="stat-month" data-testid="stat-month">–</div><div class="stat-sub" id="stat-month-sub"></div></div>
-      <div class="stat-card"><div class="stat-label">Last year</div><div class="stat-num" id="stat-year" data-testid="stat-year">–</div><div class="stat-sub" id="stat-year-sub"></div></div>
+      <div class="stat-card"><div class="stat-label">All time</div><div class="stat-num" id="stat-all" data-testid="stat-all">–</div></div>
+      <div class="stat-card"><div class="stat-label">Last 24 hours</div><div class="stat-num" id="stat-day" data-testid="stat-day">–</div></div>
+      <div class="stat-card"><div class="stat-label">Last month</div><div class="stat-num" id="stat-month" data-testid="stat-month">–</div></div>
+      <div class="stat-card"><div class="stat-label">Last year</div><div class="stat-num" id="stat-year" data-testid="stat-year">–</div></div>
     </div>
 
     <div class="charts-grid">
       <div class="chart-card"><div class="chart-title">Last 24 hours (sign-ins per hour)</div><div class="chart" id="chart-day"></div></div>
       <div class="chart-card"><div class="chart-title">Last month (sign-ins per day)</div><div class="chart" id="chart-month"></div></div>
       <div class="chart-card"><div class="chart-title">Last year (sign-ins per month)</div><div class="chart" id="chart-year"></div></div>
-      <div class="chart-card"><div class="chart-title">All time (sign-ins per month)</div><div class="chart" id="chart-all"></div></div>
+      <div class="chart-card"><div class="chart-title">All time</div><div class="chart" id="chart-all"></div></div>
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Visitors</h2>
-      <div class="count" id="visitor-count" data-testid="text-visitor-count"></div>
+      <h2 style="margin-top:0">Every sign-in (most recent first)</h2>
+      <div class="count" id="visit-count" data-testid="text-visit-count"></div>
       <table>
-        <thead><tr><th>Gmail</th><th>Name</th><th>Visits</th><th>First visit</th><th>Most recent</th></tr></thead>
-        <tbody id="visitors-body"></tbody>
-      </table>
-      <div class="empty hidden" id="visitors-empty">No Google sign-ins recorded yet.</div>
-
-      <h2>Every sign-in (most recent first)</h2>
-      <table>
-        <thead><tr><th>Gmail</th><th>Name</th><th>When</th></tr></thead>
+        <thead><tr><th>Gmail</th><th>When</th></tr></thead>
         <tbody id="events-body"></tbody>
       </table>
       <div class="empty hidden" id="events-empty">No sign-ins recorded yet.</div>
@@ -108,8 +100,6 @@
 (function() {
   var gate = document.getElementById('gate');
   var panel = document.getElementById('panel');
-  var gateErr = document.getElementById('gate-err');
-  var passInput = document.getElementById('admin-pass');
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
@@ -123,105 +113,89 @@
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  function renderChart(elId, rows) {
+    var el = document.getElementById(elId);
+    el.innerHTML = '';
+    rows = rows || [];
+    var total = 0, max = 0;
+    rows.forEach(function(r) { total += r.count; if (r.count > max) max = r.count; });
+    if (rows.length === 0 || total === 0) {
+      el.innerHTML = '<div class="chart-empty" style="width:100%">No sign-ins in this period.</div>';
+      return;
+    }
+    var labelEvery = Math.max(1, Math.ceil(rows.length / 8));
+    rows.forEach(function(r, i) {
+      var wrap = document.createElement('div');
+      wrap.className = 'bar-wrap';
+      var bar = document.createElement('div');
+      bar.className = 'bar' + (r.count === 0 ? ' zero' : '');
+      var h = max > 0 ? Math.round((r.count / max) * 90) : 0;
+      bar.style.height = Math.max(2, h) + 'px';
+      bar.title = r.label + ': ' + r.count + ' sign-in(s)';
+      var lbl = document.createElement('div');
+      lbl.className = 'bar-label';
+      lbl.textContent = (i % labelEvery === 0) ? r.label : '';
+      wrap.appendChild(bar);
+      wrap.appendChild(lbl);
+      el.appendChild(wrap);
+    });
+  }
+
   async function loadVisits() {
-    var r = await fetch('/api/admin/visits');
+    var r;
+    try {
+      r = await fetch('/api/admin/visits');
+    } catch (e) {
+      gate.classList.remove('hidden'); panel.classList.add('hidden');
+      return;
+    }
     if (!r.ok) { gate.classList.remove('hidden'); panel.classList.add('hidden'); return; }
     var data = await r.json();
     gate.classList.add('hidden');
     panel.classList.remove('hidden');
 
     var s = data.stats || {};
-    function setStat(key, visitors, signins) {
-      document.getElementById('stat-' + key).textContent = visitors == null ? '0' : visitors;
-      document.getElementById('stat-' + key + '-sub').textContent = (signins == null ? 0 : signins) + ' sign-in(s)';
-    }
-    setStat('all', s.visitors_all, s.signins_all);
-    setStat('day', s.visitors_day, s.signins_day);
-    setStat('month', s.visitors_month, s.signins_month);
-    setStat('year', s.visitors_year, s.signins_year);
+    document.getElementById('stat-all').textContent = s.allTime == null ? '0' : s.allTime;
+    document.getElementById('stat-day').textContent = s.last24Hours == null ? '0' : s.last24Hours;
+    document.getElementById('stat-month').textContent = s.lastMonth == null ? '0' : s.lastMonth;
+    document.getElementById('stat-year').textContent = s.lastYear == null ? '0' : s.lastYear;
 
-    function fmtBucket(ts, mode) {
-      var d = new Date(ts);
-      if (mode === 'hour') return d.getHours() + 'h';
-      if (mode === 'day') return (d.getMonth() + 1) + '/' + d.getDate();
-      return d.toLocaleDateString(undefined, { month: 'short' });
-    }
-    function renderChart(elId, rows, mode) {
-      var el = document.getElementById(elId);
-      el.innerHTML = '';
-      rows = rows || [];
-      var total = 0, max = 0;
-      rows.forEach(function(r) { total += r.count; if (r.count > max) max = r.count; });
-      if (rows.length === 0 || total === 0) {
-        el.innerHTML = '<div class="chart-empty" style="width:100%">No sign-ins in this period.</div>';
-        return;
-      }
-      var labelEvery = Math.max(1, Math.ceil(rows.length / 8));
-      rows.forEach(function(r, i) {
-        var wrap = document.createElement('div');
-        wrap.className = 'bar-wrap';
-        var bar = document.createElement('div');
-        bar.className = 'bar' + (r.count === 0 ? ' zero' : '');
-        var h = max > 0 ? Math.round((r.count / max) * 90) : 0;
-        bar.style.height = Math.max(2, h) + 'px';
-        bar.title = fmtBucket(r.bucket, mode) + ': ' + r.count + ' sign-in(s)';
-        var lbl = document.createElement('div');
-        lbl.className = 'bar-label';
-        lbl.textContent = (i % labelEvery === 0) ? fmtBucket(r.bucket, mode) : '';
-        wrap.appendChild(bar);
-        wrap.appendChild(lbl);
-        el.appendChild(wrap);
-      });
-    }
     var series = data.series || {};
-    renderChart('chart-day', series.day, 'hour');
-    renderChart('chart-month', series.month, 'day');
-    renderChart('chart-year', series.year, 'month');
-    renderChart('chart-all', series.all, 'month');
-
-    var vb = document.getElementById('visitors-body');
-    vb.innerHTML = '';
-    (data.visitors || []).forEach(function(v, i) {
-      var tr = document.createElement('tr');
-      tr.setAttribute('data-testid', 'row-visitor-' + i);
-      tr.innerHTML = '<td>' + esc(v.email) + '</td><td>' + esc(v.name || '') + '</td><td>' + esc(v.visits) + '</td><td>' + esc(fmt(v.first_visit)) + '</td><td>' + esc(fmt(v.last_visit)) + '</td>';
-      vb.appendChild(tr);
-    });
-    document.getElementById('visitors-empty').classList.toggle('hidden', (data.visitors || []).length > 0);
-    document.getElementById('visitor-count').textContent = (data.visitors || []).length + ' distinct visitor(s), ' + (data.events || []).length + ' total sign-in(s) shown';
+    renderChart('chart-day', series.last24Hours);
+    renderChart('chart-month', series.lastMonth);
+    renderChart('chart-year', series.lastYear);
+    renderChart('chart-all', series.allTime);
 
     var eb = document.getElementById('events-body');
     eb.innerHTML = '';
-    (data.events || []).forEach(function(e, i) {
+    (data.visits || []).forEach(function(v, i) {
       var tr = document.createElement('tr');
-      tr.setAttribute('data-testid', 'row-event-' + i);
-      tr.innerHTML = '<td>' + esc(e.email || '(no email)') + '</td><td>' + esc(e.name || '') + '</td><td>' + esc(fmt(e.created_at)) + '</td>';
+      tr.setAttribute('data-testid', 'row-visit-' + i);
+      tr.innerHTML = '<td>' + esc(v.email || '(no email)') + '</td><td>' + esc(fmt(v.visitedAt)) + '</td>';
       eb.appendChild(tr);
     });
-    document.getElementById('events-empty').classList.toggle('hidden', (data.events || []).length > 0);
+    document.getElementById('events-empty').classList.toggle('hidden', (data.visits || []).length > 0);
+    document.getElementById('visit-count').textContent = (data.visits || []).length + ' sign-in(s) shown';
   }
 
-  async function login() {
-    gateErr.textContent = '';
-    try {
-      var r = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passInput.value })
-      });
-      if (!r.ok) {
-        var d = await r.json().catch(function() { return {}; });
-        gateErr.textContent = d.error || 'Wrong password';
-        return;
-      }
-      await loadVisits();
-    } catch (e) {
-      gateErr.textContent = 'Could not reach the server.';
+  document.getElementById('btn-google-signin').addEventListener('click', function() {
+    var inIframe = false;
+    try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
+    if (inIframe) {
+      window.open('/auth/google', '_blank');
+      var poll = setInterval(async function() {
+        try {
+          var r = await fetch('/api/auth/user');
+          var a = await r.json();
+          if (a.authenticated) { clearInterval(poll); window.location.reload(); }
+        } catch (e) {}
+      }, 2000);
+      setTimeout(function() { clearInterval(poll); }, 180000);
+    } else {
+      window.location.href = '/auth/google';
     }
-  }
-
-  document.getElementById('btn-admin-login').addEventListener('click', login);
-  passInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
+  });
+  document.getElementById('btn-gate-back').addEventListener('click', function() { window.location.href = '/'; });
   document.getElementById('btn-refresh').addEventListener('click', loadVisits);
   document.getElementById('btn-back').addEventListener('click', function() { window.location.href = '/'; });
 

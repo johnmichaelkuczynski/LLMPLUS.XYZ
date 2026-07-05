@@ -4100,20 +4100,72 @@
     } catch (e) {}
   });
 
-  // No login system: the app starts directly.
+  // Optional login: the app is always visible; Google sign-in personalizes the workspace.
   document.getElementById('btn-administrative').addEventListener('click', function() {
     window.location.href = '/administrative';
   });
 
+  function renderAuthUI(auth) {
+    var signinBtn = document.getElementById('btn-google-signin');
+    var chip = document.getElementById('user-chip');
+    var chipName = document.getElementById('user-chip-name');
+    if (auth && auth.authenticated && auth.user) {
+      signinBtn.classList.add('hidden');
+      chip.classList.remove('hidden');
+      chipName.textContent = auth.user.displayName || auth.user.username || auth.user.email || 'Signed in';
+      window.__userName = auth.user.displayName || auth.user.username || '';
+    } else {
+      chip.classList.add('hidden');
+      signinBtn.classList.remove('hidden');
+    }
+  }
+
+  async function fetchAuthState() {
+    try {
+      var r = await fetch('/api/auth/user');
+      if (r.ok) return await r.json();
+    } catch (e) {}
+    return { authenticated: false, user: null };
+  }
+
+  document.getElementById('btn-google-signin').addEventListener('click', function() {
+    var inIframe = false;
+    try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
+    if (inIframe) {
+      // Google blocks OAuth inside iframes (Replit preview) — open a tab and poll for completion.
+      var w = window.open('/auth/google', '_blank');
+      var poll = setInterval(async function() {
+        var auth = await fetchAuthState();
+        if (auth.authenticated) {
+          clearInterval(poll);
+          try { if (w && !w.closed) w.close(); } catch (e) {}
+          window.location.reload();
+        }
+      }, 2000);
+      setTimeout(function() { clearInterval(poll); }, 180000);
+    } else {
+      window.location.href = '/auth/google';
+    }
+  });
+
+  document.getElementById('btn-signout').addEventListener('click', async function() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+    window.location.reload();
+  });
+
   async function checkAuth() {
     appEl.classList.remove('hidden');
-    try {
-      var r = await fetch('/api/auth/me');
-      if (r.ok) {
-        var user = await r.json();
-        window.__userName = user.username || '';
-      }
-    } catch (e) {}
+    var auth = await fetchAuthState();
+    renderAuthUI(auth);
+    if (!auth.authenticated) {
+      try {
+        var r = await fetch('/api/auth/me');
+        if (r.ok) {
+          var user = await r.json();
+          window.__userName = user.username || '';
+        }
+      } catch (e) {}
+    }
     setGreeting();
     loadProjects();
     updateReminderDot();

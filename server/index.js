@@ -4,11 +4,10 @@ import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import session from 'express-session';
-import connectPgSimple from 'connect-pg-simple';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from './db.js';
+import { setupAuth } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,18 +31,9 @@ app.use(cors({
   }
 }));
 app.use(bodyParser.json({ limit: '50mb' }));
-var PgSession = connectPgSimple(session);
-app.use(session({
-  store: new PgSession({
-    pool: pool,
-    tableName: 'user_sessions',
-    createTableIfMissing: true
-  }),
-  secret: process.env.SESSION_SECRET || 'llmplus-dev-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: 'lax' }
-}));
+// Canonical authentication (server/auth.js): session store, passport, Google
+// OAuth routes, /api/auth/user|me|logout, and owner-only /api/admin/visits.
+setupAuth(app);
 app.use(function(req, res, next) {
   if (req.secure && req.session && req.session.cookie) {
     req.session.cookie.sameSite = 'none';
@@ -71,143 +61,21 @@ async function getDefaultUserId() {
   return defaultUserId;
 }
 
-// ─── Administrative page (visitor log) — password protected ───
-var ADMIN_PASSWORD = '1234';
-
+// ─── Administrative page: served openly; its data API (/api/admin/visits in
+// server/auth.js) is restricted to the owner's Google account.
 app.get('/administrative', function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'client', 'admin.html'));
 });
 
-var adminAttempts = {};
-app.post('/api/admin/login', async function(req, res) {
-  var ip = req.ip || 'unknown';
-  var a = adminAttempts[ip] || { count: 0, until: 0 };
-  if (Date.now() < a.until) {
-    return res.status(429).json({ error: 'Too many attempts. Try again in a minute.' });
-  }
-  var pw = String((req.body && req.body.password) || '');
-  if (pw !== ADMIN_PASSWORD) {
-    a.count++;
-    if (a.count >= 5) { a.until = Date.now() + 60000; a.count = 0; }
-    adminAttempts[ip] = a;
-    return res.status(401).json({ error: 'Wrong password' });
-  }
-  delete adminAttempts[ip];
-  var keep = { userId: req.session.userId, username: req.session.username, via: req.session.via };
-  req.session.regenerate(function(err) {
-    if (err) return res.status(500).json({ error: 'Session error' });
-    req.session.userId = keep.userId;
-    req.session.username = keep.username;
-    req.session.via = keep.via;
-    req.session.isAdmin = true;
-    req.session.save(function() { res.json({ ok: true }); });
-  });
-});
-
-app.post('/api/admin/logout', async function(req, res) {
-  if (req.session) {
-    req.session.isAdmin = false;
-    req.session.save(function() { res.json({ ok: true }); });
-    return;
-  }
-  res.json({ ok: true });
-});
-
-app.get('/api/admin/visits', async function(req, res) {
-  if (!req.session || !req.session.isAdmin) return res.status(401).json({ error: 'Admin login required' });
-  try {
-    var events = await pool.query(
-      'SELECT email, name, created_at FROM login_events ORDER BY created_at DESC LIMIT 500'
-    );
-    var visitors = await pool.query(
-      `SELECT COALESCE(NULLIF(email, ''), '(no email)') AS email,
-              MAX(name) AS name,
-              COUNT(*)::int AS visits,
-              MIN(created_at) AS first_visit,
-              MAX(created_at) AS last_visit
-       FROM login_events
-       GROUP BY COALESCE(NULLIF(email, ''), '(no email)')
-       ORDER BY MAX(created_at) DESC`
-    );
-    var stats = await pool.query(
-      `SELECT
-         COUNT(*)::int AS signins_all,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id))::int AS visitors_all,
-         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS signins_day,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours')::int AS visitors_day,
-         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS signins_month,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')::int AS visitors_month,
-         COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS signins_year,
-         COUNT(DISTINCT COALESCE(NULLIF(email, ''), google_id, clerk_id)) FILTER (WHERE created_at > NOW() - INTERVAL '365 days')::int AS visitors_year
-       FROM login_events`
-    );
-    var seriesDay = await pool.query(
-      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
-       FROM generate_series(date_trunc('hour', NOW()) - INTERVAL '23 hours', date_trunc('hour', NOW()), '1 hour') gs
-       LEFT JOIN (
-         SELECT date_trunc('hour', created_at) AS h, COUNT(*) AS c
-         FROM login_events WHERE created_at > NOW() - INTERVAL '24 hours' GROUP BY 1
-       ) t ON t.h = gs ORDER BY gs`
-    );
-    var seriesMonth = await pool.query(
-      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
-       FROM generate_series(date_trunc('day', NOW()) - INTERVAL '29 days', date_trunc('day', NOW()), '1 day') gs
-       LEFT JOIN (
-         SELECT date_trunc('day', created_at) AS d, COUNT(*) AS c
-         FROM login_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY 1
-       ) t ON t.d = gs ORDER BY gs`
-    );
-    var seriesYear = await pool.query(
-      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
-       FROM generate_series(date_trunc('month', NOW()) - INTERVAL '11 months', date_trunc('month', NOW()), '1 month') gs
-       LEFT JOIN (
-         SELECT date_trunc('month', created_at) AS m, COUNT(*) AS c
-         FROM login_events WHERE created_at > NOW() - INTERVAL '365 days' GROUP BY 1
-       ) t ON t.m = gs ORDER BY gs`
-    );
-    var seriesAll = await pool.query(
-      `SELECT gs AS bucket, COALESCE(t.c, 0)::int AS count
-       FROM generate_series(
-         COALESCE((SELECT date_trunc('month', MIN(created_at)) FROM login_events), date_trunc('month', NOW())),
-         date_trunc('month', NOW()), '1 month') gs
-       LEFT JOIN (
-         SELECT date_trunc('month', created_at) AS m, COUNT(*) AS c
-         FROM login_events GROUP BY 1
-       ) t ON t.m = gs ORDER BY gs`
-    );
-    res.json({
-      events: events.rows,
-      visitors: visitors.rows,
-      stats: stats.rows[0],
-      series: {
-        day: seriesDay.rows,
-        month: seriesMonth.rows,
-        year: seriesYear.rows,
-        all: seriesAll.rows
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// No login system: every visitor uses the default workspace automatically.
-app.get('/api/auth/me', async function(req, res) {
-  try {
-    var id = await getDefaultUserId();
-    res.json({ id: id, username: DEFAULT_USERNAME, via: 'auto', isOwner: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// The app is fully open (login is optional): signed-in Google users work in
+// their own workspace; anonymous visitors use the default JMK workspace.
 function requireAuth(req, res, next) {
+  if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.id) {
+    req.userId = req.user.id;
+    return next();
+  }
   getDefaultUserId().then(function(id) {
     req.userId = id;
-    if (req.session) {
-      req.session.userId = id;
-      req.session.username = DEFAULT_USERNAME;
-    }
     next();
   }).catch(function(err) {
     res.status(500).json({ error: err.message });
@@ -215,11 +83,7 @@ function requireAuth(req, res, next) {
 }
 
 app.use('/api', function(req, res, next) {
-  if (req.path.startsWith('/auth/')) {
-    // Only /api/auth/me exists now; removed login routes must 404, not fall through to the SPA.
-    if (req.path === '/auth/me') return next();
-    return res.status(404).json({ error: 'Not found' });
-  }
+  if (req.path.startsWith('/auth/')) return next();
   if (req.path.startsWith('/admin/')) return next();
   requireAuth(req, res, next);
 });
@@ -364,6 +228,12 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT");
+      // Owner's Google sign-in claims the JMK workspace via email lookup in server/storage.js
+      await client.query(
+        "UPDATE users SET email = $1 WHERE LOWER(username) = LOWER($2) AND (email IS NULL OR email = '')",
+        ['johnmichaelkuczynski@gmail.com', DEFAULT_USERNAME]
+      );
     } catch (e) { /* columns may already exist */ }
     try {
       await client.query(`CREATE TABLE IF NOT EXISTS login_events (
