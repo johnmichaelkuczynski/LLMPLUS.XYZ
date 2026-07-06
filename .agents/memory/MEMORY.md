@@ -2,3 +2,4 @@
 - [Login churn — now MANDATORY Google login](replit-auth-no-packages.md) — after repeated rip-outs, mandatory Google OAuth (canonical auth.js) is live and working as of Jul 5 2026; owner email claims the JMK workspace.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.
 - [Google OAuth client mismatch](google-oauth-client-mismatch.md) — redirect_uri_mismatch with a "registered" URI usually means wrong OAuth client; same-project client IDs share the numeric prefix, so compare full IDs.
+- [Secret updates and stale env](secret-update-stale-env.md) — shell/server can hold a stale secret after user updates it; fingerprint via sha256 and restart workflow after the save, not before.
