@@ -1211,38 +1211,19 @@ app.post('/api/chat', async function(req, res) {
       return res.end();
     }
 
-    var projectResult = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
-    var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
+    // Single round-trip for all project-level fields (was 3 separate queries).
+    var projectResult = await pool.query(
+      'SELECT tractatus_tree, pinned_context, last_tree_update, compression_count FROM projects WHERE id = $1',
+      [projectId]
+    );
+    var projRow = projectResult.rows[0] || {};
+    var tree = projRow.tractatus_tree || {};
+    var pinnedCtx = projRow.pinned_context || '';
 
     var tieredMemory = await loadTieredMemory(projectId);
 
     var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
     var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
-
-    var otherSessions = await pool.query(
-      'SELECT title, transcript FROM sessions WHERE project_id = $1 AND id != $2 ORDER BY created_at DESC LIMIT 10',
-      [projectId, sessionId]
-    );
-    var crossSessionContext = '';
-    var crossContextBudget = 10000;
-    for (var os = 0; os < otherSessions.rows.length; os++) {
-      var otherT = otherSessions.rows[os].transcript || [];
-      if (otherT.length > 0) {
-        var otherTitle = otherSessions.rows[os].title || 'Untitled Chat';
-        var otherRecent = otherT.slice(-6);
-        var summary = '';
-        for (var om = 0; om < otherRecent.length; om++) {
-          var role = otherRecent[om].role === 'user' ? 'User' : 'Assistant';
-          var snippet = (otherRecent[om].content || '').substring(0, 400);
-          summary += role + ': ' + snippet + '\n';
-        }
-        crossSessionContext += '\n--- Previous chat: "' + otherTitle + '" ---\n' + summary + '\n';
-        if (crossSessionContext.length > crossContextBudget) {
-          crossSessionContext = crossSessionContext.substring(0, crossContextBudget) + '\n[...truncated...]';
-          break;
-        }
-      }
-    }
 
     var userOwnWords = message || '';
     var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
@@ -1253,26 +1234,50 @@ app.post('/api/chat', async function(req, res) {
     var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
     console.log('[Chat] projectSpecific=' + includeProjectContext);
 
-    var stalenessInfo = null;
+    // Cross-session context is only injected when the query is project-specific,
+    // so only pay for it then. Trim each session's transcript to its last 6
+    // messages IN SQL so we never transfer/parse whole megabyte transcripts.
+    var crossSessionContext = '';
     if (includeProjectContext) {
-      var stalenessResult = await pool.query(
-        'SELECT last_tree_update, compression_count FROM projects WHERE id = $1',
-        [projectId]
+      var otherSessions = await pool.query(
+        "SELECT title, (SELECT COALESCE(jsonb_agg(e ORDER BY ord), '[]'::jsonb) " +
+        "FROM (SELECT e, ord FROM jsonb_array_elements(CASE WHEN jsonb_typeof(transcript)='array' THEN transcript ELSE '[]'::jsonb END) WITH ORDINALITY AS x(e, ord) " +
+        "ORDER BY ord DESC LIMIT 6) s) AS tail " +
+        "FROM sessions WHERE project_id = $1 AND id != $2 ORDER BY created_at DESC LIMIT 6",
+        [projectId, sessionId]
       );
-      if (stalenessResult.rows[0] && stalenessResult.rows[0].last_tree_update) {
-        var lastUpdate = new Date(stalenessResult.rows[0].last_tree_update);
-        var daysSince = Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-        var compCount = stalenessResult.rows[0].compression_count || 0;
-        if (daysSince >= 3 || compCount >= 2) {
-          stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
-          console.log('[Chat] Staleness warning: ' + daysSince + ' days since update, ' + compCount + ' compressions');
+      var crossContextBudget = 10000;
+      for (var os = 0; os < otherSessions.rows.length; os++) {
+        var otherRecent = otherSessions.rows[os].tail || [];
+        if (otherRecent.length > 0) {
+          var otherTitle = otherSessions.rows[os].title || 'Untitled Chat';
+          var summary = '';
+          for (var om = 0; om < otherRecent.length; om++) {
+            var role = otherRecent[om].role === 'user' ? 'User' : 'Assistant';
+            var snippet = (otherRecent[om].content || '').substring(0, 400);
+            summary += role + ': ' + snippet + '\n';
+          }
+          crossSessionContext += '\n--- Previous chat: "' + otherTitle + '" ---\n' + summary + '\n';
+          if (crossSessionContext.length > crossContextBudget) {
+            crossSessionContext = crossSessionContext.substring(0, crossContextBudget) + '\n[...truncated...]';
+            break;
+          }
         }
       }
     }
 
+    var stalenessInfo = null;
+    if (includeProjectContext && projRow.last_tree_update) {
+      var lastUpdate = new Date(projRow.last_tree_update);
+      var daysSince = Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+      var compCount = projRow.compression_count || 0;
+      if (daysSince >= 3 || compCount >= 2) {
+        stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
+        console.log('[Chat] Staleness warning: ' + daysSince + ' days since update, ' + compCount + ' compressions');
+      }
+    }
+
     var auditLessons = await loadAuditLessons(projectId);
-    var pinnedCtxRes = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [projectId]);
-    var pinnedCtx = pinnedCtxRes.rows[0] ? (pinnedCtxRes.rows[0].pinned_context || '') : '';
     var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedCtx);
     if (includeProjectContext && crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
@@ -1281,10 +1286,10 @@ app.post('/api/chat', async function(req, res) {
     console.log('[Chat] System prompt: ' + systemPrompt.length + ' chars | Tree nodes: ' + Object.keys(tree).length + ' | Tiers: ' + (tieredMemory.tiers ? tieredMemory.tiers.length : 0) + ' | Cross-session: ' + crossSessionContext.length + ' chars');
 
     var msgs = [];
-    var recent = transcript.slice(-16);
-    var maxMsgChars = 8000;
+    var recent = transcript.slice(-12);
+    var maxMsgChars = 5000;
     var totalChars = 0;
-    var charBudget = 100000;
+    var charBudget = 50000;
     for (var i = recent.length - 1; i >= 0; i--) {
       var content = recent[i].content || '';
       if (content.length > maxMsgChars) {
