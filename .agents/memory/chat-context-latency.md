@@ -17,4 +17,10 @@ Root causes found (all in the per-turn context-build):
 2. Gate expensive optional context (cross-session) behind the flag that decides whether it's used (`includeProjectContext`) — compute the flag first.
 3. Keep the raw recent-history window lean (currently last 12 @ 5000 chars / 50K budget). **Why:** the Tractatus tree + tiered memory + pinned context are what carry continuity; the raw window is redundant safety, not the memory of record.
 
-**How to apply:** any time you touch chat/compare context assembly, re-check these three. Measure TTFT against the largest real session (find it via `ORDER BY pg_column_size(transcript) DESC`), not a fresh one. Fixing all three took TTFT on a 98-message session from ~3.3s to ~1.8s.
+**How to apply:** any time you touch chat/compare context assembly, re-check these three. Measure TTFT against the largest real session (find it via `ORDER BY pg_column_size(transcript) DESC`), not a fresh one.
+
+## The scalable fix (makes per-turn cost flat, not just smaller)
+Trimming constants (fewer messages / chars) only lowers the constant — the read still scaled with session length because it did `SELECT transcript` (whole JSONB) then `slice()` in Node. The real fix: `loadRecentTranscript(sessionId, limit)` trims the tail IN SQL, so the hot path never transfers/parses the full transcript. Applied to both `/api/chat` and `/api/chat/compare` (last 16). Result: TTFT went flat (~1.5s) across 4-, 76-, and 98-message sessions (was 3.3s on the 98-msg one).
+
+**Key reasoning for future scale questions:** the felt "conversation dragging" is entirely at READ time (before generation). The transcript WRITE (`jsonb ||` append) happens AFTER the response streams, so its O(n) cost does NOT affect perceived latency — don't waste a risky message-per-row migration on it unless write throughput itself becomes a problem. On-demand features (report/summarize/profile/paper) still load the full transcript on purpose; that's fine, they're not the hot path.
+**Why:** user demanded a "scalable" solution and was right that constant-tuning wasn't it — the architecture, not the numbers, had to stop scaling with length.

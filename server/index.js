@@ -811,6 +811,20 @@ async function loadAuditLessons(projectId) {
   } catch (e) { return []; }
 }
 
+// Load only the last `limit` messages of a session's transcript, trimmed IN SQL
+// so per-turn cost is O(limit) regardless of how long the conversation gets.
+// This is what keeps chat latency flat as sessions grow to hundreds of messages.
+async function loadRecentTranscript(sessionId, limit) {
+  var r = await pool.query(
+    "SELECT (SELECT COALESCE(jsonb_agg(e ORDER BY ord), '[]'::jsonb) " +
+    "FROM (SELECT e, ord FROM jsonb_array_elements(CASE WHEN jsonb_typeof(transcript)='array' THEN transcript ELSE '[]'::jsonb END) WITH ORDINALITY AS x(e, ord) " +
+    "ORDER BY ord DESC LIMIT $2) s) AS tail " +
+    "FROM sessions WHERE id = $1",
+    [sessionId, limit]
+  );
+  return r.rows[0] ? (r.rows[0].tail || []) : [];
+}
+
 function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext) {
   var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort. Provide expert-level, intellectually rigorous responses.';
 
@@ -1222,8 +1236,9 @@ app.post('/api/chat', async function(req, res) {
 
     var tieredMemory = await loadTieredMemory(projectId);
 
-    var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
-    var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
+    // Only the last ~16 messages are ever used below; trim in SQL so this read
+    // stays cheap no matter how long the conversation has grown.
+    var transcript = await loadRecentTranscript(sessionId, 16);
 
     var userOwnWords = message || '';
     var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
@@ -1632,8 +1647,7 @@ app.post('/api/chat/compare', async function(req, res) {
     var tree = projectResult.rows[0] ? projectResult.rows[0].tractatus_tree || {} : {};
     var tieredMemory = await loadTieredMemory(projectId);
 
-    var sessionResult = await pool.query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
-    var transcript = sessionResult.rows[0] ? (sessionResult.rows[0].transcript || []) : [];
+    var transcript = await loadRecentTranscript(sessionId, 16);
 
     var userOwnWords = (message || '').substring(0, 2000);
     var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
