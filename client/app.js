@@ -1197,7 +1197,7 @@
       '<div class="tp-title">&#128736; Updating Project Memory</div>' +
       '<div class="tp-controls">' +
       '<button class="tp-minimize" data-testid="tp-minimize" title="Minimize">&#8211;</button>' +
-      '<button class="tp-close hidden" data-testid="tp-close" title="Close">&times;</button>' +
+      '<button class="tp-close" data-testid="tp-close" title="Close">&times;</button>' +
       '</div></div>' +
       '<div class="tp-body"><div class="tp-content"><span class="cursor-blink"></span></div></div>';
 
@@ -1211,18 +1211,25 @@
     var minimized = false;
     var rawText = '';
 
-    tpMinimize.addEventListener('click', function() {
-      minimized = !minimized;
+    function setMinimized(v) {
+      minimized = v;
       tpBody.classList.toggle('hidden', minimized);
-      tpMinimize.innerHTML = minimized ? '&#9744;' : '&#8211;';
-    });
-    tpClose.addEventListener('click', function() { popup.remove(); });
+      popup.classList.toggle('minimized', minimized);
+      tpMinimize.innerHTML = minimized ? '&#9633;' : '&#8211;';
+      tpMinimize.title = minimized ? 'Expand' : 'Minimize';
+    }
+    tpMinimize.addEventListener('click', function(e) { e.stopPropagation(); setMinimized(!minimized); });
+    tpClose.addEventListener('click', function(e) { e.stopPropagation(); popup.remove(); });
 
     var header = popup.querySelector('.tp-header');
-    var dragging = false, startX, startY, origX, origY;
+    var dragging = false, moved = false, startX, startY, origX, origY;
+    header.addEventListener('dblclick', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      setMinimized(!minimized);
+    });
     header.addEventListener('mousedown', function(e) {
       if (e.target.tagName === 'BUTTON') return;
-      dragging = true;
+      dragging = true; moved = false;
       startX = e.clientX; startY = e.clientY;
       var rect = popup.getBoundingClientRect();
       origX = rect.left; origY = rect.top;

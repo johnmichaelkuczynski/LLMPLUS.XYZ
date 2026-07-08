@@ -2071,20 +2071,28 @@ html, body {
 }
 
 .tp-controls button {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.25);
   border: none;
   color: #fff;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.tp-controls button:hover { background: rgba(255,255,255,0.35); }
+.tp-controls button:hover { background: rgba(255,255,255,0.5); }
+
+.tractatus-popup.minimized {
+  width: auto;
+  max-width: 260px;
+}
+.tractatus-popup.minimized .tp-header { border-radius: 12px; }
 
 .tp-body {
   flex: 1;
