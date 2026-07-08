@@ -850,14 +850,16 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n- EXCEPTION: If the user asks for a LIST (e.g. "list all X", "what are the Y"), provide the COMPLETE list — do not cut it short. Lists should be complete but each item should be brief.';
     prompt += '\n- VIOLATING THIS BY WRITING UNNECESSARILY LONG RESPONSES IS A CRITICAL FAILURE.';
   } else if (responseLength === 'normal') {
-    prompt += '\n\nRESPONSE LENGTH: NORMAL. Give balanced, moderate-length responses.';
-    prompt += '\n- A few paragraphs for most questions. Not too short, not too long.';
-    prompt += '\n- For simple factual questions, still keep it brief — a sentence or two.';
-    prompt += '\n- Only elaborate when the topic genuinely requires it.';
-    prompt += '\n- When writing documents, produce a complete but moderate-length version.';
+    prompt += '\n\nRESPONSE LENGTH: NORMAL — MATCH THE ANSWER TO THE QUESTION. Length is not a target to fill; it is dictated by what the question actually needs.';
+    prompt += '\n- If a one-word or one-sentence answer is correct and complete, give EXACTLY that and stop. "Is X true?" → "Yes." or "No, because <one clause>."';
+    prompt += '\n- A short question gets a short answer. A simple factual question gets just the fact. Do NOT pad, do NOT add unrequested background, caveats, or summaries.';
+    prompt += '\n- Only write multiple paragraphs when the question genuinely calls for explanation, comparison, or analysis.';
+    prompt += '\n- Only write a long document when the user explicitly asks you to write/draft/compose one. Never turn a plain question into an essay.';
+    prompt += '\n- Writing far more than the question requires is a failure, exactly like writing too little.';
   } else if (responseLength === 'detailed') {
-    prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses.';
-    prompt += '\n- Provide comprehensive coverage of the topic.';
+    prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses WHEN the question warrants it.';
+    prompt += '\n- If the question has a short, factual, or yes/no answer, still answer it briefly — do NOT inflate a simple question into an essay just because this mode is on.';
+    prompt += '\n- When the topic genuinely calls for depth, provide comprehensive coverage.';
     prompt += '\n- Include examples, nuances, edge cases, and supporting reasoning.';
     prompt += '\n- When writing documents, be expansive and thorough.';
   } else if (responseLength === 'exhaustive') {
@@ -1475,13 +1477,19 @@ app.post('/api/chat', async function(req, res) {
       if (requestedWords > 0 && currentWords >= requestedWords * 1.2) {
         console.log('[Chat] stopping: upper bound reached (' + currentWords + '/' + requestedWords + ' words, max ' + Math.round(requestedWords * 1.2) + ')');
       } else if (lastResult.stopReason === 'max_tokens') {
-        if (responseLength === 'concise' && requestedWords === 0) {
-          console.log('[Chat] stopping: concise mode, no continuations');
-        } else if (requestedWords > 0 && currentWords >= requestedWords * 0.8) {
+        if (requestedWords > 0 && currentWords >= requestedWords * 0.8) {
           console.log('[Chat] stopping: within 20% margin of target (' + currentWords + '/' + requestedWords + ')');
-        } else {
+        } else if (requestedWords > 0) {
           needsMore = true;
-          console.log('[Chat] continuing: max_tokens hit');
+          console.log('[Chat] continuing: toward explicit word target');
+        } else if (isLongform) {
+          needsMore = true;
+          console.log('[Chat] continuing: explicit long-form request');
+        } else {
+          // No explicit length target and not an explicit long-form request:
+          // do NOT auto-continue. The model chose this length; forcing more
+          // is exactly the runaway-length behavior users hate.
+          console.log('[Chat] stopping: max_tokens but no explicit length target (adaptive)');
         }
       } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.8) {
         needsMore = true;
