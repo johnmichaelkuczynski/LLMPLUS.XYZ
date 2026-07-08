@@ -106,7 +106,7 @@
   }
 
   function formatArtifactHtml(text) {
-    var h = esc(text);
+    var h = renderTables(text);
     h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
@@ -124,7 +124,7 @@
     var htmlLines = h.split('\n');
     for (var i = 0; i < htmlLines.length; i++) {
       var line = htmlLines[i];
-      var isBlock = /^<(h[1-3]|hr|pre|ul|ol|li|blockquote)/.test(line.trim());
+      var isBlock = /^<(h[1-3]|hr|pre|ul|ol|li|blockquote|table)/.test(line.trim());
       if (isBlock) {
         if (inParagraph) { result += '</p>'; inParagraph = false; }
         result += line + '\n';
@@ -423,8 +423,69 @@
     return d.innerHTML;
   }
 
+  // Inline markdown (bold/italic/code) for use inside table cells.
+  function inlineMd(s) {
+    var h = esc(s);
+    h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+    h = h.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+    return h;
+  }
+
+  // Convert GitHub-style markdown tables into HTML <table> blocks. Takes RAW
+  // text: table cells are escaped+inline-formatted once via inlineMd, and every
+  // non-table line is escaped here, so this is the FIRST transform (replaces the
+  // initial esc() call). A table is consecutive pipe rows whose 2nd line is a
+  // --- separator.
+  function renderTables(rawText) {
+    var lines = String(rawText).split('\n');
+    var out = [];
+    var i = 0;
+    var inFence = false;
+    // A separator must itself be pipe-delimited (rules out a lone "---" after
+    // prose that happens to contain a pipe) and describe >=2 columns.
+    function isRow(l) { return /\|/.test(l) && l.trim().length > 0; }
+    function isSep(l) {
+      if (!/\|/.test(l)) return false;
+      if (!/^[\s|:-]+$/.test(l.trim())) return false;
+      if (!/-/.test(l)) return false;
+      return cells(l).length >= 2;
+    }
+    function cells(l) {
+      var t = l.trim().replace(/^\|/, '').replace(/\|$/, '');
+      return t.split('|').map(function(c) { return c.trim(); });
+    }
+    while (i < lines.length) {
+      if (/^\s*```/.test(lines[i])) { inFence = !inFence; out.push(esc(lines[i])); i++; continue; }
+      if (!inFence && isRow(lines[i]) && i + 1 < lines.length && isSep(lines[i + 1]) && cells(lines[i]).length >= 2) {
+        var header = cells(lines[i]);
+        var body = [];
+        var j = i + 2;
+        while (j < lines.length && isRow(lines[j]) && !isSep(lines[j])) {
+          body.push(cells(lines[j]));
+          j++;
+        }
+        var tbl = '<table class="md-table"><thead><tr>';
+        for (var h = 0; h < header.length; h++) tbl += '<th>' + inlineMd(header[h]) + '</th>';
+        tbl += '</tr></thead><tbody>';
+        for (var r = 0; r < body.length; r++) {
+          tbl += '<tr>';
+          for (var c = 0; c < header.length; c++) tbl += '<td>' + inlineMd(body[r][c] || '') + '</td>';
+          tbl += '</tr>';
+        }
+        tbl += '</tbody></table>';
+        out.push(tbl);
+        i = j;
+      } else {
+        out.push(esc(lines[i]));
+        i++;
+      }
+    }
+    return out.join('\n');
+  }
+
   function fmt(text) {
-    var h = esc(text);
+    var h = renderTables(text);
     h = h.replace(/```([\s\S]*?)```/g, '<pre style="background:#f3f4f6;padding:12px;border-radius:6px;overflow-x:auto;font-family:JetBrains Mono,monospace;font-size:13px;margin:8px 0">$1</pre>');
     h = h.replace(/`([^`]+)`/g, '<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:13px">$1</code>');
     h = h.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');

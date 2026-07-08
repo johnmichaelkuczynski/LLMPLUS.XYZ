@@ -2267,6 +2267,49 @@ html, body {
   width: 60%;
 }
 
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.md-table th,
+.md-table td {
+  border: 1px solid #d1d5db;
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  background: #f3f4f6;
+  font-weight: 700;
+}
+
+.md-table tbody tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.msg-text .md-table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.msg-text .md-table th,
+.msg-text .md-table td {
+  border: 1px solid #d1d5db;
+  padding: 6px 9px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.msg-text .md-table th {
+  background: #f3f4f6;
+  font-weight: 700;
+}
+
 .artifact-body blockquote {
   margin: 12px 0 12px 30px;
   padding-left: 15px;

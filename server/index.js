@@ -3635,12 +3635,63 @@ app.post('/api/artifact/docx', async function(req, res) {
     var Paragraph = docxModule.Paragraph;
     var TextRun = docxModule.TextRun;
     var HeadingLevel = docxModule.HeadingLevel;
+    var Table = docxModule.Table;
+    var TableRow = docxModule.TableRow;
+    var TableCell = docxModule.TableCell;
+    var WidthType = docxModule.WidthType;
+
+    function boldRuns(str) {
+      var runs = [];
+      var parts = String(str).split(/(\*\*[^*]+\*\*)/);
+      for (var p = 0; p < parts.length; p++) {
+        if (/^\*\*(.+)\*\*$/.test(parts[p])) {
+          runs.push(new TextRun({ text: parts[p].replace(/\*\*/g, ''), bold: true }));
+        } else if (parts[p]) {
+          runs.push(new TextRun({ text: parts[p] }));
+        }
+      }
+      if (runs.length === 0) runs.push(new TextRun({ text: '' }));
+      return runs;
+    }
+    function tableCells(l) {
+      return l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function(c) { return c.trim(); });
+    }
+    function isTableRow(l) { return /\|/.test(l) && l.trim().length > 0; }
+    function isTableSep(l) {
+      if (!/\|/.test(l) || !/-/.test(l)) return false;
+      if (!/^[\s|:-]+$/.test(l.trim())) return false;
+      return tableCells(l).length >= 2;
+    }
 
     var children = [];
     var lines = text.split('\n');
+    var docInFence = false;
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
-      if (/^# (.+)/.test(line)) {
+      if (/^\s*```/.test(line)) { docInFence = !docInFence; children.push(new Paragraph({ children: boldRuns(line) })); continue; }
+      if (!docInFence && isTableRow(line) && i + 1 < lines.length && isTableSep(lines[i + 1]) && tableCells(line).length >= 2) {
+        var header = tableCells(line);
+        var rows = [];
+        var mkCell = function(txt, bold) {
+          return new TableCell({
+            width: { size: Math.floor(100 / header.length), type: WidthType.PERCENTAGE },
+            children: [new Paragraph({ children: bold ? [new TextRun({ text: String(txt), bold: true })] : boldRuns(txt) })]
+          });
+        };
+        var headCells = header.map(function(c) { return mkCell(c, true); });
+        rows.push(new TableRow({ tableHeader: true, children: headCells }));
+        var j = i + 2;
+        while (j < lines.length && isTableRow(lines[j]) && !isTableSep(lines[j])) {
+          var bodyC = tableCells(lines[j]);
+          var cellObjs = [];
+          for (var c2 = 0; c2 < header.length; c2++) cellObjs.push(mkCell(bodyC[c2] || '', false));
+          rows.push(new TableRow({ children: cellObjs }));
+          j++;
+        }
+        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows }));
+        children.push(new Paragraph({ text: '' }));
+        i = j - 1;
+      } else if (/^# (.+)/.test(line)) {
         children.push(new Paragraph({ text: line.replace(/^# /, ''), heading: HeadingLevel.HEADING_1 }));
       } else if (/^## (.+)/.test(line)) {
         children.push(new Paragraph({ text: line.replace(/^## /, ''), heading: HeadingLevel.HEADING_2 }));
@@ -3649,16 +3700,7 @@ app.post('/api/artifact/docx', async function(req, res) {
       } else if (line.trim() === '') {
         children.push(new Paragraph({ text: '' }));
       } else {
-        var runs = [];
-        var parts = line.split(/(\*\*[^*]+\*\*)/);
-        for (var p = 0; p < parts.length; p++) {
-          if (/^\*\*(.+)\*\*$/.test(parts[p])) {
-            runs.push(new TextRun({ text: parts[p].replace(/\*\*/g, ''), bold: true }));
-          } else if (parts[p]) {
-            runs.push(new TextRun({ text: parts[p] }));
-          }
-        }
-        children.push(new Paragraph({ children: runs }));
+        children.push(new Paragraph({ children: boldRuns(line) }));
       }
     }
 
@@ -3696,9 +3738,63 @@ app.post('/api/artifact/pdf', async function(req, res) {
     });
 
     var lines = text.split('\n');
+    var pdfInFence = false;
+    function pCells(l) {
+      return l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function(c) {
+        return c.trim().replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+      });
+    }
+    function pIsRow(l) { return /\|/.test(l) && l.trim().length > 0; }
+    function pIsSep(l) {
+      if (!/\|/.test(l) || !/-/.test(l)) return false;
+      if (!/^[\s|:-]+$/.test(l.trim())) return false;
+      return pCells(l).length >= 2;
+    }
+    function drawTable(header, body) {
+      var pageLeft = 72, tableWidth = 468;
+      var colW = tableWidth / header.length;
+      var padding = 4;
+      function rowHeight(cellArr, isHead) {
+        doc.fontSize(10).font(isHead ? 'Helvetica-Bold' : 'Helvetica');
+        var maxH = 0;
+        for (var k = 0; k < header.length; k++) {
+          var hgt = doc.heightOfString(String(cellArr[k] || ''), { width: colW - padding * 2 });
+          if (hgt > maxH) maxH = hgt;
+        }
+        return maxH + padding * 2;
+      }
+      function drawRow(cellArr, isHead) {
+        var h = rowHeight(cellArr, isHead);
+        if (doc.y + h > doc.page.height - 72) doc.addPage();
+        var y0 = doc.y;
+        doc.fontSize(10).font(isHead ? 'Helvetica-Bold' : 'Helvetica');
+        for (var k = 0; k < header.length; k++) {
+          var x = pageLeft + k * colW;
+          doc.rect(x, y0, colW, h).stroke();
+          doc.text(String(cellArr[k] || ''), x + padding, y0 + padding, { width: colW - padding * 2 });
+        }
+        doc.y = y0 + h;
+      }
+      drawRow(header, true);
+      for (var b = 0; b < body.length; b++) drawRow(body[b], false);
+      doc.moveDown(0.5);
+      doc.font('Times-Roman');
+    }
+
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
-      if (/^# (.+)/.test(line)) {
+      if (/^\s*```/.test(line)) { pdfInFence = !pdfInFence; doc.moveDown(0.2); continue; }
+      if (!pdfInFence && pIsRow(line) && i + 1 < lines.length && pIsSep(lines[i + 1]) && pCells(line).length >= 2) {
+        var pHeader = pCells(line);
+        var pBody = [];
+        var pj = i + 2;
+        while (pj < lines.length && pIsRow(lines[pj]) && !pIsSep(lines[pj])) {
+          pBody.push(pCells(lines[pj]));
+          pj++;
+        }
+        drawTable(pHeader, pBody);
+        i = pj - 1;
+      } else if (/^# (.+)/.test(line)) {
         doc.fontSize(18).font('Helvetica-Bold').text(line.replace(/^# /, ''), { align: 'center' });
         doc.moveDown(0.5);
       } else if (/^## (.+)/.test(line)) {
