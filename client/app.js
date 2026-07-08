@@ -1190,6 +1190,11 @@
   }
 
   function startTractatusUpdate(projectId, userMessage, assistantResponse) {
+    // Never let memory popups stack — remove any leftover one first so failed
+    // updates can't pile up and cover the screen.
+    var stale = document.querySelectorAll('[data-testid="tractatus-popup"]');
+    for (var s = 0; s < stale.length; s++) stale[s].remove();
+
     var popup = document.createElement('div');
     popup.className = 'tractatus-popup';
     popup.setAttribute('data-testid', 'tractatus-popup');
@@ -1304,6 +1309,7 @@
                     setTimeout(function() { popup.remove(); }, 4000);
                   } else {
                     tpTitle.innerHTML = '&#10060; Update Failed: ' + errMsg;
+                    setTimeout(function() { popup.remove(); }, 6000);
                   }
                   tpClose.classList.remove('hidden');
                 }
@@ -1312,8 +1318,11 @@
           }
           pump();
         }).catch(function() {
-          tpTitle.innerHTML = '&#10060; Connection Lost';
+          tpTitle.innerHTML = '&#10060; Connection Lost (memory saved in background)';
           tpClose.classList.remove('hidden');
+          var cursor = tpContent.querySelector('.cursor-blink');
+          if (cursor) cursor.remove();
+          setTimeout(function() { popup.remove(); }, 5000);
         });
       }
       pump();
@@ -1322,6 +1331,7 @@
       tpClose.classList.remove('hidden');
       var cursor = tpContent.querySelector('.cursor-blink');
       if (cursor) cursor.remove();
+      setTimeout(function() { popup.remove(); }, 6000);
     });
   }
 
