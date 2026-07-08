@@ -2925,16 +2925,20 @@
     els.projectModal.classList.remove('active');
   });
 
-  els.btnNewSession.addEventListener('click', async function() {
+  els.btnNewSession.addEventListener('click', function() {
     if (!state.currentProject) {
       notify('Select a project first', 'error');
       return;
     }
+    openGroundRulesModal('create');
+  });
+
+  async function createChatWithRules(rules) {
     try {
       var s = await api('/api/projects/' + state.currentProject.id + '/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'New Chat' })
+        body: JSON.stringify({ title: 'New Chat', groundRules: rules || '' })
       });
       s.transcript = [];
       state.sessions.unshift(s);
@@ -2944,7 +2948,7 @@
     } catch (err) {
       notify('Failed to create chat', 'error');
     }
-  });
+  }
 
   els.btnUpload.addEventListener('click', function() {
     els.fileInput.click();
@@ -4063,6 +4067,65 @@
       updatePinnedCount();
       pinnedModal.classList.add('show');
       setTimeout(function() { pinnedInput.focus(); }, 50);
+    } catch (e) { notify('Failed to load: ' + e.message, 'error'); }
+  });
+
+  var grModal = document.getElementById('ground-rules-modal');
+  var grInput = document.getElementById('ground-rules-input');
+  var grCharcount = document.getElementById('ground-rules-charcount');
+  var grTitle = document.getElementById('ground-rules-title');
+  var grSkipBtn = document.getElementById('btn-ground-rules-skip');
+  var grSaveBtn = document.getElementById('btn-ground-rules-save');
+  var grMode = 'create';
+  function updateGrCount() { if (grCharcount && grInput) grCharcount.textContent = (grInput.value || '').length; }
+  if (grInput) grInput.addEventListener('input', updateGrCount);
+  function closeGr() { if (grModal) grModal.classList.remove('show'); }
+  function openGroundRulesModal(mode, existing) {
+    grMode = mode;
+    grInput.value = existing || '';
+    updateGrCount();
+    if (mode === 'edit') {
+      grTitle.innerHTML = '\u2696\uFE0F Ground Rules for this Chat';
+      grSkipBtn.textContent = 'Cancel';
+      grSaveBtn.textContent = 'Save';
+    } else {
+      grTitle.innerHTML = '\u2696\uFE0F Set Ground Rules for this New Chat';
+      grSkipBtn.textContent = 'Skip';
+      grSaveBtn.textContent = 'Start Chat';
+    }
+    grModal.classList.add('show');
+    setTimeout(function() { grInput.focus(); }, 50);
+  }
+  if (document.getElementById('close-ground-rules')) document.getElementById('close-ground-rules').addEventListener('click', function() { closeGr(); });
+  if (grSkipBtn) grSkipBtn.addEventListener('click', async function() {
+    if (grMode === 'create') { closeGr(); await createChatWithRules(''); }
+    else { closeGr(); }
+  });
+  if (grSaveBtn) grSaveBtn.addEventListener('click', async function() {
+    var rules = grInput.value || '';
+    if (grMode === 'create') {
+      closeGr();
+      await createChatWithRules(rules);
+    } else {
+      if (!state.currentSession) { notify('No chat selected', 'error'); return; }
+      try {
+        var res = await fetch('/api/sessions/' + state.currentSession.id + '/ground-rules', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groundRules: rules })
+        });
+        if (!res.ok) throw new Error('Save failed (' + res.status + ')');
+        state.currentSession.ground_rules = rules;
+        notify('Ground rules saved', 'success');
+        closeGr();
+      } catch (e) { notify('Failed to save: ' + e.message, 'error'); }
+    }
+  });
+  document.getElementById('btn-ground-rules').addEventListener('click', async function() {
+    if (!state.currentSession) { notify('Open or start a chat first', 'error'); return; }
+    try {
+      var res = await fetch('/api/sessions/' + state.currentSession.id + '/ground-rules');
+      var data = await res.json();
+      openGroundRulesModal('edit', data.groundRules || '');
     } catch (e) { notify('Failed to load: ' + e.message, 'error'); }
   });
 

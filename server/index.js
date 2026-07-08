@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
   title TEXT,
   transcript JSONB DEFAULT '[]'::jsonb,
+  ground_rules TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS project_documents (
@@ -253,6 +254,7 @@ async function initDB() {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS compression_count INTEGER DEFAULT 0");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS audit_lessons JSONB DEFAULT '[]'::jsonb");
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS pinned_context TEXT DEFAULT ''");
+      await client.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ground_rules TEXT DEFAULT ''");
     } catch (e) { /* columns may already exist */ }
     try {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT");
@@ -825,7 +827,7 @@ async function loadRecentTranscript(sessionId, limit) {
   return r.rows[0] ? (r.rows[0].tail || []) : [];
 }
 
-function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext) {
+function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext, groundRules) {
   var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort. Provide expert-level, intellectually rigorous responses.';
 
   if (includeProjectContext !== false && pinnedContext && String(pinnedContext).trim().length > 0) {
@@ -851,6 +853,15 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- STAY ON MISSION. When the user has stated an overall goal (e.g. producing a specific legal document with surgical references), keep that goal in view and do exactly the step requested — do not drift into tangents on your own initiative.';
   prompt += '\n- Only ask a clarifying question if an instruction is genuinely self-contradictory or impossible; otherwise carry it out as given rather than stalling.';
   prompt += '\n- Two equal failures: (a) burying the user\'s task under unrequested analysis, and (b) refusing or skimping on work the user actually asked for. Avoid both by doing precisely what was instructed.';
+
+  if (groundRules && String(groundRules).trim().length > 0) {
+    var gr = String(groundRules).trim().slice(0, 4000);
+    prompt += '\n\nGROUND RULES FOR THIS CHAT — set by the user for this conversation. These are STANDING instructions that apply to EVERY response in this chat and take PRECEDENCE over the length, format, or verbosity that any individual message might otherwise imply, and over the stance/length/format defaults below.';
+    prompt += '\n- Obey them literally and consistently in every single reply.';
+    prompt += '\n- Example: if a ground rule says "no answer longer than one paragraph," then even when the user asks you to "explain in full detail" or "give me everything," you deliver a full, dense answer COMPRESSED into one paragraph — you do NOT exceed the limit. Honor the request for depth WITHIN the rule, do not break the rule to satisfy it.';
+    prompt += '\n- The ONLY thing that overrides a ground rule is an EXPLICIT instruction in the current message to set that specific rule aside for this one answer (e.g. "ignore the one-paragraph limit this time" or "for this answer only, write 3000 words"). A general request for detail or thoroughness is NOT such an override.';
+    prompt += '\n- The ground rules are:\n' + gr;
+  }
 
   prompt += '\n\nSTANCE — this governs the analytical posture of your response. Stance is a CONTENT directive, not a tonal one. The manner of delivery remains professional and measured in every stance; what changes is which case you build.';
   if (stance === 'agreeable') {
@@ -995,6 +1006,13 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   return prompt;
 }
 
+// Appended by callers as the ABSOLUTE last line of the system prompt (after any
+// length/target/concise/cross-session additions) so ground rules win on recency.
+function groundRulesFinalReminder(groundRules) {
+  if (!groundRules || String(groundRules).trim().length === 0) return '';
+  return '\n\nABSOLUTE FINAL RULE — GROUND RULES FOR THIS CHAT WIN. Everything above (the length mode, any exact word-count target, any "be thorough"/"full detail" request) is subordinate to the user\'s ground rules for this chat. Comply with them exactly as the last word. If they cap length or format, honor that cap even for detail requests and even if an exact word-count target was stated above — pack the depth into the allowed space rather than exceeding it. The ONLY exception is if the user, in their latest message, explicitly told you to set a specific ground rule aside for this one answer. The ground rules:\n' + String(groundRules).trim().slice(0, 4000);
+}
+
 app.get('/api/projects/:id/pinned-context', async function(req, res) {
   try {
     if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
@@ -1089,11 +1107,33 @@ app.post('/api/projects/:id/sessions', async function(req, res) {
   try {
     if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
     var title = req.body.title || 'New Session';
+    var groundRules = String(req.body.groundRules || '').slice(0, 4000);
     var result = await pool.query(
-      "INSERT INTO sessions (project_id, title, transcript) VALUES ($1, $2, '[]'::jsonb) RETURNING *",
-      [req.params.id, title]
+      "INSERT INTO sessions (project_id, title, transcript, ground_rules) VALUES ($1, $2, '[]'::jsonb, $3) RETURNING *",
+      [req.params.id, title, groundRules]
     );
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sessions/:id/ground-rules', async function(req, res) {
+  try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var r = await pool.query('SELECT ground_rules FROM sessions WHERE id = $1', [req.params.id]);
+    res.json({ groundRules: r.rows[0] ? (r.rows[0].ground_rules || '') : '' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/sessions/:id/ground-rules', async function(req, res) {
+  try {
+    if (!await verifySessionOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var text = String(req.body.groundRules || '').slice(0, 4000);
+    await pool.query('UPDATE sessions SET ground_rules = $1 WHERE id = $2', [text, req.params.id]);
+    res.json({ ok: true, groundRules: text });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1249,6 +1289,9 @@ app.post('/api/chat', async function(req, res) {
     // stays cheap no matter how long the conversation has grown.
     var transcript = await loadRecentTranscript(sessionId, 16);
 
+    var grRes = await pool.query('SELECT ground_rules FROM sessions WHERE id = $1', [sessionId]);
+    var groundRules = grRes.rows[0] ? (grRes.rows[0].ground_rules || '') : '';
+
     var userOwnWords = message || '';
     var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
     if (attachIdx === -1) attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
@@ -1302,7 +1345,7 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var auditLessons = await loadAuditLessons(projectId);
-    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedCtx);
+    var systemPrompt = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedCtx, groundRules);
     if (includeProjectContext && crossSessionContext) {
       systemPrompt += '\n\n## Context from previous chats in this project\nIMPORTANT: You DO have access to previous conversations in this project. The excerpts below are from other chat sessions the user has had. When the user asks about previous sessions or what was discussed before, USE this context to answer. Never say "I don\'t have access to previous conversations" — you do, they are right here:\n' + crossSessionContext;
     }
@@ -1349,6 +1392,7 @@ app.post('/api/chat', async function(req, res) {
     } else if (responseLength === 'concise') {
       systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. Everything above notwithstanding, your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words even for complex questions. Never produce essays, multi-section documents, or long lists of caveats in this mode.';
     }
+    systemPrompt += groundRulesFinalReminder(groundRules);
     var continuationCount = 0;
 
     async function streamOpenAICompatibleCall(callMsgs, callFn, label) {
@@ -1676,8 +1720,10 @@ app.post('/api/chat/compare', async function(req, res) {
     var auditLessonsCmp = await loadAuditLessons(projectId);
     var pinnedCmpRes = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [projectId]);
     var pinnedCmpCtx = pinnedCmpRes.rows[0] ? (pinnedCmpRes.rows[0].pinned_context || '') : '';
-    var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA, auditLessonsCmp, pinnedCmpCtx);
-    var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB, auditLessonsCmp, pinnedCmpCtx);
+    var grCmpRes = await pool.query('SELECT ground_rules FROM sessions WHERE id = $1', [sessionId]);
+    var groundRulesCmp = grCmpRes.rows[0] ? (grCmpRes.rows[0].ground_rules || '') : '';
+    var systemA = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceA, auditLessonsCmp, pinnedCmpCtx, groundRulesCmp);
+    var systemB = buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stanceB, auditLessonsCmp, pinnedCmpCtx, groundRulesCmp);
 
     var cmpTargetWords = parseInt(req.body.targetWords, 10);
     if (!(cmpTargetWords >= 10 && cmpTargetWords <= 30000)) cmpTargetWords = 0;
@@ -1691,6 +1737,9 @@ app.post('/api/chat/compare', async function(req, res) {
       systemA += cmpConciseNote;
       systemB += cmpConciseNote;
     }
+    var grCmpFinal = groundRulesFinalReminder(groundRulesCmp);
+    systemA += grCmpFinal;
+    systemB += grCmpFinal;
 
     var msgs = [];
     var recent = transcript.slice(-16);
