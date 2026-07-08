@@ -3,4 +3,5 @@
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.
 - [Google OAuth client mismatch](google-oauth-client-mismatch.md) — redirect_uri_mismatch with a "registered" URI usually means wrong OAuth client; same-project client IDs share the numeric prefix, so compare full IDs.
 - [Chat context-build latency](chat-context-latency.md) — per-turn chat latency must NOT scale with project size; trim transcript tails in SQL, gate cross-session behind includeProjectContext, keep raw history lean (memory tree carries continuity).
+- [Assistant verbosity & mission drift](assistant-verbosity-mission-drift.md) — highest-priority prompt block makes the assistant obey "read and take note" (brief confirm, no lecture) and stay on mission; keep it ABOVE any rigor/analysis framing.
 - [Secret updates and stale env](secret-update-stale-env.md) — shell/server can hold a stale secret after user updates it; fingerprint via sha256 and restart workflow after the save, not before.
