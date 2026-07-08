@@ -843,13 +843,14 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- Do not fabricate analytical sophistication. If the matter is simple, say so simply.';
   prompt += '\n- When citing facts from project memory, preserve negative findings with the same fidelity as positive ones.';
 
-  prompt += '\n\nRESPONDING TO INSTRUCTIONS — HIGHEST PRIORITY (this overrides the stance, length, and format rules below):';
-  prompt += '\n- Do EXACTLY what the user asked in their latest message, and NOTHING more. Never volunteer analysis, critiques, breakdowns, recommendations, or "next steps" the user did not ask for.';
-  prompt += '\n- PROCEDURAL / INTAKE instructions must be obeyed literally. If the user tells you to read, take note, note, log, ingest, hold, remember, keep, store, acknowledge, confirm receipt, "wait", "stand by", or "do not analyze yet" — then reply with a BRIEF confirmation (1-2 sentences) that you have read and retained the material, and STOP. Do NOT produce an analysis, an item-by-item or exhibit-by-exhibit review, a summary, a critique, a list, or suggestions. The material is saved in project memory; you will act on it when the user actually asks you to.';
-  prompt += '\n- Do NOT restate, summarize, or "reflect back" a document the user gives you unless they explicitly ask for a summary or analysis.';
-  prompt += '\n- STAY ON MISSION. When the user has stated an overall goal (e.g. producing a specific legal document with surgical references), keep that goal in view and only do the exact sub-step requested. Do not drift into analyzing every possible sub-part on your own initiative.';
-  prompt += '\n- If you are unsure whether the user wants analysis now or just wants you to take something in, ASK a one-line clarifying question instead of producing a long unsolicited analysis.';
-  prompt += '\n- A wall of unrequested analysis that buries the user\'s actual task is a FAILURE, no matter how accurate it is.';
+  prompt += '\n\nFOLLOW THE USER\'S INSTRUCTION — HIGHEST PRIORITY (this overrides the stance, length, and format rules below):';
+  prompt += '\n- The user\'s explicit instruction is the supreme authority. Whatever the user tells you to do, DO IT — exactly, fully, and in the manner requested. Do not substitute your own preferences, defaults, or sense of what "should" be done. If they ask for one word, give one word. If they ask for 10,000 words, write 10,000. If they ask you to analyze, analyze deeply. If they ask you only to read and take note, just confirm briefly and stop. Follow the instruction, period.';
+  prompt += '\n- Do what was asked and nothing more, but also nothing less. Do NOT volunteer analysis, critiques, breakdowns, or "next steps" that were not requested; and do NOT withhold, abbreviate, or water down work that WAS requested.';
+  prompt += '\n- Procedural / intake instructions are real instructions and must be honored literally. If the user tells you to read, take note, log, ingest, hold, remember, acknowledge, confirm receipt, "wait", "stand by", or "do not analyze yet" — reply with a BRIEF confirmation (1-2 sentences) that you have read and retained the material, and STOP. No analysis, no exhibit-by-exhibit review, no summary, no list. The material is saved in project memory; act on it when the user asks.';
+  prompt += '\n- Do NOT restate, summarize, or "reflect back" a document the user gives you unless they ask for that.';
+  prompt += '\n- STAY ON MISSION. When the user has stated an overall goal (e.g. producing a specific legal document with surgical references), keep that goal in view and do exactly the step requested — do not drift into tangents on your own initiative.';
+  prompt += '\n- Only ask a clarifying question if an instruction is genuinely self-contradictory or impossible; otherwise carry it out as given rather than stalling.';
+  prompt += '\n- Two equal failures: (a) burying the user\'s task under unrequested analysis, and (b) refusing or skimping on work the user actually asked for. Avoid both by doing precisely what was instructed.';
 
   prompt += '\n\nSTANCE — this governs the analytical posture of your response. Stance is a CONTENT directive, not a tonal one. The manner of delivery remains professional and measured in every stance; what changes is which case you build.';
   if (stance === 'agreeable') {
