@@ -329,17 +329,9 @@
 
   els.artifactCopy.addEventListener('click', function() {
     if (!currentArtifact) return;
-    navigator.clipboard.writeText(currentArtifact.text).then(function() {
-      els.artifactCopy.textContent = '\u2705 Copied';
-      setTimeout(function() { els.artifactCopy.innerHTML = '&#128203; Copy'; }, 2000);
-    }).catch(function() {
-      var ta = document.createElement('textarea');
-      ta.value = currentArtifact.text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      els.artifactCopy.textContent = '\u2705 Copied';
+    var html = els.artifactBody ? els.artifactBody.innerHTML : fmt(currentArtifact.text);
+    copyRich(html, currentArtifact.text, function(ok) {
+      els.artifactCopy.textContent = ok ? '\u2705 Copied' : '\u26A0 Copy failed';
       setTimeout(function() { els.artifactCopy.innerHTML = '&#128203; Copy'; }, 2000);
     });
   });
@@ -442,6 +434,47 @@
     h = h.replace(/^# (.+)$/gm, '<strong style="font-size:18px;display:block;margin:16px 0 6px">$1</strong>');
     h = h.replace(/^- (.+)$/gm, '\u2022 $1');
     return h;
+  }
+
+  // Copy with formatting preserved: writes both rich HTML and plain text to the
+  // clipboard so pasting into Word / Google Docs / email keeps bold, headings,
+  // bullets and line breaks, while plain-text editors still get clean text.
+  function copyRich(html, plain, onDone) {
+    var clean = document.createElement('div');
+    clean.innerHTML = html || '';
+    var junk = clean.querySelectorAll('.cursor-blink, .thinking-indicator, .artifact-link');
+    for (var i = junk.length - 1; i >= 0; i--) junk[i].parentNode.removeChild(junk[i]);
+    html = clean.innerHTML;
+    var wrapped = '<div style="white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#111">' + html + '</div>';
+    var finish = function(ok) { if (onDone) onDone(ok); };
+    var plainFallback = function() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = plain;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        finish(true);
+      } catch (e) { finish(false); }
+    };
+    if (navigator.clipboard && typeof window.ClipboardItem === 'function') {
+      try {
+        var item = new window.ClipboardItem({
+          'text/html': new Blob([wrapped], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' })
+        });
+        navigator.clipboard.write([item]).then(function() { finish(true); }).catch(plainFallback);
+        return;
+      } catch (e) { /* fall through */ }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(plain).then(function() { finish(true); }).catch(plainFallback);
+    } else {
+      plainFallback();
+    }
   }
 
   async function api(url, opts) {
@@ -787,8 +820,9 @@
         copyBtn.addEventListener('click', function() {
           var textEl = div.querySelector('.msg-text');
           var rawText = textEl ? textEl.innerText : content;
-          navigator.clipboard.writeText(rawText).then(function() {
-            copyBtn.textContent = '\u2705';
+          var html = textEl ? textEl.innerHTML : fmt(content);
+          copyRich(html, rawText, function(ok) {
+            copyBtn.textContent = ok ? '\u2705' : '\u26A0';
             setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
           });
         });
@@ -928,8 +962,9 @@
     copyBtn.addEventListener('click', function() {
       var textEl = div.querySelector('.msg-text');
       var rawText = textEl ? textEl.innerText : '';
-      navigator.clipboard.writeText(rawText).then(function() {
-        copyBtn.textContent = '\u2705';
+      var html = textEl ? textEl.innerHTML : '';
+      copyRich(html, rawText, function(ok) {
+        copyBtn.textContent = ok ? '\u2705' : '\u26A0';
         setTimeout(function() { copyBtn.innerHTML = '&#128203;'; }, 1500);
       });
     });
