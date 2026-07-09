@@ -2944,7 +2944,9 @@
       notify('Select a project first', 'error');
       return;
     }
-    openGroundRulesModal('create');
+    // No popup barrier: start the chat immediately. Ground rules are optional and
+    // can be set any time from inside the chat via the standing "Ground Rules" button.
+    createChatWithRules('');
   });
 
   async function createChatWithRules(rules) {
