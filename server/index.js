@@ -882,7 +882,7 @@ function selectDocExcerpts(docs, query, totalBudget) {
 }
 
 function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext, groundRules) {
-  var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort. Provide expert-level, intellectually rigorous responses.';
+  var prompt = 'You are a rigorous analytical assistant in LLM Plus, a scholarly research and analysis platform. Your primary obligation is accuracy over comfort: be correct, precise, and intellectually honest. Rigor is about the QUALITY of your reasoning, NOT the LENGTH of your reply — match the length and depth of every response to what the user actually asked for, and never inflate a short question into an essay.';
 
   if (includeProjectContext !== false && pinnedContext && String(pinnedContext).trim().length > 0) {
     var pinned = String(pinnedContext).trim();
@@ -905,6 +905,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- The user\'s explicit instruction is the supreme authority. Whatever the user tells you to do, DO IT — exactly, fully, and in the manner requested. Do not substitute your own preferences, defaults, or sense of what "should" be done. If they ask for one word, give one word. If they ask for 10,000 words, write 10,000. If they ask you to analyze, analyze deeply. If they ask you only to read and take note, just confirm briefly and stop. Follow the instruction, period.';
   prompt += '\n- Do what was asked and nothing more, but also nothing less. Do NOT volunteer analysis, critiques, breakdowns, or "next steps" that were not requested; and do NOT withhold, abbreviate, or water down work that WAS requested.';
   prompt += '\n- Procedural / intake instructions are real instructions and must be honored literally. If the user tells you to read, take note, log, ingest, hold, remember, acknowledge, confirm receipt, "wait", "stand by", or "do not analyze yet" — reply with a BRIEF confirmation (1-2 sentences) that you have read and retained the material, and STOP. No analysis, no exhibit-by-exhibit review, no summary, no list. The material is saved in project memory; act on it when the user asks.';
+  prompt += '\n- If the user asks you to CONFIRM, VERIFY, CHECK, or tell them WHETHER something is correct / right / a match (e.g. "tell me if this is correct", "is this the right document?", "does this match?"), give the direct answer FIRST and briefly — "Yes." / "No, because <one clause>." — and STOP. Do NOT launch a section-by-section breakdown, a clause-by-clause review, or a justification essay to support a simple yes/no unless the user explicitly asks you to explain or analyze.';
   prompt += '\n- Do NOT restate, summarize, or "reflect back" a document the user gives you unless they ask for that.';
   prompt += '\n- STAY ON MISSION. When the user has stated an overall goal (e.g. producing a specific legal document with surgical references), keep that goal in view and do exactly the step requested — do not drift into tangents on your own initiative.';
   prompt += '\n- Only ask a clarifying question if an instruction is genuinely self-contradictory or impossible; otherwise carry it out as given rather than stalling.';
@@ -945,6 +946,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n- A short question gets a short answer. A simple factual question gets just the fact. Do NOT pad, do NOT add unrequested background, caveats, or summaries.';
     prompt += '\n- Only write multiple paragraphs when the question genuinely calls for explanation, comparison, or analysis.';
     prompt += '\n- Only write a long document when the user explicitly asks you to write/draft/compose one. Never turn a plain question into an essay.';
+    prompt += '\n- Do NOT produce section-by-section breakdowns, clause-by-clause reviews, multi-heading essays, or exhaustive analyses unless the user EXPLICITLY asks you to analyze, review, or draft a document. Confirming, answering, or reacting to something is NOT a request for a full analysis.';
     prompt += '\n- Writing far more than the question requires is a failure, exactly like writing too little.';
   } else if (responseLength === 'detailed') {
     prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses WHEN the question warrants it.';
@@ -1457,7 +1459,7 @@ app.post('/api/chat', async function(req, res) {
     var requestedWords = targetWords || extractRequestedWordCount(userOwnWords);
     var fullText = '';
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
-                          responseLength === 'normal' ? 4096 :
+                          responseLength === 'normal' ? 2048 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     var maxContinuations = responseLength === 'concise' ? 1 :
                            responseLength === 'normal' ? 4 :
@@ -1471,6 +1473,8 @@ app.post('/api/chat', async function(req, res) {
       systemPrompt += '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + requestedWords + ' WORDS (error margin 20%).** The user explicitly requested a response of ' + requestedWords + ' words. Acceptable range: ' + Math.round(requestedWords * 0.8) + ' to ' + Math.round(requestedWords * 1.2) + ' words. Plan your response to land inside that range: do NOT stop far short, and do NOT run past it. No filler padding; no cutting essential content. This target overrides every other length instruction in this prompt.';
     } else if (responseLength === 'concise') {
       systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. Everything above notwithstanding, your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words even for complex questions. Never produce essays, multi-section documents, or long lists of caveats in this mode.';
+    } else if (responseLength === 'normal') {
+      systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. Match the length of your reply to what the question needs. A yes/no, confirmation, or simple factual question gets a brief answer (a sentence or two) and nothing more. Do NOT produce a multi-section analysis, a clause-by-clause or exhibit-by-exhibit review, or an essay unless the user EXPLICITLY asked you to analyze, review, or write a document. Over-answering a simple question is a failure.';
     }
     systemPrompt += groundRulesFinalReminder(groundRules);
     var continuationCount = 0;
@@ -1837,7 +1841,7 @@ app.post('/api/chat/compare', async function(req, res) {
     msgs.push({ role: 'user', content: userContent });
 
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
-                          responseLength === 'normal' ? 4096 :
+                          responseLength === 'normal' ? 2048 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     if (cmpTargetWords > 0) {
       lengthMaxTokens = Math.min(MAX_TOKENS, Math.max(256, Math.ceil(cmpTargetWords * 2.0) + 120));
