@@ -187,7 +187,10 @@
           <button class="rl-btn active" data-length="normal" data-testid="rl-normal" title="Balanced responses">Normal</button>
           <button class="rl-btn" data-length="detailed" data-testid="rl-detailed" title="Thorough, in-depth responses">Detailed</button>
           <button class="rl-btn" data-length="exhaustive" data-testid="rl-exhaustive" title="Maximum depth, use all available tokens">Exhaustive</button>
-          <input type="number" id="target-words-input" data-testid="input-target-words" class="target-words-input" min="10" max="30000" step="10" placeholder="Words #" title="Exact word count for the response (within 20%). Overrides the length buttons. Leave blank for automatic.">
+          <span class="tw-wrap">
+            <input type="number" id="target-words-input" data-testid="input-target-words" class="target-words-input" min="10" max="30000" step="10" placeholder="Words #" title="Exact word count for the response (within 20%). Overrides the length buttons. Leave blank for automatic.">
+            <button type="button" id="tw-clear" class="tw-clear" data-testid="button-clear-target-words" title="Clear word target (use the Length buttons instead)" style="display:none">×</button>
+          </span>
 
           <span class="rl-divider"></span>
           <span class="rl-label">Format:</span>

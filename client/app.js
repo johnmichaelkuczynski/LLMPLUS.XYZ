@@ -2855,15 +2855,29 @@
       document.querySelectorAll('.rl-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.responseLength = btn.getAttribute('data-length');
+      clearTargetWords();
     });
   });
 
   var twInput = document.getElementById('target-words-input');
-  if (twInput) {
-    twInput.addEventListener('input', function() {
-      twInput.classList.toggle('has-value', !!getTargetWords());
-    });
+  var twClear = document.getElementById('tw-clear');
+  function refreshTargetWordsUI() {
+    if (!twInput) return;
+    var hasText = String(twInput.value || '').trim() !== '';
+    twInput.classList.toggle('has-value', hasText);
+    if (twClear) twClear.style.display = hasText ? 'inline-block' : 'none';
   }
+  function clearTargetWords() {
+    if (twInput) twInput.value = '';
+    refreshTargetWordsUI();
+  }
+  if (twInput) {
+    twInput.addEventListener('input', refreshTargetWordsUI);
+  }
+  if (twClear) {
+    twClear.addEventListener('click', clearTargetWords);
+  }
+  refreshTargetWordsUI();
 
   document.querySelectorAll('.rf-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {

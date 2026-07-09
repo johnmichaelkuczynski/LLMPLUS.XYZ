@@ -5,3 +5,4 @@
 - [Chat context-build latency](chat-context-latency.md) — per-turn chat latency must NOT scale with project size; trim transcript tails in SQL, gate cross-session behind includeProjectContext, keep raw history lean (memory tree carries continuity).
 - [Assistant verbosity & mission drift](assistant-verbosity-mission-drift.md) — highest-priority prompt block makes the assistant obey "read and take note" (brief confirm, no lecture) and stay on mission; keep it ABOVE any rigor/analysis framing.
 - [Secret updates and stale env](secret-update-stale-env.md) — shell/server can hold a stale secret after user updates it; fingerprint via sha256 and restart workflow after the save, not before.
+- [Target-words silent truncation](target-words-silent-truncation.md) — a stray value in the "Words #" box silently capped every reply (maxTokens=256) → mid-sentence freezes; persistent length-overrides need visible active state + clear.

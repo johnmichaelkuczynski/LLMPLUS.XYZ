@@ -752,11 +752,30 @@ html, body {
   color: #111827;
 }
 .target-words-input.has-value {
-  border-color: #6366f1;
-  background: #eef2ff;
-  color: #3730a3;
-  font-weight: 600;
+  border-color: #d97706;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
 }
+.tw-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.tw-clear {
+  margin-left: 2px;
+  border: none;
+  background: #d97706;
+  color: #fff;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.tw-clear:hover { background: #b45309; }
 
 .rl-btn {
   font-size: 11px;
