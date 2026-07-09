@@ -4057,7 +4057,7 @@
   var pinnedCharcount = document.getElementById('pinned-context-charcount');
   function updatePinnedCount() { if (pinnedCharcount && pinnedInput) pinnedCharcount.textContent = (pinnedInput.value || '').length; }
   if (pinnedInput) pinnedInput.addEventListener('input', updatePinnedCount);
-  function closePinned() { if (pinnedModal) pinnedModal.classList.remove('show'); }
+  function closePinned() { if (pinnedModal) pinnedModal.classList.remove('active'); }
   if (document.getElementById('close-pinned-context')) document.getElementById('close-pinned-context').addEventListener('click', closePinned);
   if (document.getElementById('btn-pinned-cancel')) document.getElementById('btn-pinned-cancel').addEventListener('click', closePinned);
   if (document.getElementById('btn-pinned-save')) document.getElementById('btn-pinned-save').addEventListener('click', async function() {
@@ -4079,7 +4079,7 @@
       var data = await res.json();
       pinnedInput.value = data.pinnedContext || '';
       updatePinnedCount();
-      pinnedModal.classList.add('show');
+      pinnedModal.classList.add('active');
       setTimeout(function() { pinnedInput.focus(); }, 50);
     } catch (e) { notify('Failed to load: ' + e.message, 'error'); }
   });
@@ -4093,7 +4093,7 @@
   var grMode = 'create';
   function updateGrCount() { if (grCharcount && grInput) grCharcount.textContent = (grInput.value || '').length; }
   if (grInput) grInput.addEventListener('input', updateGrCount);
-  function closeGr() { if (grModal) grModal.classList.remove('show'); }
+  function closeGr() { if (grModal) grModal.classList.remove('active'); }
   function openGroundRulesModal(mode, existing) {
     grMode = mode;
     grInput.value = existing || '';
@@ -4107,7 +4107,7 @@
       grSkipBtn.textContent = 'Skip';
       grSaveBtn.textContent = 'Start Chat';
     }
-    grModal.classList.add('show');
+    grModal.classList.add('active');
     setTimeout(function() { grInput.focus(); }, 50);
   }
   if (document.getElementById('close-ground-rules')) document.getElementById('close-ground-rules').addEventListener('click', function() { closeGr(); });
