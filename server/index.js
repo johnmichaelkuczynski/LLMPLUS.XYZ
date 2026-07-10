@@ -299,6 +299,13 @@ async function initDB() {
   }
 }
 
+function cleanApiErrText(t) {
+  // Upstream 5xx errors often return whole HTML error pages; never show that raw.
+  var s = String(t || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (s.length > 200) s = s.substring(0, 200) + '…';
+  return s;
+}
+
 async function callClaude(messages, systemPrompt, streaming, maxTokens) {
   var body = {
     model: CLAUDE_MODEL,
@@ -326,9 +333,9 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
       return data.content[0].text;
     }
 
-    if (response.status === 529 || response.status === 503 || response.status === 500) {
+    if (response.status >= 500 || response.status === 429) {
       var waitSec = Math.pow(2, attempt + 1) + Math.random() * 2;
-      console.log('[callClaude] API overloaded (status ' + response.status + '), retry ' + (attempt + 1) + '/' + maxRetries + ' in ' + waitSec.toFixed(1) + 's');
+      console.log('[callClaude] Transient API error (status ' + response.status + '), retry ' + (attempt + 1) + '/' + maxRetries + ' in ' + waitSec.toFixed(1) + 's');
       if (attempt < maxRetries - 1) {
         await new Promise(function(r) { setTimeout(r, waitSec * 1000); });
         continue;
@@ -336,7 +343,10 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
     }
 
     var errText = await response.text();
-    throw new Error('Anthropic API error ' + response.status + ': ' + errText);
+    if (response.status >= 500) {
+      throw new Error('Claude\'s servers are having temporary trouble (error ' + response.status + '). Please resend your message');
+    }
+    throw new Error('Anthropic API error ' + response.status + ': ' + cleanApiErrText(errText));
   }
 }
 
@@ -379,7 +389,7 @@ async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
       }
 
       var errText = await response.text();
-      lastErr = 'OpenAI API error ' + response.status + ': ' + errText.substring(0, 300);
+      lastErr = 'OpenAI API error ' + response.status + ': ' + cleanApiErrText(errText);
       if (response.status === 429 || response.status >= 500) {
         console.log('[OpenAI] Retryable error ' + response.status);
         continue;
@@ -433,7 +443,7 @@ async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
       }
 
       var errText = await response.text();
-      lastErr = 'DeepSeek API error ' + response.status + ': ' + errText.substring(0, 300);
+      lastErr = 'DeepSeek API error ' + response.status + ': ' + cleanApiErrText(errText);
       if (response.status === 429 || response.status >= 500) {
         console.log('[DeepSeek] Retryable error ' + response.status);
         continue;
@@ -483,7 +493,7 @@ async function callVenice(messages, systemPrompt, streaming, maxTokens) {
         return data.choices[0].message.content;
       }
       var errText = await response.text();
-      lastErr = 'Venice API error ' + response.status + ': ' + errText.substring(0, 300);
+      lastErr = 'Venice API error ' + response.status + ': ' + cleanApiErrText(errText);
       if (response.status === 429 || response.status >= 500) {
         console.log('[Venice] Retryable error ' + response.status);
         continue;
@@ -537,7 +547,7 @@ async function callGrok(messages, systemPrompt, streaming, maxTokens) {
       }
 
       var errText = await response.text();
-      lastErr = 'Grok API error ' + response.status + ': ' + errText.substring(0, 300);
+      lastErr = 'Grok API error ' + response.status + ': ' + cleanApiErrText(errText);
       if (response.status === 429 || response.status >= 500) {
         console.log('[Grok] Retryable error ' + response.status);
         continue;
@@ -1599,7 +1609,8 @@ app.post('/api/chat', async function(req, res) {
       } catch (err) {
         console.error('[streamOneCall] Exception:', err && err.stack ? err.stack : err.message);
         if (!res.writableEnded) {
-          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error generating response: ' + (err.message || 'unknown') + '. Please try again.]\n\n' }) + '\n\n');
+          var userMsg = cleanApiErrText(err.message || 'unknown');
+          res.write('data: ' + JSON.stringify({ type: 'text', text: '\n\n[Error generating response: ' + userMsg + '. Please try again.]\n\n' }) + '\n\n');
         }
         return { segmentText: '', stopReason: 'error' };
       }
