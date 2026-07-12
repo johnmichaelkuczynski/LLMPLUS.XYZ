@@ -949,6 +949,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n- For opinions or analysis: 1-3 sentences maximum.';
     prompt += '\n- Do NOT elaborate or add disclaimers. Do NOT start with pleasantries. Just answer.';
     prompt += '\n- EXCEPTION: If the user asks for a LIST (e.g. "list all X", "what are the Y"), provide the COMPLETE list — do not cut it short. Lists should be complete but each item should be brief.';
+    prompt += '\n- HARD CEILING: your reply must NEVER exceed ~100 words (except complete lists). Most replies should be one sentence.';
     prompt += '\n- VIOLATING THIS BY WRITING UNNECESSARILY LONG RESPONSES IS A CRITICAL FAILURE.';
   } else if (responseLength === 'normal') {
     prompt += '\n\nRESPONSE LENGTH: NORMAL — MATCH THE ANSWER TO THE QUESTION. Length is not a target to fill; it is dictated by what the question actually needs.';
@@ -1469,7 +1470,7 @@ app.post('/api/chat', async function(req, res) {
     if (!(targetWords >= 10 && targetWords <= 30000)) targetWords = 0;
     var requestedWords = targetWords || extractRequestedWordCount(userOwnWords);
     var fullText = '';
-    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
+    var lengthMaxTokens = responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     var maxContinuations = responseLength === 'concise' ? 1 :
@@ -1483,7 +1484,7 @@ app.post('/api/chat', async function(req, res) {
       maxContinuations = Math.min(40, Math.ceil(estTokens / lengthMaxTokens) + 1);
       systemPrompt += '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + requestedWords + ' WORDS (error margin 20%).** The user explicitly requested a response of ' + requestedWords + ' words. Acceptable range: ' + Math.round(requestedWords * 0.8) + ' to ' + Math.round(requestedWords * 1.2) + ' words. Plan your response to land inside that range: do NOT stop far short, and do NOT run past it. No filler padding; no cutting essential content. This target overrides every other length instruction in this prompt.';
     } else if (responseLength === 'concise') {
-      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. Everything above notwithstanding, your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words even for complex questions. Never produce essays, multi-section documents, or long lists of caveats in this mode.';
+      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. HARD CAP: your ENTIRE reply must be the shortest accurate answer — usually ONE sentence, never more than ~100 words even for complex questions (complete lists are the only exception). Never produce essays, multi-section documents, explanations, or caveats in this mode. Exceeding the cap is a failure.';
     } else if (responseLength === 'normal') {
       systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. A yes/no, confirmation, or simple factual question gets a sentence or two and nothing more. NO multi-section analyses, NO clause-by-clause or exhibit-by-exhibit reviews, NO headed essays, NO bullet-point dumps — regardless of what the conversation is about — unless the user EXPLICITLY asked you to analyze, review, or write a document (in which case they should use Detailed mode or a word count). Exceeding the cap is a failure.';
     }
@@ -1829,7 +1830,7 @@ app.post('/api/chat/compare', async function(req, res) {
       systemA += cmpLenNote;
       systemB += cmpLenNote;
     } else if (responseLength === 'concise') {
-      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE IS ON. Your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words. Never produce essays or multi-section documents in this mode.';
+      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE IS ON. HARD CAP: your ENTIRE reply must be the shortest accurate answer — usually ONE sentence, never more than ~100 words (complete lists are the only exception). Never produce essays, multi-section documents, explanations, or caveats in this mode. Exceeding the cap is a failure.';
       systemA += cmpConciseNote;
       systemB += cmpConciseNote;
     } else if (responseLength === 'normal') {
@@ -1856,7 +1857,7 @@ app.post('/api/chat/compare', async function(req, res) {
     if (userContent.length > 80000) userContent = userContent.substring(0, 80000) + '\n\n[...truncated...]';
     msgs.push({ role: 'user', content: userContent });
 
-    var lengthMaxTokens = responseLength === 'concise' ? 1024 :
+    var lengthMaxTokens = responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     if (cmpTargetWords > 0) {
