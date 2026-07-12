@@ -4403,7 +4403,13 @@
       var resp = await fetch('/api/profile/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          model: state.model,
+          responseLength: state.responseLength,
+          responseFormat: state.responseFormat,
+          stance: state.stance,
+          targetWords: getTargetWords()
+        })
       });
 
       if (!resp.ok || !resp.body) {

@@ -4372,6 +4372,23 @@ app.post('/api/profile/generate', async function(req, res) {
   try {
     var userId = req.userId;
 
+    // Obey the user's current chat settings (model, length, words, stance, format).
+    var profValidLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var profValidStances = ['agreeable', 'neutral', 'mildly_critical', 'strongly_critical'];
+    var profValidModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
+    var profLength = profValidLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
+    var profStance = profValidStances.indexOf(req.body.stance) >= 0 ? req.body.stance : 'neutral';
+    var profModel = profValidModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
+    var profFormat = req.body.responseFormat === 'bullets' ? 'bullets' : 'prose';
+    var profTargetWords = parseInt(req.body.targetWords, 10);
+    if (!(profTargetWords >= 10 && profTargetWords <= 30000)) profTargetWords = 0;
+    var profWords = profTargetWords > 0 ? profTargetWords :
+                    profLength === 'concise' ? 300 :
+                    profLength === 'normal' ? 800 :
+                    profLength === 'detailed' ? 1500 : 3000;
+    var profMaxTokens = Math.min(16384, Math.max(512, Math.ceil(profWords * 2.0) + 120));
+    console.log('[Profile] model=' + profModel + ' length=' + profLength + ' stance=' + profStance + ' format=' + profFormat + ' targetWords=' + profTargetWords + ' words=' + profWords);
+
     send({ type: 'status', message: 'Gathering cross-project data...' });
 
     var analyticsRow = await pool.query('SELECT profile_tree, exchange_count, last_updated FROM user_analytics WHERE user_id = $1', [userId]);
@@ -4461,17 +4478,32 @@ app.post('/api/profile/generate', async function(req, res) {
       prompt += '7. **Changes Since Last Profile** — Specific shifts in behavior, interests, style, or patterns\n';
     }
     prompt += '\nRules:\n';
-    prompt += '- Be objective, clinical, and analytical. No flattery, no disparagement.\n';
     prompt += '- Support observations with specific evidence: quote the user directly where possible, cite specific projects/topics.\n';
     prompt += '- Note contradictions, tensions, or unusual patterns.\n';
-    prompt += '- Use Markdown formatting with headers, bullet points, and bold for key observations.\n';
-    prompt += '- Aim for 800-1500 words depending on available data.\n';
+    if (profStance === 'agreeable') {
+      prompt += '- STANCE: AGREEABLE. Give the most charitable defensible reading of the user: emphasize strengths, capabilities, and favorable interpretations of their patterns. You may note one significant weakness briefly. Never fabricate strengths — supportive truth, not flattery.\n';
+    } else if (profStance === 'mildly_critical') {
+      prompt += '- STANCE: MILDLY CRITICAL. Acknowledge strengths, but devote substantial space to weaknesses, blind spots, unproductive habits, and tensions the user may not see. End with a candid assessment.\n';
+    } else if (profStance === 'strongly_critical') {
+      prompt += '- STANCE: STRONGLY CRITICAL. Subject the user to the most rigorous scrutiny the evidence supports: weaknesses, blind spots, self-defeating patterns, intellectual vices, and unflattering tendencies. Do not soften to spare feelings — the user explicitly asked for adversarial pressure. Never invent flaws the evidence does not support.\n';
+    } else {
+      prompt += '- STANCE: NEUTRAL. Be objective, clinical, and analytical. No flattery, no disparagement. Weigh strengths and weaknesses even-handedly.\n';
+    }
+    if (profFormat === 'bullets') {
+      prompt += '- FORMAT: Use Markdown with headers and bullet points; bold key observations. Prefer tight bullets over paragraphs.\n';
+    } else {
+      prompt += '- FORMAT: Write in flowing prose paragraphs under Markdown headers. Use bullets sparingly, only where a list is genuinely clearer.\n';
+    }
+    prompt += '- TARGET LENGTH: approximately ' + profWords + ' words (acceptable range ' + Math.round(profWords * 0.8) + '-' + Math.round(profWords * 1.2) + '). Do not stop far short and do not run far past it. Scale the depth of each section to fit this budget.\n';
 
-    var response = await callClaude(
+    var profSystem = 'You are an analyst producing evidence-based user profiles. Use Markdown formatting. Honor the stance, format, and target length instructions exactly.';
+    var profCallFns = { claude: callClaude, chatgpt: callOpenAI, deepseek: callDeepSeek, grok: callGrok, venice: callVenice };
+    var profIsOAI = profModel !== 'claude';
+    var response = await profCallFns[profModel](
       [{ role: 'user', content: prompt }],
-      'You are a clinical analyst. Produce objective, evidence-based user profiles. Use Markdown formatting.',
+      profSystem,
       true,
-      8192
+      profMaxTokens
     );
 
     var reader = response.body.getReader();
@@ -4492,9 +4524,13 @@ app.post('/api/profile/generate', async function(req, res) {
           if (!data || data === '[DONE]') continue;
           try {
             var parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
-              fullText += parsed.delta.text;
-              send({ type: 'token', text: parsed.delta.text });
+            var deltaText = '';
+            if (profIsOAI) {
+              if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
+                deltaText = parsed.choices[0].delta.content;
+              }
+            } else if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
+              deltaText = parsed.delta.text;
             } else if (parsed.type === 'error') {
               var errType = parsed.error ? parsed.error.type : 'unknown';
               if (errType === 'overloaded_error') {
@@ -4503,6 +4539,10 @@ app.post('/api/profile/generate', async function(req, res) {
                 res.end();
                 return;
               }
+            }
+            if (deltaText) {
+              fullText += deltaText;
+              send({ type: 'token', text: deltaText });
             }
           } catch (e) {}
         }
