@@ -957,6 +957,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n- Only write multiple paragraphs when the question genuinely calls for explanation, comparison, or analysis.';
     prompt += '\n- Only write a long document when the user explicitly asks you to write/draft/compose one. Never turn a plain question into an essay.';
     prompt += '\n- Do NOT produce section-by-section breakdowns, clause-by-clause reviews, multi-heading essays, or exhaustive analyses unless the user EXPLICITLY asks you to analyze, review, or draft a document. Confirming, answering, or reacting to something is NOT a request for a full analysis.';
+    prompt += '\n- HARD CEILING: in this mode your reply must NEVER exceed ~300 words, no matter the topic, unless the user explicitly asked you to write/draft a document or gave a word count. Most replies should be well under 150 words.';
     prompt += '\n- Writing far more than the question requires is a failure, exactly like writing too little.';
   } else if (responseLength === 'detailed') {
     prompt += '\n\nRESPONSE LENGTH: DETAILED. The user wants thorough, in-depth responses WHEN the question warrants it.';
@@ -1469,7 +1470,7 @@ app.post('/api/chat', async function(req, res) {
     var requestedWords = targetWords || extractRequestedWordCount(userOwnWords);
     var fullText = '';
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
-                          responseLength === 'normal' ? 2048 :
+                          responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     var maxContinuations = responseLength === 'concise' ? 1 :
                            responseLength === 'normal' ? 4 :
@@ -1484,7 +1485,7 @@ app.post('/api/chat', async function(req, res) {
     } else if (responseLength === 'concise') {
       systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. Everything above notwithstanding, your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words even for complex questions. Never produce essays, multi-section documents, or long lists of caveats in this mode.';
     } else if (responseLength === 'normal') {
-      systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. Match the length of your reply to what the question needs. A yes/no, confirmation, or simple factual question gets a brief answer (a sentence or two) and nothing more. Do NOT produce a multi-section analysis, a clause-by-clause or exhibit-by-exhibit review, or an essay unless the user EXPLICITLY asked you to analyze, review, or write a document. Over-answering a simple question is a failure.';
+      systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. A yes/no, confirmation, or simple factual question gets a sentence or two and nothing more. NO multi-section analyses, NO clause-by-clause or exhibit-by-exhibit reviews, NO headed essays, NO bullet-point dumps — regardless of what the conversation is about — unless the user EXPLICITLY asked you to analyze, review, or write a document (in which case they should use Detailed mode or a word count). Exceeding the cap is a failure.';
     }
     systemPrompt += groundRulesFinalReminder(groundRules);
     var continuationCount = 0;
@@ -1831,6 +1832,10 @@ app.post('/api/chat/compare', async function(req, res) {
       var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE IS ON. Your ENTIRE reply must be the shortest accurate answer: usually 1-3 sentences, at most ~150 words. Never produce essays or multi-section documents in this mode.';
       systemA += cmpConciseNote;
       systemB += cmpConciseNote;
+    } else if (responseLength === 'normal') {
+      var cmpNormalNote = '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. No multi-section analyses, clause-by-clause reviews, or essays unless the user EXPLICITLY asked you to analyze, review, or write a document. Exceeding the cap is a failure.';
+      systemA += cmpNormalNote;
+      systemB += cmpNormalNote;
     }
     var grCmpFinal = groundRulesFinalReminder(groundRulesCmp);
     systemA += grCmpFinal;
@@ -1852,7 +1857,7 @@ app.post('/api/chat/compare', async function(req, res) {
     msgs.push({ role: 'user', content: userContent });
 
     var lengthMaxTokens = responseLength === 'concise' ? 1024 :
-                          responseLength === 'normal' ? 2048 :
+                          responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     if (cmpTargetWords > 0) {
       lengthMaxTokens = Math.min(MAX_TOKENS, Math.max(256, Math.ceil(cmpTargetWords * 2.0) + 120));
