@@ -1468,7 +1468,11 @@ app.post('/api/chat', async function(req, res) {
 
     var targetWords = parseInt(req.body.targetWords, 10);
     if (!(targetWords >= 10 && targetWords <= 30000)) targetWords = 0;
-    var requestedWords = targetWords || extractRequestedWordCount(userOwnWords);
+    // Phrase-detected word counts ("...3,500 words...") only apply in Detailed/Exhaustive.
+    // In Normal/Concise, pasted text (court briefs, quotes) often contains word limits
+    // that are NOT a request — only the explicit Words box may set a target there.
+    var phraseWords = (responseLength === 'detailed' || responseLength === 'exhaustive') ? extractRequestedWordCount(userOwnWords) : 0;
+    var requestedWords = targetWords || phraseWords;
     var fullText = '';
     var lengthMaxTokens = responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 1200 :
@@ -1824,7 +1828,9 @@ app.post('/api/chat/compare', async function(req, res) {
 
     var cmpTargetWords = parseInt(req.body.targetWords, 10);
     if (!(cmpTargetWords >= 10 && cmpTargetWords <= 30000)) cmpTargetWords = 0;
-    if (cmpTargetWords === 0) cmpTargetWords = extractRequestedWordCount(userOwnWords);
+    if (cmpTargetWords === 0 && (responseLength === 'detailed' || responseLength === 'exhaustive')) {
+      cmpTargetWords = extractRequestedWordCount(userOwnWords);
+    }
     if (cmpTargetWords > 0) {
       var cmpLenNote = '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + cmpTargetWords + ' WORDS (error margin 20%).** Acceptable range: ' + Math.round(cmpTargetWords * 0.8) + ' to ' + Math.round(cmpTargetWords * 1.2) + ' words. Land inside that range — do NOT stop far short, do NOT run past it. This overrides every other length instruction.';
       systemA += cmpLenNote;
