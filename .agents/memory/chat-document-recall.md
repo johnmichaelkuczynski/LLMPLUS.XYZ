@@ -19,3 +19,5 @@ Root causes:
 - Bound the DB read (LIMIT + `LEFT(raw_content, N)`) so one huge doc can't blow up latency/memory; the prompt budget alone does not cap the DB/string cost.
 
 **Why it matters:** memory-across-chats + not-bullshitting is the app's whole value prop vs. plain ChatGPT. If either regresses, the user churns.
+
+**Tiered memory injection (Jul 2026):** hallucinations traced to blind per-tier char truncation of the Tractatus tiers (Tier1 8K from the top, older tiers 4K/2K, budget break) — older trees were silently invisible. Fixed with query-aware selection (selectMemoryString): guarantee newest Tier-1 nodes (~6K), keyword-score every node in every tier against the user's message (same tokenizer as doc excerpts), fill budget with top scorers + newest leftovers, render with "[... N less relevant nodes omitted ...]" markers and a prompt note that omission ≠ never discussed. Rule: never inject memory by chopping the first N chars — select by relevance + recency.
