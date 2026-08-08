@@ -884,7 +884,7 @@ function selectDocExcerpts(docs, query, totalBudget) {
       }
       excerpt += '\n[...document truncated...]';
     }
-    var block = '\n\n--- DOCUMENT: "' + name + '" ---\n' + excerpt;
+    var block = '\n\n--- DOCUMENT: "' + name + '" (extracted text only — original page numbers NOT preserved) ---\n' + excerpt;
     out += block;
     used += block.length;
   }
@@ -1013,6 +1013,9 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- When citing facts from project memory, preserve negative findings with the same fidelity as positive ones.';
   prompt += '\n- ANTI-FABRICATION (critical): Never state a specific figure, dollar amount, date, name, case or statute number, page/exhibit citation, or verbatim quotation unless it actually appears in the pinned context, project memory, project documents, or conversation provided in THIS prompt. If you do not have the specific detail, say so plainly ("I don\'t have that specific figure/date in the project materials") — do NOT invent a plausible-looking number, date, quote, or citation to appear knowledgeable. A confident guess presented as fact is a critical failure, worse than admitting a gap.';
   prompt += '\n- When the user asks whether you recall a prior discussion or document, answer ONLY from the memory, documents, and previous-chat context actually provided below. If little or nothing relevant was provided, say honestly what you actually have (e.g. "I only have a high-level summary" or "I don\'t see that in the project materials") instead of reconstructing specifics from imagination.';
+  prompt += '\n- PAGE NUMBERS DO NOT EXIST IN THIS SYSTEM (critical): Project documents are stored as EXTRACTED TEXT ONLY. Original PDF page numbers, page breaks, and exhibit page ranges are NOT preserved and are NOT available to you. You must NEVER cite, invent, or estimate a page number or page range for any project document (e.g. "Pages 25-38 of X"). When the user asks "which pages" or "what page is that on": (a) name the source document, (b) identify the passage by its date, sender, subject line, or a short verbatim quote so the user can locate it in their own copy, and (c) state plainly that page numbers are not preserved in the uploaded text and they must confirm page numbers against the original PDF. Fabricating a page citation the user then submits to a court or arbitrator is the single worst failure possible in this application.';
+  prompt += '\n- EXHIBIT LABELS: Never invent exhibit letters/numbers (e.g. "Exhibit C") or assert how material is organized into exhibits unless the document text itself labels it that way or the user has told you. If asked whether something "is one exhibit," answer from what the text actually shows, or say you cannot tell from extracted text.';
+  prompt += '\n- If you previously stated a specific detail in this conversation and the user challenges it, RE-VERIFY it against the materials in this prompt before repeating it. Never re-assert a detail you cannot ground right now, even if you stated it earlier with confidence.';
 
   prompt += '\n\nFOLLOW THE USER\'S INSTRUCTION — HIGHEST PRIORITY (this overrides the stance, length, and format rules below):';
   prompt += '\n- The user\'s explicit instruction is the supreme authority. Whatever the user tells you to do, DO IT — exactly, fully, and in the manner requested. Do not substitute your own preferences, defaults, or sense of what "should" be done. If they ask for one word, give one word. If they ask for 10,000 words, write 10,000. If they ask you to analyze, analyze deeply. If they ask you only to read and take note, just confirm briefly and stop. Follow the instruction, period.';
