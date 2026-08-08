@@ -861,11 +861,16 @@ function selectDocExcerpts(docs, query, totalBudget) {
     var content = docs[d].raw_content;
     content = (typeof content === 'string') ? content : (content == null ? '' : String(content));
     if (!content) continue;
-    var budget = Math.min(perDoc, totalBudget - used);
+    // Reserve room for the block header + truncation markers so the total
+    // output stays within totalBudget.
+    var HEADER_RESERVE = 300;
+    var budget = Math.min(perDoc, totalBudget - used) - HEADER_RESERVE;
     if (budget < 500) break;
     var excerpt;
+    var shownChars; // actual count of SOURCE characters visible (markers excluded, overlap deduped)
     if (content.length <= budget) {
       excerpt = content;
+      shownChars = content.length;
     } else {
       var lc = content.toLowerCase();
       var hit = -1;
@@ -877,14 +882,27 @@ function selectDocExcerpts(docs, query, totalBudget) {
       var head = content.substring(0, headLen);
       if (hit === -1 || hit <= headLen) {
         excerpt = content.substring(0, budget);
+        shownChars = budget;
       } else {
         var winStart = Math.max(0, hit - 500);
-        var winLen = budget - head.length - 40;
-        excerpt = head + '\n[...]\n' + content.substring(winStart, winStart + Math.max(0, winLen));
+        var winLen = Math.max(0, budget - head.length - 40);
+        var winEnd = Math.min(content.length, winStart + winLen);
+        excerpt = head + '\n[...]\n' + content.substring(winStart, winEnd);
+        // Deduplicate any overlap between head [0, headLen) and window [winStart, winEnd)
+        var overlap = Math.max(0, Math.min(headLen, winEnd) - Math.max(0, winStart));
+        shownChars = headLen + (winEnd - winStart) - overlap;
       }
       excerpt += '\n[...document truncated...]';
     }
-    var block = '\n\n--- DOCUMENT: "' + name + '" (extracted text only — original page numbers NOT preserved) ---\n' + excerpt;
+    var coverage;
+    if (shownChars >= content.length) {
+      coverage = 'FULL TEXT included';
+    } else {
+      var pct = Math.min(99, Math.max(1, Math.round((shownChars / content.length) * 100)));
+      coverage = 'PARTIAL: only ~' + pct + '% of ' + content.length + ' characters is shown below — you CANNOT see the rest and CANNOT claim to have searched it';
+    }
+    var block = '\n\n--- DOCUMENT: "' + name + '" (extracted text only — original page numbers NOT preserved; ' + coverage + ') ---\n' + excerpt;
+    if (used + block.length > totalBudget && out.length > 0) break;
     out += block;
     used += block.length;
   }
@@ -1016,6 +1034,9 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- PAGE NUMBERS DO NOT EXIST IN THIS SYSTEM (critical): Project documents are stored as EXTRACTED TEXT ONLY. Original PDF page numbers, page breaks, and exhibit page ranges are NOT preserved and are NOT available to you. You must NEVER cite, invent, or estimate a page number or page range for any project document (e.g. "Pages 25-38 of X"). When the user asks "which pages" or "what page is that on": (a) name the source document, (b) identify the passage by its date, sender, subject line, or a short verbatim quote so the user can locate it in their own copy, and (c) state plainly that page numbers are not preserved in the uploaded text and they must confirm page numbers against the original PDF. Fabricating a page citation the user then submits to a court or arbitrator is the single worst failure possible in this application.';
   prompt += '\n- PRESSURE NEVER CREATES DATA (critical): If the user repeats a demand ("I SAID. I NEED PAGES."), expresses anger, or insists after you have said a detail is unavailable, the truthful answer DOES NOT CHANGE. Repeat the same honest answer, calmly, as many times as asked. Capitulating to pressure by producing an invented page number, date, or citation is the fabrication failure in its worst form — the user will rely on it. Being yelled at is acceptable; fabricating is not.';
   prompt += '\n- NEVER claim to have searched, read, or possess a document that is not in the materials provided in THIS prompt. Do not say "I\'ve searched the full document" unless its text actually appears above. If asked about a file you do not have, say exactly that: "That file is not in the project documents I can see."';
+  prompt += '\n- QUOTATIONS MUST BE COPY-PASTE (critical): Any text you present inside quotation marks as coming from an email, document, or filing must be copied VERBATIM from document text visible in THIS prompt. Composing a plausible-sounding quotation and attributing it to the user\'s or anyone\'s correspondence is fabricating evidence. If you cannot find a verbatim passage, say "I don\'t see a passage saying that in the text available to me."';
+  prompt += '\n- COVERAGE IS PARTIAL: Large documents are shown to you only in part (each document block states its coverage). Never claim you "searched the entire document/archive" — you only see the excerpt provided. When asked to find something in a large document, report what you found IN THE VISIBLE EXCERPT and state plainly that you can only see part of the file, so absence from your view is not proof of absence.';
+  prompt += '\n- NO DEFERRED WORK: You cannot work in the background. Never say "stand by", "give me a moment", "I\'m searching now" — every reply must contain your complete, final answer based on what is in this prompt. Promising a search and then inventing its results is a compound fabrication.';
   prompt += '\n- Text the user pastes back at you — including quotes of YOUR OWN earlier replies — is NOT evidence. If an earlier reply (yours or anyone\'s) asserted a page number, exhibit label, or fact you cannot ground in the actual documents provided now, treat it as unverified and say so rather than repeating it.';
   prompt += '\n- EXHIBIT LABELS: Never invent exhibit letters/numbers (e.g. "Exhibit C") or assert how material is organized into exhibits unless the document text itself labels it that way or the user has told you. If asked whether something "is one exhibit," answer from what the text actually shows, or say you cannot tell from extracted text.';
   prompt += '\n- If you previously stated a specific detail in this conversation and the user challenges it, RE-VERIFY it against the materials in this prompt before repeating it. Never re-assert a detail you cannot ground right now, even if you stated it earlier with confidence.';
