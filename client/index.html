@@ -3,23 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LLM Plus</title>
+  <title>LLM Plus — AI Chat with Persistent Memory, Document Analysis &amp; Fact Auditing</title>
+  <link rel="canonical" href="https://llmplus.ink/">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="LLM Plus">
   <meta name="theme-color" content="#0a0a0a">
-  <meta name="description" content="LLM Plus - Minimalist AI chat with document management and persistent memory">
+  <meta name="description" content="LLM Plus is an AI chat workspace with persistent project memory that survives between sessions. Upload legal documents and PDFs, pin critical facts to Ground Truth, audit answers for accuracy, and track memory health — powered by Claude and other leading models.">
+  <meta name="keywords" content="AI chat, persistent memory AI, document analysis AI, legal document AI, Claude chat, AI assistant with memory, fact checking AI, PDF analysis, LLM workspace">
+  <meta name="author" content="LLM Plus">
+
+  <!-- Open Graph (Facebook, LinkedIn, etc.) -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://llmplus.ink/">
+  <meta property="og:site_name" content="LLM Plus">
+  <meta property="og:title" content="LLM Plus — AI Chat with Persistent Memory, Document Analysis &amp; Fact Auditing">
+  <meta property="og:description" content="An AI chat workspace that actually remembers: persistent project memory, document uploads, pinned Ground Truth facts, answer auditing, and memory-health tracking.">
+  <meta property="og:image" content="https://llmplus.ink/icon-512.png">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="LLM Plus — AI Chat with Persistent Memory">
+  <meta name="twitter:description" content="AI chat workspace with persistent project memory, document analysis, fact auditing, and pinned Ground Truth.">
+  <meta name="twitter:image" content="https://llmplus.ink/icon-512.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "LLM Plus",
+    "url": "https://llmplus.ink/",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "Web",
+    "description": "AI chat workspace with persistent project memory, document analysis, fact auditing, pinned Ground Truth facts, and memory-health tracking.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Persistent project memory that survives between sessions",
+      "PDF and document upload with full-text recall",
+      "Ground Truth pinned facts that survive memory compression",
+      "Answer auditing and fact verification",
+      "Memory health meter with decay warnings",
+      "Multiple AI models including Claude"
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=6">
+  <link rel="stylesheet" href="/style.css?v=9">
 </head>
 <body>
+  <noscript>
+    <h1>LLM Plus — AI Chat with Persistent Memory</h1>
+    <p>LLM Plus is an AI chat workspace with persistent project memory that survives between sessions. Upload PDFs and legal documents, pin critical facts to Ground Truth so they survive memory compression, audit answers for factual accuracy, and monitor memory health with a live decay meter. Powered by Claude and other leading AI models. JavaScript is required to use the app.</p>
+  </noscript>
   <div id="login-gate" class="hidden" data-testid="login-gate" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#f7f4ec 0%,#faf9f5 50%,#f3efe4 100%);display:flex;align-items:center;justify-content:center">
     <div style="background:#fff;border:1px solid #e5e0d5;border-radius:16px;padding:48px 40px;max-width:400px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
       <h1 style="font-size:28px;margin-bottom:6px;color:#3a3629">LLM <span style="color:#c05b3c">Plus</span></h1>
+      <p style="color:#8a8577;font-size:14px;margin-bottom:10px">AI chat that actually remembers. Persistent project memory, document analysis, pinned Ground Truth facts, and answer auditing.</p>
       <p style="color:#8a8577;font-size:14px;margin-bottom:28px">Sign in with your Google account to continue.</p>
       <button id="btn-gate-signin" data-testid="btn-gate-signin" style="background:#fff;color:#333;border:1px solid #dadce0;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;width:100%">
         <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:-4px;margin-right:8px"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>
@@ -79,6 +123,8 @@
       <header class="topbar">
         <span class="topbar-title" id="topbar-title" data-testid="topbar-title">LLM Plus</span>
         <span class="topbar-project" id="topbar-project" data-testid="topbar-project"></span>
+        <span class="visitor-count-chip hidden" id="visitor-count-chip" data-testid="visitor-count-chip" title="Unique visitors (only you can see this)"></span>
+        <button class="mem-health-badge hidden" id="memory-health-badge" data-testid="memory-health-badge" title="Memory health — click for details" type="button">&#129504; <span id="memory-health-pct">—</span></button>
         <button class="topbar-btn" id="btn-download-session" data-testid="btn-download-session" title="Download this chat session">&#11015; Download chat</button>
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
         <button class="topbar-btn topbar-btn-diagnostic" id="btn-diagnostic" data-testid="btn-diagnostic" title="Run a full system check">&#129514; Diagnostic</button>
@@ -360,6 +406,16 @@
     </div>
   </div>
 
+  <div class="modal-bg" id="memory-health-modal">
+    <div class="modal" style="width:560px;max-height:80vh;display:flex;flex-direction:column">
+      <div class="modal-head">
+        <span class="modal-title" id="memory-health-title">&#129504; Memory Health</span>
+        <button class="modal-x" id="close-memory-health" data-testid="close-memory-health">&times;</button>
+      </div>
+      <div class="modal-body" id="memory-health-body" data-testid="memory-health-body" style="flex:1;overflow-y:auto;padding:14px 18px"></div>
+    </div>
+  </div>
+
   <div class="modal-bg" id="pinned-context-modal">
     <div class="modal" style="width:640px;max-height:80vh;display:flex;flex-direction:column">
       <div class="modal-head">
@@ -515,6 +571,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=33"></script>
+  <script src="/app.js?v=36"></script>
 </body>
 </html>

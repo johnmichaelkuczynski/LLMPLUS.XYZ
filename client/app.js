@@ -1290,6 +1290,9 @@
                   tpTitle.innerHTML = '&#9989; Memory Updated (' + p.nodes + ' nodes)';
                   tpClose.classList.remove('hidden');
                   setTimeout(function() { popup.remove(); }, 8000);
+                  checkStaleness();
+                } else if (p.type === 'compressed') {
+                  checkStaleness();
                 } else if (p.type === 'status') {
                   var cursor = tpContent.querySelector('.cursor-blink');
                   if (cursor) cursor.remove();
@@ -3905,66 +3908,226 @@
     }
   }
 
-  async function checkStaleness() {
-    if (!state.currentProject) {
+  // ─── Memory Health (decay meter & rip cord) ────────────────────────────
+  var memHealthBadge = document.getElementById('memory-health-badge');
+  var memHealthPct = document.getElementById('memory-health-pct');
+  var memHealthModal = document.getElementById('memory-health-modal');
+  var memHealthBody = document.getElementById('memory-health-body');
+  var lastMemHealth = null;
+
+  function auditLatestAssistant(triggerBtn) {
+    var allMsgs = els.messages.querySelectorAll('.message.assistant');
+    if (allMsgs.length === 0) { notify('No assistant messages to audit', 'info'); return; }
+    var textToAudit = '';
+    for (var i = allMsgs.length - 1; i >= 0; i--) {
+      var m = allMsgs[i];
+      var t = '';
+      var te = m.querySelector('.msg-text');
+      if (te) t = te.innerText || '';
+      if (!t) {
+        var tb = m.querySelector('.msg-body');
+        if (tb) t = tb.innerText || '';
+      }
+      if (!t) {
+        var clone = m.cloneNode(true);
+        var actions = clone.querySelector('.msg-actions-row');
+        if (actions) actions.remove();
+        t = clone.innerText || clone.textContent || '';
+      }
+      t = (t || '').trim();
+      if (t.length >= 20) { textToAudit = t; break; }
+    }
+    if (textToAudit) runAudit(textToAudit, triggerBtn);
+    else notify('No assistant text found to audit yet', 'info');
+  }
+
+  function severityLabel(sev) {
+    return sev === 'critical' ? 'Critical' : sev === 'warning' ? 'Degraded' : sev === 'notice' ? 'Fading' : 'Healthy';
+  }
+
+  function renderHealthBadge(data) {
+    memHealthBadge.classList.remove('hidden', 'health-healthy', 'health-notice', 'health-warning', 'health-critical');
+    memHealthBadge.classList.add('health-' + data.severity);
+    memHealthPct.textContent = data.score + '%';
+    memHealthBadge.title = 'Memory health: ' + data.score + '/100 (' + severityLabel(data.severity) + ') — click for details';
+  }
+
+  function renderRipcordBanner(data) {
+    if (data.severity !== 'warning' && data.severity !== 'critical') {
       stalenessContainer.innerHTML = '';
       return;
     }
+    var sevClass = data.severity === 'critical' ? 'severity-critical' : 'severity-warning';
+    var msg = '<strong>Memory health ' + data.score + '/100 — ' + severityLabel(data.severity).toLowerCase() + '.</strong> ';
+    msg += 'This project\u2019s memory has been compressed and trimmed; specific names, dates, and numbers may now be unreliable. ';
+    msg += 'Pin critical facts so they can\u2019t be lost, and audit recent answers before relying on specifics.';
+    stalenessContainer.innerHTML = '<div class="staleness-banner ' + sevClass + '" data-testid="ripcord-banner">' +
+      '<span class="staleness-icon">\u26A0\uFE0F</span>' +
+      '<span class="staleness-text">' + msg + '</span>' +
+      '<span class="ripcord-actions">' +
+      '<button class="ripcord-btn ripcord-pin" data-testid="btn-ripcord-pin" title="Pin critical facts to Ground Truth — pinned text survives all compression">&#128204; Pin Facts</button>' +
+      '<button class="ripcord-btn ripcord-audit" data-testid="btn-ripcord-audit" title="Fact-check the latest answer against project sources">&#128269; Run Audit</button>' +
+      '<button class="ripcord-btn ripcord-memory" data-testid="btn-ripcord-memory" title="See what remains in memory, tier by tier">&#129504; View Memory</button>' +
+      '</span>' +
+      '<button class="btn-dismiss-staleness" data-testid="btn-dismiss-staleness">&times;</button>' +
+      '</div>';
+    stalenessContainer.querySelector('.ripcord-pin').addEventListener('click', function() {
+      document.getElementById('btn-pinned-context').click();
+    });
+    var auditBtn = stalenessContainer.querySelector('.ripcord-audit');
+    auditBtn.addEventListener('click', function() { auditLatestAssistant(auditBtn); });
+    stalenessContainer.querySelector('.ripcord-memory').addEventListener('click', function() {
+      document.getElementById('btn-memory-hierarchy').click();
+    });
+    stalenessContainer.querySelector('.btn-dismiss-staleness').addEventListener('click', function() {
+      stalenessContainer.innerHTML = '';
+    });
+  }
+
+  async function checkStaleness() {
+    if (!state.currentProject) {
+      stalenessContainer.innerHTML = '';
+      memHealthBadge.classList.add('hidden');
+      lastMemHealth = null;
+      return;
+    }
+    var projectIdAtCall = state.currentProject.id;
     try {
-      var r = await fetch('/api/projects/' + state.currentProject.id + '/staleness');
+      var r = await fetch('/api/projects/' + projectIdAtCall + '/memory-health');
       if (!r.ok) return;
       var data = await r.json();
-      if (!data.isStale) {
-        stalenessContainer.innerHTML = '';
-        return;
-      }
-      var icon = data.severity === 'critical' ? '\u26A0\uFE0F' : data.severity === 'warning' ? '\u26A0\uFE0F' : '\u2139\uFE0F';
-      var msg = 'Project memory';
-      if (data.daysSinceUpdate !== null && data.daysSinceUpdate > 0) msg += ' last updated ' + data.daysSinceUpdate + ' day' + (data.daysSinceUpdate !== 1 ? 's' : '') + ' ago';
-      if (data.compressionCount > 0) msg += ', compressed ' + data.compressionCount + ' time' + (data.compressionCount !== 1 ? 's' : '');
-      msg += '. Specific dates, numbers, and names may have degraded. Use Audit to verify critical claims.';
-      stalenessContainer.innerHTML = '<div class="staleness-banner severity-' + data.severity + '" data-testid="staleness-banner">' +
-        '<span class="staleness-icon">' + icon + '</span>' +
-        '<span class="staleness-text">' + msg + '</span>' +
-        '<button class="btn-run-audit-banner" data-testid="btn-run-audit-banner">Run Audit</button>' +
-        '<button class="btn-dismiss-staleness" data-testid="btn-dismiss-staleness">&times;</button>' +
-        '</div>';
-      var runAuditBannerBtn = stalenessContainer.querySelector('.btn-run-audit-banner');
-      if (runAuditBannerBtn) {
-        runAuditBannerBtn.addEventListener('click', function() {
-          var allMsgs = els.messages.querySelectorAll('.message.assistant');
-          if (allMsgs.length === 0) { notify('No assistant messages to audit', 'info'); return; }
-          var textToAudit = '';
-          for (var i = allMsgs.length - 1; i >= 0; i--) {
-            var m = allMsgs[i];
-            var t = '';
-            var te = m.querySelector('.msg-text');
-            if (te) t = te.innerText || '';
-            if (!t) {
-              var tb = m.querySelector('.msg-body');
-              if (tb) t = tb.innerText || '';
-            }
-            if (!t) {
-              var clone = m.cloneNode(true);
-              var actions = clone.querySelector('.msg-actions-row');
-              if (actions) actions.remove();
-              t = clone.innerText || clone.textContent || '';
-            }
-            t = (t || '').trim();
-            if (t.length >= 20) { textToAudit = t; break; }
-          }
-          if (textToAudit) runAudit(textToAudit, runAuditBannerBtn);
-          else notify('No assistant text found to audit yet', 'info');
-        });
-      }
-      var dismissBtn = stalenessContainer.querySelector('.btn-dismiss-staleness');
-      if (dismissBtn) {
-        dismissBtn.addEventListener('click', function() {
-          stalenessContainer.innerHTML = '';
-        });
-      }
+      if (!state.currentProject || state.currentProject.id !== projectIdAtCall) return;
+      lastMemHealth = data;
+      renderHealthBadge(data);
+      renderRipcordBanner(data);
     } catch (e) {}
   }
+
+  function factorRow(label, detail, penalty) {
+    var color = penalty === 0 ? '#059669' : penalty < 10 ? '#d97706' : '#dc2626';
+    return '<div class="mem-factor-row"><span><strong>' + label + '</strong><br><span style="color:#6b7280;font-size:12px">' + detail + '</span></span>' +
+      '<span class="mf-penalty" style="color:' + color + '">' + (penalty === 0 ? 'no loss' : '\u2212' + penalty + ' pts') + '</span></div>';
+  }
+
+  function showMemoryHealthDetail() {
+    var d = lastMemHealth;
+    if (!d) return;
+    var sevColor = d.severity === 'healthy' ? '#059669' : d.severity === 'notice' ? '#ca8a04' : d.severity === 'warning' ? '#ea580c' : '#dc2626';
+    var f = d.factors || {};
+    var html = '<div style="text-align:center;margin-bottom:14px">' +
+      '<div style="font-size:40px;font-weight:700;color:' + sevColor + '" data-testid="memory-health-score">' + d.score + '<span style="font-size:18px;color:#9ca3af">/100</span></div>' +
+      '<div style="font-size:13px;font-weight:600;color:' + sevColor + '">' + severityLabel(d.severity) + '</div>' +
+      '</div>';
+    html += '<div style="font-size:12px;color:#6b7280;margin-bottom:10px">The score starts at 100 and loses points for each decay driver below. It reflects how much detail the assistant can still actually see, not just how old the memory is.</div>';
+    if (f.age) {
+      html += factorRow('Age', f.age.daysSinceUpdate === null ? 'No tree updates recorded yet' :
+        'Last memory update ' + (f.age.daysSinceUpdate === 0 ? 'today' : f.age.daysSinceUpdate + ' day' + (f.age.daysSinceUpdate !== 1 ? 's' : '') + ' ago'), f.age.penalty);
+    }
+    if (f.compression) {
+      var compDetail = f.compression.count === 0 ? 'Never compressed' :
+        'Compressed ' + f.compression.count + ' time' + (f.compression.count !== 1 ? 's' : '') + ', up to Tier ' + f.compression.maxTier +
+        (f.compression.lastCompression ? '; last on ' + new Date(f.compression.lastCompression).toLocaleDateString() : '') +
+        '. Each round summarizes ~200 nodes down to 50\u201380, discarding detail.';
+      html += factorRow('Compression', compDetail, f.compression.penalty);
+    }
+    if (f.truncation) {
+      var trDetail = f.truncation.penalty === 0 ?
+        'The whole live tree (' + f.truncation.liveChars.toLocaleString() + ' chars) fits in the ' + f.truncation.promptBudget.toLocaleString() + '-char prompt budget' :
+        '~' + Math.round(f.truncation.ratio * 100) + '% of the live tree (' + f.truncation.liveChars.toLocaleString() + ' chars vs a ' + f.truncation.promptBudget.toLocaleString() + '-char budget) is cut from each chat prompt';
+      html += factorRow('Prompt-budget truncation', trDetail, f.truncation.penalty);
+    }
+    if (f.archive) {
+      var arDetail = f.archive.archivedNodes === 0 ? 'Nothing archived; ' + f.archive.liveNodes + ' live nodes' :
+        f.archive.archivedNodes.toLocaleString() + ' nodes archived vs ' + f.archive.liveNodes.toLocaleString() + ' live (' + Math.round(f.archive.ratio * 100) + '% of all memory is out of the live tree)';
+      html += factorRow('Archived memory', arDetail, f.archive.penalty);
+    }
+    html += '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center">' +
+      '<button class="ripcord-btn ripcord-pin" id="mh-pin" data-testid="mh-btn-pin">&#128204; Pin Facts to Ground Truth</button>' +
+      '<button class="ripcord-btn ripcord-audit" id="mh-audit" data-testid="mh-btn-audit">&#128269; Run Audit</button>' +
+      '<button class="ripcord-btn ripcord-memory" id="mh-memory" data-testid="mh-btn-memory">&#129504; View Memory Hierarchy</button>' +
+      '</div>';
+    memHealthBody.innerHTML = html;
+    memHealthModal.classList.add('active');
+    document.getElementById('mh-pin').addEventListener('click', function() {
+      memHealthModal.classList.remove('active');
+      document.getElementById('btn-pinned-context').click();
+    });
+    document.getElementById('mh-audit').addEventListener('click', function() {
+      memHealthModal.classList.remove('active');
+      auditLatestAssistant(null);
+    });
+    document.getElementById('mh-memory').addEventListener('click', function() {
+      memHealthModal.classList.remove('active');
+      document.getElementById('btn-memory-hierarchy').click();
+    });
+  }
+
+  // ─── Highlight-to-Remember rip cord ─────────────────────────────────────
+  var rememberBtn = document.createElement('button');
+  rememberBtn.id = 'remember-float-btn';
+  rememberBtn.className = 'remember-float-btn hidden';
+  rememberBtn.setAttribute('data-testid', 'btn-remember-selection');
+  rememberBtn.innerHTML = '\u{1F4CC} Remember';
+  rememberBtn.title = 'Pin the highlighted text to Ground Truth so it survives all memory compression (limit 10/day)';
+  document.body.appendChild(rememberBtn);
+
+  function hideRememberBtn() { rememberBtn.classList.add('hidden'); }
+
+  function currentMessageSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+    var text = sel.toString().replace(/\s+/g, ' ').trim();
+    if (text.length < 3) return null;
+    var node = sel.getRangeAt(0).commonAncestorContainer;
+    if (node.nodeType === 3) node = node.parentNode;
+    if (!els.messages.contains(node)) return null;
+    return { text: text, rect: sel.getRangeAt(0).getBoundingClientRect() };
+  }
+
+  document.addEventListener('mouseup', function(e) {
+    if (e.target === rememberBtn) return;
+    setTimeout(function() {
+      var s = currentMessageSelection();
+      if (!s || !state.currentProject) { hideRememberBtn(); return; }
+      rememberBtn.classList.remove('hidden');
+      var top = s.rect.top - 38;
+      if (top < 6) top = s.rect.bottom + 8;
+      rememberBtn.style.top = Math.round(top) + 'px';
+      rememberBtn.style.left = Math.round(Math.min(Math.max(s.rect.left + s.rect.width / 2 - 55, 6), window.innerWidth - 120)) + 'px';
+    }, 10);
+  });
+  document.addEventListener('scroll', hideRememberBtn, true);
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') hideRememberBtn(); });
+
+  rememberBtn.addEventListener('click', async function() {
+    var s = currentMessageSelection();
+    hideRememberBtn();
+    if (!s || !state.currentProject) return;
+    try {
+      var r = await fetch('/api/projects/' + state.currentProject.id + '/remember', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: s.text })
+      });
+      var data = await r.json();
+      if (r.ok) {
+        notify('\u{1F4CC} Remembered. It\u2019s now in Ground Truth and survives compression (' + data.remaining + ' left today).', 'success');
+        try { window.getSelection().removeAllRanges(); } catch (e2) {}
+      } else {
+        notify(data.error || 'Could not remember that.', 'error');
+      }
+    } catch (err) {
+      notify('Could not remember that: ' + err.message, 'error');
+    }
+  });
+
+  memHealthBadge.addEventListener('click', showMemoryHealthDetail);
+  document.getElementById('close-memory-health').addEventListener('click', function() {
+    memHealthModal.classList.remove('active');
+  });
+  memHealthModal.addEventListener('click', function(e) {
+    if (e.target === memHealthModal) memHealthModal.classList.remove('active');
+  });
 
   var reminderDot = document.getElementById('reminder-dot');
   var remindersModal = document.getElementById('reminders-modal');
@@ -4383,10 +4546,22 @@
 
     // Administrative button only appears for the owner
     var adminBtn = document.getElementById('btn-administrative');
+    var visitorChip = document.getElementById('visitor-count-chip');
     if ((auth.user.email || '').toLowerCase() === ADMIN_EMAIL) {
       adminBtn.classList.remove('hidden');
+      // Owner-only unique visitor count (server also enforces the email check)
+      fetch('/api/admin/visitor-stats').then(function(r) { return r.ok ? r.json() : null; }).then(function(s) {
+        if (!s) return;
+        visitorChip.innerHTML = '\u{1F441} ' + s.unique_total.toLocaleString() + ' visitor' + (s.unique_total !== 1 ? 's' : '');
+        visitorChip.title = 'Unique visitors: ' + s.unique_total.toLocaleString() +
+          ' | active last 24h: ' + s.active_24h.toLocaleString() +
+          ' | new last 7 days: ' + s.new_7d.toLocaleString() +
+          ' | total page loads: ' + s.total_visits.toLocaleString() + ' (only you can see this)';
+        visitorChip.classList.remove('hidden');
+      }).catch(function() {});
     } else {
       adminBtn.classList.add('hidden');
+      visitorChip.classList.add('hidden');
     }
 
     setGreeting();

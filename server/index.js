@@ -85,6 +85,29 @@ app.use('/api', function(req, res, next) {
   if (origin && !allowedOrigins.has(origin)) return res.status(403).json({ error: 'Cross-site request blocked' });
   next();
 });
+// ── Unique visitor tracking (owner-only stats) ──────────────────────────
+var VISITOR_COOKIE = 'llmplus_vid';
+app.use(function(req, res, next) {
+  if (req.method !== 'GET' || (req.path !== '/' && req.path !== '/index.html')) return next();
+  try {
+    var vid = null;
+    var raw = req.headers.cookie || '';
+    var m = raw.match(new RegExp('(?:^|;\\s*)' + VISITOR_COOKIE + '=([^;]+)'));
+    if (m && /^[0-9a-f-]{36}$/.test(m[1])) vid = m[1];
+    var isNew = !vid;
+    if (!vid) vid = globalThis.crypto.randomUUID();
+    if (isNew) {
+      res.append('Set-Cookie', VISITOR_COOKIE + '=' + vid + '; Path=/; Max-Age=63072000; SameSite=Lax' + (req.secure || (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''));
+    }
+    // fire-and-forget; never block page load on analytics
+    pool.query(
+      'INSERT INTO site_visitors (visitor_id) VALUES ($1) ON CONFLICT (visitor_id) DO UPDATE SET last_seen = NOW(), visits = site_visitors.visits + 1',
+      [vid]
+    ).catch(function() {});
+  } catch (e) { /* analytics must never break the page */ }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
 
 var DEFAULT_USERNAME = 'JMK';
@@ -256,6 +279,9 @@ async function initDB() {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS pinned_context TEXT DEFAULT ''");
       await client.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ground_rules TEXT DEFAULT ''");
     } catch (e) { /* columns may already exist */ }
+    try {
+      await client.query("CREATE TABLE IF NOT EXISTS site_visitors (visitor_id TEXT PRIMARY KEY, first_seen TIMESTAMPTZ DEFAULT NOW(), last_seen TIMESTAMPTZ DEFAULT NOW(), visits INTEGER DEFAULT 1)");
+    } catch (e) { /* table may already exist */ }
     try {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT");
@@ -1177,13 +1203,26 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   }
 
   if (stalenessInfo && stalenessInfo.isStale) {
-    prompt += '\n\n⚠️ MEMORY STALENESS WARNING: This project\'s Tractatus tree has not been updated in ' + stalenessInfo.daysSinceUpdate + ' days';
-    if (stalenessInfo.compressionCount > 0) prompt += ' and has been compressed ' + stalenessInfo.compressionCount + ' time(s)';
-    prompt += '. Some details (especially specific dates, numbers, names) may have degraded during compression or may be outdated. When citing specific facts from memory:';
+    var decaySev = stalenessInfo.severity || 'notice';
+    var decayScore = (typeof stalenessInfo.score === 'number') ? stalenessInfo.score : null;
+    prompt += '\n\n⚠️ MEMORY DECAY ' + (decaySev === 'critical' ? 'CRITICAL' : decaySev === 'warning' ? 'WARNING' : 'NOTICE') + (decayScore !== null ? ' (health score ' + decayScore + '/100)' : '') + ': This project\'s memory has degraded';
+    var decayReasons = [];
+    if (stalenessInfo.daysSinceUpdate !== null && stalenessInfo.daysSinceUpdate > 2) decayReasons.push('not updated in ' + stalenessInfo.daysSinceUpdate + ' days');
+    if (stalenessInfo.compressionCount > 0) decayReasons.push('compressed ' + stalenessInfo.compressionCount + ' time(s), each round discarding detail');
+    if (stalenessInfo.factors && stalenessInfo.factors.truncation && stalenessInfo.factors.truncation.penalty > 0) decayReasons.push('~' + Math.round(stalenessInfo.factors.truncation.ratio * 100) + '% of the live memory does not fit the prompt budget and is invisible to you');
+    if (stalenessInfo.factors && stalenessInfo.factors.archive && stalenessInfo.factors.archive.archivedNodes > 0) decayReasons.push(stalenessInfo.factors.archive.archivedNodes + ' nodes were archived out of the live tree');
+    if (decayReasons.length > 0) prompt += ': ' + decayReasons.join('; ');
+    prompt += '. Specific NAMES, DATES, and FIGURES (dollar amounts, case numbers, page/exhibit references) are the first casualties of this decay. When citing specific facts from memory:';
     prompt += '\n- ALWAYS qualify uncertain specifics: "According to project records..." or "The tree records this as..."';
     prompt += '\n- NEVER fabricate details that are not explicitly present in the tree nodes';
     prompt += '\n- If a date/number/name is not in the tree, say "I don\'t have that specific detail in the current project memory" rather than guessing';
     prompt += '\n- Recommend the user run an Audit if accuracy of specific claims is critical';
+    if (decaySev === 'warning' || decaySev === 'critical') {
+      prompt += '\n- Because decay is ' + decaySev.toUpperCase() + ': treat every specific name, date, and figure from memory as UNVERIFIED unless it also appears in the pinned context or a document excerpt in THIS prompt. Explicitly flag such items ("memory records X, but this may be unreliable after compression") instead of asserting them.';
+    }
+    if (decaySev === 'critical') {
+      prompt += '\n- CRITICAL DECAY: proactively tell the user, once per conversation, that this project\'s memory has heavily degraded and that they should pin critical facts to the Pinned Context (Ground Truth) and re-upload key documents before relying on specifics.';
+    }
   }
 
   return prompt;
@@ -1210,6 +1249,56 @@ app.put('/api/projects/:id/pinned-context', async function(req, res) {
     var text = String(req.body.pinnedContext || '').slice(0, 8000);
     await pool.query('UPDATE projects SET pinned_context = $1 WHERE id = $2', [text, req.params.id]);
     res.json({ ok: true, pinnedContext: text });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// "Remember" rip cord: append a highlighted snippet to pinned context (Ground Truth).
+// Rate-limited: max 10 remembers per project per calendar day, 500 chars each,
+// and the total pinned context stays under the existing 8000-char cap.
+var REMEMBER_DAILY_LIMIT = 10;
+var REMEMBER_MAX_CHARS = 500;
+app.post('/api/projects/:id/remember', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var text = String(req.body.text || '').replace(/\s+/g, ' ').trim();
+    if (text.length < 3) return res.status(400).json({ error: 'Nothing to remember — highlight some text first.' });
+    if (text.length > REMEMBER_MAX_CHARS) return res.status(400).json({ error: 'That selection is too long (' + text.length + ' chars). Keep each remembered fact under ' + REMEMBER_MAX_CHARS + ' characters.' });
+    var r = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [req.params.id]);
+    var pinned = (r.rows[0] && r.rows[0].pinned_context) || '';
+    var today = new Date().toISOString().slice(0, 10);
+    var marker = '[Remembered ' + today + ']';
+    var usedToday = (pinned.match(new RegExp('\\[Remembered ' + today + '\\]', 'g')) || []).length;
+    if (usedToday >= REMEMBER_DAILY_LIMIT) {
+      return res.status(429).json({ error: 'Daily limit reached (' + REMEMBER_DAILY_LIMIT + ' remembers per day). You can still edit Ground Truth directly via the pin button.', remaining: 0 });
+    }
+    if (pinned.indexOf(text) !== -1) {
+      return res.status(409).json({ error: 'That fact is already in Ground Truth.', remaining: REMEMBER_DAILY_LIMIT - usedToday });
+    }
+    var entry = '\u{1F4CC} ' + marker + ' ' + text;
+    var updated = pinned ? pinned.replace(/\s+$/, '') + '\n' + entry : entry;
+    if (updated.length > 8000) {
+      return res.status(400).json({ error: 'Ground Truth is full (8000-char cap). Open the pin panel and trim old entries first.', remaining: REMEMBER_DAILY_LIMIT - usedToday });
+    }
+    await pool.query('UPDATE projects SET pinned_context = $1 WHERE id = $2', [updated, req.params.id]);
+    res.json({ ok: true, entry: entry, remaining: REMEMBER_DAILY_LIMIT - usedToday - 1, pinnedContext: updated });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Owner-only unique-visitor stats
+var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
+app.get('/api/admin/visitor-stats', async function(req, res) {
+  try {
+    // /api/admin/* bypasses the global requireAuth, so gate here directly.
+    if (!(req.isAuthenticated && req.isAuthenticated() && req.user)) return res.status(401).json({ error: 'Unauthorized' });
+    var email = String(req.user.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) return res.status(403).json({ error: 'Forbidden' });
+    var r = await pool.query(
+      "SELECT COUNT(*)::int AS unique_total, " +
+      "COUNT(*) FILTER (WHERE last_seen >= NOW() - INTERVAL '1 day')::int AS active_24h, " +
+      "COUNT(*) FILTER (WHERE first_seen >= NOW() - INTERVAL '7 days')::int AS new_7d, " +
+      "COALESCE(SUM(visits),0)::int AS total_visits FROM site_visitors"
+    );
+    res.json(r.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1524,13 +1613,18 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var stalenessInfo = null;
-    if (includeProjectContext && projRow.last_tree_update) {
-      var lastUpdate = new Date(projRow.last_tree_update);
-      var daysSince = Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-      var compCount = projRow.compression_count || 0;
-      if (daysSince >= 3 || compCount >= 2) {
-        stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
-        console.log('[Chat] Staleness warning: ' + daysSince + ' days since update, ' + compCount + ' compressions');
+    if (includeProjectContext) {
+      var chatArch = await getArchiveStats(projectId);
+      var chatHealth = computeMemoryHealthFromData({
+        lastUpdate: projRow.last_tree_update,
+        compressionCount: projRow.compression_count || 0,
+        tieredMemory: tieredMemory,
+        archivedNodes: chatArch.archivedNodes,
+        lastCompression: chatArch.lastCompression
+      });
+      if (chatHealth.isStale) {
+        stalenessInfo = chatHealth;
+        console.log('[Chat] Memory decay: score=' + chatHealth.score + ' severity=' + chatHealth.severity + ' (' + chatHealth.daysSinceUpdate + 'd, ' + chatHealth.compressionCount + ' compressions)');
       }
     }
 
@@ -1922,13 +2016,15 @@ app.post('/api/chat/compare', async function(req, res) {
     var stalenessInfo = null;
     if (includeProjectContext) {
       var sr = await pool.query('SELECT last_tree_update, compression_count FROM projects WHERE id = $1', [projectId]);
-      if (sr.rows[0] && sr.rows[0].last_tree_update) {
-        var daysSince = Math.floor((Date.now() - new Date(sr.rows[0].last_tree_update).getTime()) / (1000 * 60 * 60 * 24));
-        var compCount = sr.rows[0].compression_count || 0;
-        if (daysSince >= 3 || compCount >= 2) {
-          stalenessInfo = { isStale: true, daysSinceUpdate: daysSince, compressionCount: compCount };
-        }
-      }
+      var cmpArch = await getArchiveStats(projectId);
+      var cmpHealth = computeMemoryHealthFromData({
+        lastUpdate: sr.rows[0] ? sr.rows[0].last_tree_update : null,
+        compressionCount: sr.rows[0] ? (sr.rows[0].compression_count || 0) : 0,
+        tieredMemory: tieredMemory,
+        archivedNodes: cmpArch.archivedNodes,
+        lastCompression: cmpArch.lastCompression
+      });
+      if (cmpHealth.isStale) stalenessInfo = cmpHealth;
     }
 
     var auditLessonsCmp = await loadAuditLessons(projectId);
@@ -2834,6 +2930,88 @@ async function loadTieredMemory(projectId) {
 
   tiers.sort(function(a, b) { return a.tier - b.tier; });
   return { tiers: tiers, archives: archives.rows };
+}
+
+// ─── Memory Health (decay meter) ───────────────────────────────────────────
+// Composite score of the real decay drivers, not just age:
+//  - compression count & highest tier reached (each round discards detail)
+//  - prompt-budget truncation: fraction of live tree chars that cannot fit in
+//    the ~15K char memory budget injected into chats
+//  - archive volume vs live nodes (how much has been moved out of sight)
+//  - days since last tree update
+// Pure function: callers supply data they already loaded (keeps chat latency flat).
+var MEMORY_PROMPT_BUDGET = 15000;
+
+function computeMemoryHealthFromData(data) {
+  var days = (data.lastUpdate) ? Math.floor((Date.now() - new Date(data.lastUpdate).getTime()) / (1000 * 60 * 60 * 24)) : null;
+  var compCount = data.compressionCount || 0;
+
+  var liveNodes = 0, liveChars = 0, maxTier = 1;
+  var tiers = (data.tieredMemory && data.tieredMemory.tiers) ? data.tieredMemory.tiers : [];
+  for (var t = 0; t < tiers.length; t++) {
+    var tree = tiers[t].tree || {};
+    var keys = Object.keys(tree);
+    liveNodes += keys.length;
+    if ((tiers[t].tier || 1) > maxTier) maxTier = tiers[t].tier || 1;
+    for (var k = 0; k < keys.length; k++) {
+      var val = tree[keys[k]];
+      var line = keys[k] + ': ' + (typeof val === 'string' ? val : JSON.stringify(val));
+      liveChars += Math.min(line.length, 800) + 1;
+    }
+  }
+
+  var archivedNodes = data.archivedNodes || 0;
+  var lastCompression = data.lastCompression || null;
+
+  var agePenalty = (days === null || days <= 2) ? 0 : Math.min(25, (days - 2) * 2);
+  var compressionPenalty = Math.min(30, compCount * 8 + Math.max(0, maxTier - 1) * 4);
+  var truncationRatio = liveChars > MEMORY_PROMPT_BUDGET ? (liveChars - MEMORY_PROMPT_BUDGET) / liveChars : 0;
+  var truncationPenalty = Math.round(truncationRatio * 25);
+  var archiveRatio = (archivedNodes + liveNodes) > 0 ? archivedNodes / (archivedNodes + liveNodes) : 0;
+  var archivePenalty = Math.round(archiveRatio * 20);
+
+  var score = Math.max(0, 100 - agePenalty - compressionPenalty - truncationPenalty - archivePenalty);
+  var severity = score >= 75 ? 'healthy' : score >= 55 ? 'notice' : score >= 35 ? 'warning' : 'critical';
+
+  return {
+    score: score,
+    severity: severity,
+    isStale: severity !== 'healthy',
+    daysSinceUpdate: days,
+    compressionCount: compCount,
+    lastUpdate: data.lastUpdate ? new Date(data.lastUpdate).toISOString() : null,
+    factors: {
+      age: { daysSinceUpdate: days, penalty: agePenalty },
+      compression: { count: compCount, maxTier: maxTier, lastCompression: lastCompression ? new Date(lastCompression).toISOString() : null, penalty: compressionPenalty },
+      truncation: { liveChars: liveChars, promptBudget: MEMORY_PROMPT_BUDGET, ratio: Math.round(truncationRatio * 100) / 100, penalty: truncationPenalty },
+      archive: { archivedNodes: archivedNodes, liveNodes: liveNodes, ratio: Math.round(archiveRatio * 100) / 100, penalty: archivePenalty }
+    }
+  };
+}
+
+async function getArchiveStats(projectId) {
+  var r = await pool.query(
+    'SELECT COALESCE(SUM(node_count), 0) AS archived_nodes, MAX(created_at) AS last_compression FROM tractatus_archive WHERE project_id = $1',
+    [projectId]
+  );
+  return {
+    archivedNodes: parseInt(r.rows[0].archived_nodes, 10) || 0,
+    lastCompression: r.rows[0].last_compression || null
+  };
+}
+
+async function computeMemoryHealth(projectId) {
+  var pr = await pool.query('SELECT last_tree_update, compression_count FROM projects WHERE id = $1', [projectId]);
+  if (pr.rows.length === 0) return null;
+  var tieredMemory = await loadTieredMemory(projectId);
+  var arch = await getArchiveStats(projectId);
+  return computeMemoryHealthFromData({
+    lastUpdate: pr.rows[0].last_tree_update,
+    compressionCount: pr.rows[0].compression_count || 0,
+    tieredMemory: tieredMemory,
+    archivedNodes: arch.archivedNodes,
+    lastCompression: arch.lastCompression
+  });
 }
 
 async function streamClaudeToSSE(messages, systemPrompt, sendFn, maxTokens) {
@@ -5004,40 +5182,22 @@ app.delete('/api/projects/:id/audit-lessons/:lessonId', async function(req, res)
   }
 });
 
-app.get('/api/projects/:id/staleness', async function(req, res) {
+// Memory Health endpoint — composite decay score (replaces the old
+// days-only staleness endpoint; /staleness is kept as an alias).
+async function memoryHealthHandler(req, res) {
   try {
     if (!await verifyProjectOwnership(req.params.id, req.userId)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    var result = await pool.query(
-      'SELECT last_tree_update, compression_count, tractatus_tree FROM projects WHERE id = $1',
-      [req.params.id]
-    );
-    if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
-    var row = result.rows[0];
-    var lastUpdate = row.last_tree_update ? new Date(row.last_tree_update) : null;
-    var daysSince = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24)) : null;
-    var compCount = row.compression_count || 0;
-    var nodeCount = row.tractatus_tree ? Object.keys(row.tractatus_tree).length : 0;
-    var isStale = (daysSince !== null && daysSince >= 3) || compCount >= 2;
-    var severity = 'fresh';
-    if (isStale) {
-      if (daysSince >= 14 || compCount >= 5) severity = 'critical';
-      else if (daysSince >= 7 || compCount >= 3) severity = 'warning';
-      else severity = 'mild';
-    }
-    res.json({
-      isStale: isStale,
-      severity: severity,
-      daysSinceUpdate: daysSince,
-      compressionCount: compCount,
-      nodeCount: nodeCount,
-      lastUpdate: lastUpdate ? lastUpdate.toISOString() : null
-    });
+    var health = await computeMemoryHealth(req.params.id);
+    if (!health) return res.status(404).json({ error: 'Not found' });
+    res.json(health);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+app.get('/api/projects/:id/memory-health', memoryHealthHandler);
+app.get('/api/projects/:id/staleness', memoryHealthHandler);
 
 app.get('/api/reminders', async function(req, res) {
   try {

@@ -379,6 +379,96 @@ html, body {
   50% { opacity: 0.5; }
 }
 
+.mem-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.mem-health-badge:hover { filter: brightness(0.96); }
+.mem-health-badge.health-healthy { background: #f0fdf4; border-color: #86efac; color: #166534; }
+.mem-health-badge.health-notice { background: #fefce8; border-color: #fde047; color: #854d0e; }
+.mem-health-badge.health-warning { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+.mem-health-badge.health-critical { background: #fef2f2; border-color: #fca5a5; color: #991b1b; animation: pulse-audit 1.5s ease-in-out infinite; }
+
+.mem-factor-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  color: #374151;
+}
+.mem-factor-row .mf-penalty {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ripcord-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.ripcord-btn {
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  white-space: nowrap;
+  transition: filter 0.15s;
+  color: #fff;
+}
+.ripcord-btn:hover { filter: brightness(0.9); }
+.ripcord-pin { background: #0891b2; }
+.ripcord-audit { background: #f59e0b; }
+.ripcord-audit.auditing { cursor: wait; animation: pulse-audit 1.5s ease-in-out infinite; }
+.ripcord-memory { background: #047857; }
+
+.remember-float-btn {
+  position: fixed;
+  z-index: 3000;
+  border: none;
+  border-radius: 6px;
+  background: #0891b2;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  transition: filter 0.15s;
+}
+.remember-float-btn:hover { filter: brightness(0.9); }
+
+.visitor-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+  white-space: nowrap;
+  cursor: default;
+}
+
 .staleness-banner {
   background: #fef3c7;
   border: 1px solid #f59e0b;
