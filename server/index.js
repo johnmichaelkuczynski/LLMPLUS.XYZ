@@ -1362,6 +1362,112 @@ app.get('/api/projects/:id/memory-hierarchy', async function(req, res) {
   }
 });
 
+// Browse a single archived Tractatus snapshot (full tree) for restore.
+app.get('/api/projects/:id/archives/:archiveId', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var r = await pool.query(
+      'SELECT id, tier, tree, node_count, created_at FROM tractatus_archive WHERE id = $1 AND project_id = $2',
+      [req.params.archiveId, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Archive snapshot not found' });
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Restore selected nodes from an archived snapshot back into live memory.
+// Body: { archiveId, keys: [...], target: 'tree' | 'pinned' }
+// - target 'tree': merge nodes into the live tractatus_tree (conflicting keys get a
+//   numeric ".9xx" suffix so ordering still sorts, identical values are skipped)
+// - target 'pinned': append "[Restored ...]" lines to pinned_context (8000-char cap)
+// Returns the refreshed memory-health payload so the UI can update the score.
+app.post('/api/projects/:id/restore-memory', async function(req, res) {
+  try {
+    if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var projectId = req.params.id;
+    var archiveId = req.body.archiveId;
+    var target = req.body.target === 'pinned' ? 'pinned' : 'tree';
+    var keys = Array.isArray(req.body.keys) ? req.body.keys.map(String) : [];
+    if (!archiveId) return res.status(400).json({ error: 'archiveId is required' });
+    if (keys.length === 0) return res.status(400).json({ error: 'Select at least one node to restore' });
+    if (keys.length > 200) return res.status(400).json({ error: 'Too many nodes selected (max 200 per restore)' });
+
+    var ar = await pool.query(
+      'SELECT tree FROM tractatus_archive WHERE id = $1 AND project_id = $2',
+      [archiveId, projectId]
+    );
+    if (ar.rows.length === 0) return res.status(404).json({ error: 'Archive snapshot not found' });
+    var archTree = ar.rows[0].tree || {};
+
+    var valueToString = function(v) {
+      return typeof v === 'string' ? v : JSON.stringify(v);
+    };
+
+    var restored = 0, skipped = 0, missing = 0;
+
+    if (target === 'tree') {
+      var pr = await pool.query('SELECT tractatus_tree FROM projects WHERE id = $1', [projectId]);
+      if (pr.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+      var liveTree = pr.rows[0].tractatus_tree || {};
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (!(key in archTree)) { missing++; continue; }
+        var val = archTree[key];
+        if (!(key in liveTree)) {
+          liveTree[key] = val;
+          restored++;
+        } else if (valueToString(liveTree[key]) === valueToString(val)) {
+          skipped++; // already present, identical
+        } else {
+          // Key conflict with different content: park under a numeric suffix so
+          // dotted-number sorting in the UI still works and nothing is overwritten.
+          var suffix = 901;
+          while ((key + '.' + suffix) in liveTree && suffix < 999) suffix++;
+          liveTree[key + '.' + suffix] = val;
+          restored++;
+        }
+      }
+      if (restored > 0) {
+        await pool.query(
+          'UPDATE projects SET tractatus_tree = $1, last_tree_update = NOW() WHERE id = $2',
+          [JSON.stringify(liveTree), projectId]
+        );
+      }
+    } else {
+      var pc = await pool.query('SELECT pinned_context FROM projects WHERE id = $1', [projectId]);
+      if (pc.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+      var pinned = (pc.rows[0].pinned_context || '').replace(/\s+$/, '');
+      var today = new Date().toISOString().slice(0, 10);
+      for (var j = 0; j < keys.length; j++) {
+        var pKey = keys[j];
+        if (!(pKey in archTree)) { missing++; continue; }
+        var text = valueToString(archTree[pKey]).replace(/\s+/g, ' ').trim().slice(0, 500);
+        if (pinned.indexOf(text) !== -1) { skipped++; continue; }
+        var entry = '\u{1F4CC} [Restored ' + today + '] ' + pKey + ': ' + text;
+        var candidate = pinned ? pinned + '\n' + entry : entry;
+        if (candidate.length > 8000) {
+          if (restored === 0) {
+            return res.status(400).json({ error: 'Ground Truth is full (8000-char cap). Trim old entries first, or restore into the live tree instead.' });
+          }
+          break; // keep what fit
+        }
+        pinned = candidate;
+        restored++;
+      }
+      if (restored > 0) {
+        await pool.query('UPDATE projects SET pinned_context = $1 WHERE id = $2', [pinned, projectId]);
+      }
+    }
+
+    var health = await computeMemoryHealth(projectId);
+    res.json({ ok: true, target: target, restored: restored, skipped: skipped, missing: missing, health: health });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/projects/:id/sessions', async function(req, res) {
   try {
     if (!await verifyProjectOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
@@ -2924,7 +3030,7 @@ async function loadTieredMemory(projectId) {
   }
 
   var archives = await pool.query(
-    'SELECT tier, tree, node_count, created_at FROM tractatus_archive WHERE project_id = $1 ORDER BY tier ASC, created_at DESC LIMIT 10',
+    'SELECT id, tier, node_count, created_at FROM tractatus_archive WHERE project_id = $1 ORDER BY tier ASC, created_at DESC LIMIT 10',
     [projectId]
   );
 

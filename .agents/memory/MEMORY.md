@@ -8,6 +8,6 @@
 - [Target-words silent truncation](target-words-silent-truncation.md) — a stray value in the "Words #" box silently capped every reply (maxTokens=256) → mid-sentence freezes; persistent length-overrides need visible active state + clear.
 - [Chat document recall](chat-document-recall.md) — ordinary chat must inject the ACTUAL project_documents text (budgeted, query-relevant), not just the lossy tree; project-context is gated by isProjectSpecificQuery (a phrasing miss drops ALL memory) with a regex fallback; treat doc text as untrusted.
 - [Normal length runaway](response-length-normal.md) — "Normal = never-ending" is fixed by 3 agreeing levers (length block + end-of-prompt FINAL REMINDER for recency + max_tokens ceiling), not by continuation logic; confirm/verify/check = brief yes/no, not an essay.
-- [UI verification & login gate](ui-verification-login-gate.md) — screenshot tool always shows the login gate (cookie drop); verify via Playwright in tools/r1 after /api/auth/dev-login.
+- [UI verification & login gate](ui-verification-login-gate.md) — screenshot tool shows login gate; verify via Playwright after /api/auth/dev-login (use https dev domain, not localhost); modals opened from the artifact panel need z-index ≥1200.
 - [Auto-commit PII sweep](auto-commit-pii-sweep.md) — completion commits sweep in pasted attached_assets transcripts; strip them or review rejects.
 - [Server ESM & admin-route gotchas](server-esm-gotchas.md) — index.js is ESM (require() throws, silently in try/catch); /api/admin/* bypasses requireAuth, gate via req.user.email.

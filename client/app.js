@@ -222,11 +222,15 @@
         html += '<div style="border:1px solid #e5e7eb;border-radius:8px;margin-top:16px;overflow:hidden">';
         html += '<div style="padding:12px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb"><strong style="color:#6b7280">&#128451; Archived Snapshots</strong></div>';
         html += '<div style="padding:12px">';
+        html += '<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">Snapshots taken before each compression. Browse one to restore lost facts into live memory or Ground Truth.</div>';
         for (var a = 0; a < archives.length; a++) {
           var arch = archives[a];
           var archDate = new Date(arch.created_at).toLocaleDateString();
-          html += '<div style="padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#6b7280">';
-          html += 'Tier ' + arch.tier + ' snapshot — ' + (arch.node_count || '?') + ' nodes — ' + archDate;
+          html += '<div style="padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:12px;color:#6b7280;display:flex;justify-content:space-between;align-items:center;gap:8px">';
+          html += '<span>Tier ' + arch.tier + ' snapshot — ' + (arch.node_count || '?') + ' nodes — ' + archDate + '</span>';
+          if (arch.id) {
+            html += '<button class="sidebar-btn mem-archive-restore" data-archive-id="' + esc(arch.id) + '" data-testid="btn-browse-archive-' + a + '" style="flex:0 0 auto;font-size:11px;padding:3px 10px">&#9851; Browse &amp; Restore</button>';
+          }
           html += '</div>';
         }
         html += '</div></div>';
@@ -305,6 +309,121 @@
           arrow.style.transform = '';
         }
       });
+    });
+
+    els.artifactBody.querySelectorAll('.mem-archive-restore').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var archiveId = btn.getAttribute('data-archive-id');
+        try {
+          var snap = await api('/api/projects/' + state.currentProject.id + '/archives/' + archiveId);
+          showArchiveRestoreModal(snap);
+        } catch (err) {
+          notify('Failed to load archive snapshot', 'error');
+        }
+      });
+    });
+  }
+
+  function sortTreeKeys(keys) {
+    return keys.slice().sort(function(a, b) {
+      var pa = a.split('.').map(Number);
+      var pb = b.split('.').map(Number);
+      for (var k = 0; k < Math.max(pa.length, pb.length); k++) {
+        var va = pa[k] || 0, vb = pb[k] || 0;
+        if (va !== vb) return va - vb;
+      }
+      return 0;
+    });
+  }
+
+  function showArchiveRestoreModal(snap) {
+    var tree = snap.tree || {};
+    var keys = sortTreeKeys(Object.keys(tree));
+    var archDate = new Date(snap.created_at).toLocaleDateString();
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-bg active';
+    modal.style.zIndex = '1200';
+
+    var inner = '<div class="modal" style="width:640px;max-width:92vw"><div class="modal-head"><span class="modal-title">&#9851; Restore from Archive</span><button class="modal-x" data-close>&times;</button></div><div class="modal-body">';
+    inner += '<div style="font-size:12px;color:#6b7280;margin-bottom:10px">Tier ' + snap.tier + ' snapshot from ' + archDate + ' — ' + keys.length + ' nodes. Pick the facts you want back, then choose where they go.</div>';
+    inner += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    inner += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" data-field="select-all" data-testid="restore-select-all" style="margin:0"> Select all</label>';
+    inner += '<span data-field="sel-count" style="font-size:12px;color:#6b7280">0 selected</span></div>';
+    inner += '<div data-field="node-list" data-testid="restore-node-list" style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;padding:6px;font-family:\'SF Mono\',Consolas,monospace;font-size:11px;line-height:1.5">';
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var depth = key.split('.').length - 1;
+      var val = tree[key];
+      var valStr = typeof val === 'string' ? val : JSON.stringify(val);
+      inner += '<label style="display:flex;gap:6px;align-items:flex-start;padding:2px 0;padding-left:' + (depth * 14) + 'px;cursor:pointer">';
+      inner += '<input type="checkbox" class="restore-node-cb" value="' + esc(key) + '" style="margin:2px 0 0">';
+      inner += '<span><span style="color:#9ca3af;font-size:10px;margin-right:6px">' + esc(key) + '</span><span style="color:#374151">' + esc(valStr) + '</span></span></label>';
+    }
+    inner += '</div>';
+    inner += '<div style="margin-top:12px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Restore to</label>';
+    inner += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="radio" name="restore-target" value="tree" checked style="margin:0"> <span><strong>Live memory tree</strong> <span style="color:#6b7280">— back into normal working memory (may be compressed again later)</span></span></label>';
+    inner += '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="restore-target" value="pinned" style="margin:0"> <span><strong>Ground Truth (pinned)</strong> <span style="color:#6b7280">— survives compression, but shares an 8000-char cap</span></span></label></div>';
+    inner += '</div><div class="modal-foot"><button class="btn-cancel" data-close>Cancel</button><button class="btn-ok" data-testid="btn-do-restore" style="background:#059669">&#9851; Restore Selected</button></div></div>';
+    modal.innerHTML = inner;
+    document.body.appendChild(modal);
+
+    modal.querySelectorAll('[data-close]').forEach(function(b) {
+      b.addEventListener('click', function() { modal.remove(); });
+    });
+    modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
+
+    var cbs = modal.querySelectorAll('.restore-node-cb');
+    var selCount = modal.querySelector('[data-field="sel-count"]');
+    var selectAll = modal.querySelector('[data-field="select-all"]');
+    function updateCount() {
+      var n = modal.querySelectorAll('.restore-node-cb:checked').length;
+      selCount.textContent = n + ' selected';
+    }
+    cbs.forEach(function(cb) { cb.addEventListener('change', updateCount); });
+    selectAll.addEventListener('change', function() {
+      cbs.forEach(function(cb) { cb.checked = selectAll.checked; });
+      updateCount();
+    });
+
+    var restoreBtn = modal.querySelector('[data-testid="btn-do-restore"]');
+    restoreBtn.addEventListener('click', async function() {
+      var selected = [];
+      modal.querySelectorAll('.restore-node-cb:checked').forEach(function(cb) { selected.push(cb.value); });
+      if (selected.length === 0) {
+        notify('Select at least one node to restore', 'error');
+        return;
+      }
+      var target = modal.querySelector('input[name="restore-target"]:checked').value;
+      restoreBtn.disabled = true;
+      restoreBtn.textContent = 'Restoring...';
+      try {
+        var result = await api('/api/projects/' + state.currentProject.id + '/restore-memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archiveId: snap.id, keys: selected, target: target })
+        });
+        var where = target === 'pinned' ? 'Ground Truth' : 'the live memory tree';
+        var msg = 'Restored ' + result.restored + ' node' + (result.restored !== 1 ? 's' : '') + ' to ' + where;
+        if (result.skipped > 0) msg += ' (' + result.skipped + ' already present)';
+        notify(msg, 'success');
+        modal.remove();
+        if (result.health) {
+          lastMemHealth = result.health;
+          renderHealthBadge(result.health);
+          renderRipcordBanner(result.health);
+        } else {
+          checkStaleness();
+        }
+        try {
+          var memory = await api('/api/projects/' + state.currentProject.id + '/memory-hierarchy');
+          showMemoryHierarchy(memory);
+        } catch (e) {}
+      } catch (err) {
+        notify(err.message || 'Restore failed', 'error');
+        restoreBtn.disabled = false;
+        restoreBtn.innerHTML = '&#9851; Restore Selected';
+      }
     });
   }
 
@@ -4041,10 +4160,12 @@
         f.archive.archivedNodes.toLocaleString() + ' nodes archived vs ' + f.archive.liveNodes.toLocaleString() + ' live (' + Math.round(f.archive.ratio * 100) + '% of all memory is out of the live tree)';
       html += factorRow('Archived memory', arDetail, f.archive.penalty);
     }
+    var hasArchived = f.archive && f.archive.archivedNodes > 0;
     html += '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center">' +
       '<button class="ripcord-btn ripcord-pin" id="mh-pin" data-testid="mh-btn-pin">&#128204; Pin Facts to Ground Truth</button>' +
       '<button class="ripcord-btn ripcord-audit" id="mh-audit" data-testid="mh-btn-audit">&#128269; Run Audit</button>' +
       '<button class="ripcord-btn ripcord-memory" id="mh-memory" data-testid="mh-btn-memory">&#129504; View Memory Hierarchy</button>' +
+      (hasArchived ? '<button class="ripcord-btn ripcord-memory" id="mh-restore" data-testid="mh-btn-restore" style="background:#059669;color:#fff">&#9851; Restore Archived Memory</button>' : '') +
       '</div>';
     memHealthBody.innerHTML = html;
     memHealthModal.classList.add('active');
@@ -4060,6 +4181,14 @@
       memHealthModal.classList.remove('active');
       document.getElementById('btn-memory-hierarchy').click();
     });
+    var mhRestore = document.getElementById('mh-restore');
+    if (mhRestore) {
+      mhRestore.addEventListener('click', function() {
+        memHealthModal.classList.remove('active');
+        // The hierarchy view lists archived snapshots with Browse & Restore buttons.
+        document.getElementById('btn-memory-hierarchy').click();
+      });
+    }
   }
 
   // ─── Highlight-to-Remember rip cord ─────────────────────────────────────
