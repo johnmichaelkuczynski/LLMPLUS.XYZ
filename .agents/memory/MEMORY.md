@@ -10,4 +10,5 @@
 - [Normal length runaway](response-length-normal.md) — "Normal = never-ending" is fixed by 3 agreeing levers (length block + end-of-prompt FINAL REMINDER for recency + max_tokens ceiling), not by continuation logic; confirm/verify/check = brief yes/no, not an essay.
 - [UI verification & login gate](ui-verification-login-gate.md) — screenshot tool shows login gate; verify via Playwright after /api/auth/dev-login (use https dev domain, not localhost); modals opened from the artifact panel need z-index ≥1200.
 - [Auto-commit PII sweep](auto-commit-pii-sweep.md) — completion commits sweep in pasted attached_assets transcripts; strip them or review rejects.
+- [Decay-warning behavioral testing](decay-behavior-testing.md) — prompt-effect checks need A/B (degraded vs healthy) with per-trial projects (chat cross-injects sessions) and zero decay language allowed in controls.
 - [Server ESM & admin-route gotchas](server-esm-gotchas.md) — index.js is ESM (require() throws, silently in try/catch); /api/admin/* bypasses requireAuth, gate via req.user.email.
