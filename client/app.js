@@ -766,11 +766,23 @@
     });
   }
 
+  var projectSwitchToken = 0;
   async function selectProject(p) {
+    var token = ++projectSwitchToken;
     state.currentProject = p;
+    // Clear the previous project's session immediately so its chat can never
+    // linger (or receive messages) under the newly selected project.
+    state.currentSession = null;
+    state.sessions = [];
     els.topbarProject.textContent = p.name;
     renderProjects();
-    state.sessions = await api('/api/projects/' + p.id + '/sessions');
+    renderSessions();
+    showWelcome();
+    var sessions = await api('/api/projects/' + p.id + '/sessions');
+    // If the user clicked another project while this request was in flight,
+    // drop this (stale) response instead of overwriting the newer project.
+    if (token !== projectSwitchToken) return;
+    state.sessions = sessions;
     renderSessions();
     loadProjectDocs();
     checkStaleness();
@@ -910,6 +922,9 @@
   }
 
   function selectSession(s) {
+    // Never activate a session that belongs to a different project than the
+    // one currently selected (guards against stale/racing state).
+    if (s && s.project_id && state.currentProject && s.project_id !== state.currentProject.id) return;
     state.currentSession = s;
     renderSessions();
     renderTranscript(s.transcript || []);
@@ -1460,12 +1475,17 @@
   async function ensureSession() {
     if (state.currentSession) return;
     if (!state.currentProject) return;
+    var creatingFor = state.currentProject;
+    var tokenAtStart = projectSwitchToken;
     try {
-      var s = await api('/api/projects/' + state.currentProject.id + '/sessions', {
+      var s = await api('/api/projects/' + creatingFor.id + '/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Chat' })
       });
+      // If the user switched projects while this session was being created,
+      // don't attach the new (other-project) session to the current view.
+      if (tokenAtStart !== projectSwitchToken || !state.currentProject || state.currentProject.id !== creatingFor.id) return;
       s.transcript = [];
       state.sessions.unshift(s);
       state.currentSession = s;
@@ -1527,6 +1547,7 @@
     var isFirstMessage = !state.currentSession.transcript || state.currentSession.transcript.length === 0;
     var needsAutoTitle = isFirstMessage && state.currentSession.title === 'New Chat';
     var sendingSession = state.currentSession;
+    var sendingProject = state.currentProject;
     var optimisticTitle = '';
     if (needsAutoTitle) {
       var titleSource = text || (readyAttachments.length > 0 ? readyAttachments[0].docName : 'New Chat');
@@ -1550,8 +1571,8 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: state.currentSession.id,
-          projectId: state.currentProject.id,
+          sessionId: sendingSession.id,
+          projectId: sendingProject.id,
           message: fullMessage,
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
@@ -1609,6 +1630,11 @@
   }
 
   function runCoherence(paperSpec) {
+    // Capture the originating session/project so the popup keeps working
+    // (and never targets the wrong project) if the user switches projects
+    // while the paper is generating or awaiting revision.
+    var cohSession = state.currentSession;
+    var cohProject = state.currentProject;
     var popup = document.createElement('div');
     popup.className = 'paper-popup';
     popup.setAttribute('data-testid', 'paper-popup');
@@ -1690,8 +1716,8 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sessionId: state.currentSession.id,
-        projectId: state.currentProject.id,
+        sessionId: cohSession.id,
+        projectId: cohProject.id,
         title: paperSpec.title,
         instructions: paperSpec.instructions,
         wordcount: paperSpec.wordcount,
@@ -1774,7 +1800,7 @@
                         await api('/api/documents/save-generated', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ jobId: jid, name: docTitle, projectId: state.currentProject ? state.currentProject.id : null })
+                          body: JSON.stringify({ jobId: jid, name: docTitle, projectId: cohProject ? cohProject.id : null })
                         });
                         saveBtn.innerHTML = '&#9989; Saved';
                         saveBtn.disabled = true;
@@ -1820,8 +1846,8 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          sessionId: state.currentSession.id,
-                          projectId: state.currentProject.id,
+                          sessionId: cohSession.id,
+                          projectId: cohProject.id,
                           previousOutput: prevText,
                           revisionInstructions: revInstructions,
                           title: paperSpec.title,
@@ -1879,7 +1905,7 @@
                                     saveBtn2.innerHTML = '&#128218; Save to Library';
                                     saveBtn2.onclick = (function(jid2, dt2) { return async function() {
                                       try {
-                                        await api('/api/documents/save-generated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: jid2, name: dt2, projectId: state.currentProject ? state.currentProject.id : null }) });
+                                        await api('/api/documents/save-generated', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId: jid2, name: dt2, projectId: cohProject ? cohProject.id : null }) });
                                         saveBtn2.innerHTML = '&#9989; Saved'; saveBtn2.disabled = true;
                                         notify(state.currentProject ? 'Saved to Project Library & General Library' : 'Saved to General Library', 'success');
                                         if (state.currentProject) loadProjectDocs();

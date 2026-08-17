@@ -149,6 +149,14 @@ async function verifyProjectOwnership(projectId, userId) {
   return r.rows.length > 0;
 }
 
+async function verifySessionInProject(sessionId, projectId, userId) {
+  // The session must belong to THIS project (and the project to this user).
+  // Without the project check, a stale frontend session ID from another
+  // project would be accepted and its transcript shown under the wrong project.
+  var r = await pool.query('SELECT s.id FROM sessions s JOIN projects p ON s.project_id = p.id WHERE s.id = $1 AND p.id = $2 AND p.user_id = $3', [sessionId, projectId, userId]);
+  return r.rows.length > 0;
+}
+
 async function verifySessionOwnership(sessionId, userId) {
   var r = await pool.query('SELECT s.id FROM sessions s JOIN projects p ON s.project_id = p.id WHERE s.id = $1 AND p.user_id = $2', [sessionId, userId]);
   return r.rows.length > 0;
@@ -1647,7 +1655,7 @@ app.post('/api/chat', async function(req, res) {
     var validModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
     var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
-    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+    if (!await verifySessionInProject(sessionId, projectId, req.userId)) {
       res.write('data: ' + JSON.stringify({ type: 'error', error: 'Forbidden' }) + '\n\n');
       return res.end();
     }
@@ -2105,7 +2113,7 @@ app.post('/api/chat/compare', async function(req, res) {
     var validModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
     var modelChoice = validModels.indexOf(req.body.model) >= 0 ? req.body.model : 'claude';
 
-    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+    if (!await verifySessionInProject(sessionId, projectId, req.userId)) {
       send({ type: 'error', error: 'Forbidden' });
       return res.end();
     }
@@ -3462,7 +3470,7 @@ app.post('/api/coherence', async function(req, res) {
     var doctype = req.body.doctype || 'paper';
     var fetchResearchFlag = req.body.fetchResearch || false;
 
-    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+    if (!await verifySessionInProject(sessionId, projectId, req.userId)) {
       send({ type: 'error', error: 'Forbidden' });
       return res.end();
     }
@@ -3961,7 +3969,7 @@ app.post('/api/coherence/revise', async function(req, res) {
     var title = req.body.title || '';
     var doctype = req.body.doctype || 'paper';
 
-    if (!await verifyProjectOwnership(projectId, req.userId) || !await verifySessionOwnership(sessionId, req.userId)) {
+    if (!await verifySessionInProject(sessionId, projectId, req.userId)) {
       send({ type: 'error', error: 'Forbidden' });
       return res.end();
     }
