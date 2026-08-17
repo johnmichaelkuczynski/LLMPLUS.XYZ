@@ -671,7 +671,12 @@
     state.projects = await api('/api/projects');
     renderProjects();
     if (!state.currentProject && state.projects.length > 0) {
-      selectProject(state.projects[0]);
+      // Return to the project the user was last in, instead of silently
+      // jumping to the first project on every reload.
+      var lastId = null;
+      try { lastId = localStorage.getItem('llmplus_last_project'); } catch (e) {}
+      var last = lastId && state.projects.find(function(p) { return p.id === lastId; });
+      selectProject(last || state.projects[0]);
     }
   }
 
@@ -770,6 +775,7 @@
   async function selectProject(p) {
     var token = ++projectSwitchToken;
     state.currentProject = p;
+    try { localStorage.setItem('llmplus_last_project', p.id); } catch (e) {}
     // Clear the previous project's session immediately so its chat can never
     // linger (or receive messages) under the newly selected project.
     state.currentSession = null;
@@ -798,6 +804,9 @@
     els.sessionList.innerHTML = '';
     for (var i = 0; i < state.sessions.length; i++) {
       var s = state.sessions[i];
+      // Defense in depth: never render a chat that belongs to a different
+      // project than the one currently selected.
+      if (s.project_id && state.currentProject && s.project_id !== state.currentProject.id) continue;
       var d = document.createElement('div');
       d.className = 'sidebar-item' + (state.currentSession && state.currentSession.id === s.id ? ' active' : '');
       d.setAttribute('data-testid', 'session-' + s.id);
@@ -3098,12 +3107,17 @@
   });
 
   async function createChatWithRules(rules) {
+    var creatingFor = state.currentProject;
+    var tokenAtStart = projectSwitchToken;
     try {
-      var s = await api('/api/projects/' + state.currentProject.id + '/sessions', {
+      var s = await api('/api/projects/' + creatingFor.id + '/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Chat', groundRules: rules || '' })
       });
+      // If the user switched projects while this request was in flight, don't
+      // attach the new (other-project) chat to the current view.
+      if (tokenAtStart !== projectSwitchToken || !state.currentProject || state.currentProject.id !== creatingFor.id) return;
       s.transcript = [];
       state.sessions.unshift(s);
       state.currentSession = s;
