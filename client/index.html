@@ -53,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=9">
+  <link rel="stylesheet" href="/style.css?v=11">
 </head>
 <body>
   <noscript>
@@ -268,6 +268,15 @@
       <div class="doc-panel-header">
         <span class="doc-panel-title">Documents</span>
         <button class="doc-panel-toggle" id="doc-panel-toggle" data-testid="doc-panel-toggle" title="Minimize">&#9660;</button>
+      </div>
+      <div class="doc-panel-search-wrap" id="doc-panel-search-wrap">
+        <input type="text" class="doc-panel-search" id="doc-panel-search" data-testid="doc-panel-search" placeholder="&#128269; Search documents...">
+        <div class="doc-panel-sort-bar" id="doc-panel-sort-bar" data-testid="doc-panel-sort-bar">
+          <button class="dp-sort-btn active" data-sort="newest" data-testid="dp-sort-newest" title="Newest first">Newest</button>
+          <button class="dp-sort-btn" data-sort="oldest" data-testid="dp-sort-oldest" title="Oldest first">Oldest</button>
+          <button class="dp-sort-btn" data-sort="az" data-testid="dp-sort-az" title="Name A to Z">A-Z</button>
+          <button class="dp-sort-btn" data-sort="largest" data-testid="dp-sort-largest" title="Most words first">Largest</button>
+        </div>
       </div>
       <div class="doc-panel-list" id="doc-panel-list" data-testid="doc-panel-list"></div>
     </aside>
@@ -571,6 +580,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=36"></script>
+  <script src="/app.js?v=38"></script>
 </body>
 </html>

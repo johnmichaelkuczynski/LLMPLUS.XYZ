@@ -322,6 +322,19 @@ async function initDB() {
       await client.query("ALTER TABLE global_documents ADD COLUMN IF NOT EXISTS user_id UUID");
       await client.query("ALTER TABLE document_jobs ADD COLUMN IF NOT EXISTS user_id UUID");
     } catch (e) { /* columns may already exist */ }
+    // Backfill: rename pasted-image-<timestamp>.<ext> to friendly date-based names
+    try {
+      var backfillResult = await client.query(
+        "UPDATE project_documents SET name = 'Pasted image \u2013 ' || to_char(created_at AT TIME ZONE 'UTC', 'Mon FMDD, FMHH12:MI AM') " +
+        "WHERE name ~ '^pasted-image-[0-9]+\\.(png|jpg|jpeg|gif|webp|bmp|tiff|tif)$' RETURNING id"
+      );
+      if (backfillResult.rowCount > 0) console.log('[initDB] Backfilled ' + backfillResult.rowCount + ' pasted-image names in project_documents');
+      var backfillGlobal = await client.query(
+        "UPDATE global_documents SET name = 'Pasted image \u2013 ' || to_char(created_at AT TIME ZONE 'UTC', 'Mon FMDD, FMHH12:MI AM') " +
+        "WHERE name ~ '^pasted-image-[0-9]+\\.(png|jpg|jpeg|gif|webp|bmp|tiff|tif)$' RETURNING id"
+      );
+      if (backfillGlobal.rowCount > 0) console.log('[initDB] Backfilled ' + backfillGlobal.rowCount + ' pasted-image names in global_documents');
+    } catch (bfErr) { console.error('[initDB] Backfill warning:', bfErr.message); }
     console.log('Database schema initialized');
     var projects = await client.query('SELECT id FROM projects LIMIT 1');
     if (projects.rows.length === 0) {
@@ -4157,6 +4170,32 @@ app.delete('/api/projects/documents/:id', async function(req, res) {
     var result = await pool.query('DELETE FROM project_documents WHERE id = $1 RETURNING id', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/projects/documents/:id/name', async function(req, res) {
+  try {
+    if (!await verifyProjectDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var name = (req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    var result = await pool.query('UPDATE project_documents SET name = $1 WHERE id = $2 RETURNING id, name', [name, req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ success: true, name: result.rows[0].name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/documents/global/:id/name', async function(req, res) {
+  try {
+    if (!await verifyGlobalDocOwnership(req.params.id, req.userId)) return res.status(403).json({ error: 'Forbidden' });
+    var name = (req.body.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    var result = await pool.query('UPDATE global_documents SET name = $1 WHERE id = $2 AND user_id = $3 RETURNING id, name', [name, req.params.id, req.userId]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Document not found' });
+    res.json({ success: true, name: result.rows[0].name });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -536,6 +536,25 @@
     }, 3000);
   }
 
+  function fmtDocDate(isoStr) {
+    if (!isoStr) return '';
+    var d = new Date(isoStr);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var h = d.getHours(), m = d.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (!h) h = 12;
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
+  }
+
+  function friendlyPasteImageName() {
+    var d = new Date();
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var h = d.getHours(), m = d.getMinutes();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (!h) h = 12;
+    return 'Pasted image \u2013 ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + (m < 10 ? '0' + m : m) + ' ' + ampm;
+  }
+
   function esc(str) {
     var d = document.createElement('div');
     d.textContent = str;
@@ -1991,20 +2010,66 @@
     els.docPanelToggle.title = collapsed ? 'Expand' : 'Minimize';
   });
 
+  var docPanelSearchTerm = '';
+  var docPanelSort = 'newest';
+  var docPanelSearchInput = document.getElementById('doc-panel-search');
+  if (docPanelSearchInput) {
+    docPanelSearchInput.addEventListener('input', function() {
+      docPanelSearchTerm = docPanelSearchInput.value.trim().toLowerCase();
+      renderDocPanel();
+    });
+  }
+  document.querySelectorAll('.dp-sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.dp-sort-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      docPanelSort = btn.getAttribute('data-sort');
+      renderDocPanel();
+    });
+  });
+
+  function sortDocPanelDocs(docs) {
+    var sorted = docs.slice();
+    if (docPanelSort === 'oldest') {
+      sorted.sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+    } else if (docPanelSort === 'az') {
+      sorted.sort(function(a, b) { return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }); });
+    } else if (docPanelSort === 'largest') {
+      sorted.sort(function(a, b) { return (b.word_count || 0) - (a.word_count || 0); });
+    } else {
+      sorted.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    }
+    return sorted;
+  }
+
   function renderDocPanel() {
     els.docPanelList.innerHTML = '';
     if (state.projectDocs.length === 0) {
       els.docPanelList.innerHTML = '<div class="doc-panel-empty">No documents yet.<br>Upload via the paperclip button or drag and drop.</div>';
       return;
     }
-    for (var i = 0; i < state.projectDocs.length; i++) {
-      var doc = state.projectDocs[i];
+    var visibleDocs = state.projectDocs;
+    if (docPanelSearchTerm) {
+      visibleDocs = state.projectDocs.filter(function(d) {
+        return (d.name || '').toLowerCase().indexOf(docPanelSearchTerm) !== -1;
+      });
+      if (visibleDocs.length === 0) {
+        els.docPanelList.innerHTML = '<div class="doc-panel-empty">No documents match \u201c' + esc(docPanelSearchTerm) + '\u201d</div>';
+        return;
+      }
+    }
+    visibleDocs = sortDocPanelDocs(visibleDocs);
+    for (var i = 0; i < visibleDocs.length; i++) {
+      var doc = visibleDocs[i];
       var item = document.createElement('div');
       item.className = 'dp-item';
       item.setAttribute('data-testid', 'dp-doc-' + doc.id);
+      var dateStr = fmtDocDate(doc.created_at);
+      var metaStr = (dateStr ? dateStr + ' · ' : '') + (doc.word_count || '?') + ' words';
       item.innerHTML = '<span class="dp-icon">&#128196;</span>' +
-        '<div class="dp-info"><div class="dp-name">' + esc(doc.name) + '</div><div class="dp-words">' + (doc.word_count || '?') + ' words</div></div>' +
+        '<div class="dp-info"><div class="dp-name" title="' + esc(doc.name) + '">' + esc(doc.name) + '</div><div class="dp-words">' + esc(metaStr) + '</div></div>' +
         '<div class="dp-actions">' +
+        '<button class="dp-action-btn" title="Rename" data-testid="dp-rename-' + doc.id + '">&#9998;</button>' +
         '<button class="dp-action-btn" title="Inject into chat" data-testid="dp-inject-' + doc.id + '">&#8618;</button>' +
         '<button class="dp-action-btn" title="Move to another project" data-testid="dp-move-' + doc.id + '">&#128259;</button>' +
         '<button class="dp-action-btn" title="Copy to General Library" data-testid="dp-global-' + doc.id + '">&#128218;</button>' +
@@ -2012,6 +2077,10 @@
         '</div>';
 
       (function(d) {
+        item.querySelector('[data-testid="dp-rename-' + d.id + '"]').addEventListener('click', function(e) {
+          e.stopPropagation();
+          startDocPanelRename(item, d);
+        });
         item.querySelector('[data-testid="dp-inject-' + d.id + '"]').addEventListener('click', function(e) {
           e.stopPropagation();
           injectDocIntoChat(d.id);
@@ -2035,6 +2104,124 @@
 
       els.docPanelList.appendChild(item);
     }
+  }
+
+  function startDocPanelRename(item, doc) {
+    var nameEl = item.querySelector('.dp-name');
+    if (!nameEl) return;
+    var oldName = doc.name;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'dp-rename-input';
+    input.value = oldName;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    function commit() {
+      var newName = input.value.trim();
+      if (!newName || newName === oldName) {
+        var restored = document.createElement('div');
+        restored.className = 'dp-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+        return;
+      }
+      api('/api/projects/documents/' + doc.id + '/name', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      }).then(function() {
+        doc.name = newName;
+        var restored = document.createElement('div');
+        restored.className = 'dp-name';
+        restored.title = newName;
+        restored.textContent = newName;
+        input.replaceWith(restored);
+        var idx = state.projectDocs.findIndex ? state.projectDocs.findIndex(function(d) { return d.id === doc.id; }) : -1;
+        if (idx >= 0) state.projectDocs[idx].name = newName;
+        notify('Renamed to \u201c' + newName + '\u201d');
+      }).catch(function(err) {
+        notify('Rename failed: ' + err.message, 'error');
+        var restored = document.createElement('div');
+        restored.className = 'dp-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+      });
+    }
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        var restored = document.createElement('div');
+        restored.className = 'dp-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+      }
+    });
+    input.addEventListener('blur', commit);
+  }
+
+  function startLibRename(li, doc, kind) {
+    var nameEl = li.querySelector('.doc-name');
+    if (!nameEl) return;
+    var oldName = doc.name;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'lib-rename-input';
+    input.value = oldName;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    var endpoint = kind === 'global'
+      ? '/api/documents/global/' + doc.id + '/name'
+      : '/api/projects/documents/' + doc.id + '/name';
+    function commit() {
+      var newName = input.value.trim();
+      if (!newName || newName === oldName) {
+        var restored = document.createElement('span');
+        restored.className = 'doc-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+        return;
+      }
+      api(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      }).then(function() {
+        doc.name = newName;
+        var restored = document.createElement('span');
+        restored.className = 'doc-name';
+        restored.title = newName;
+        restored.textContent = newName;
+        input.replaceWith(restored);
+        if (kind === 'project') loadProjectDocs();
+        notify('Renamed to \u201c' + newName + '\u201d');
+      }).catch(function(err) {
+        notify('Rename failed: ' + err.message, 'error');
+        var restored = document.createElement('span');
+        restored.className = 'doc-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+      });
+    }
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        var restored = document.createElement('span');
+        restored.className = 'doc-name';
+        restored.title = oldName;
+        restored.textContent = oldName;
+        input.replaceWith(restored);
+      }
+    });
+    input.addEventListener('blur', commit);
   }
 
   async function openDocForReading(docId, docName) {
@@ -2416,9 +2603,12 @@
     li.setAttribute('data-testid', 'project-doc-' + doc.id);
     li.setAttribute('data-doc-id', doc.id);
     var wc = doc.word_count ? doc.word_count.toLocaleString() + ' words' : '';
+    var dateStr = fmtDocDate(doc.created_at);
+    var meta = (dateStr ? dateStr + ' · ' : '') + wc;
     li.innerHTML = '<label class="lib-checkbox-wrap"><input type="checkbox" class="lib-checkbox" data-testid="plib-check-' + doc.id + '"></label>' +
-      '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name">' + esc(doc.name) + '</span></div>' +
-      '<span class="doc-meta-right">' + esc(wc) + '</span>' +
+      '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name" title="' + esc(doc.name) + '">' + esc(doc.name) + '</span></div>' +
+      '<span class="doc-meta-right">' + esc(meta) + '</span>' +
+      '<button class="lib-rename-btn" data-testid="plib-rename-' + doc.id + '" title="Rename">&#9998;</button>' +
       '<button class="lib-download-btn" data-testid="plib-download-' + doc.id + '" title="Download">&#11015;</button>' +
       '<button class="lib-delete-btn" data-testid="plib-delete-' + doc.id + '" title="Delete">&#128465;</button>';
 
@@ -2427,6 +2617,11 @@
       projectLibSelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);
       updateProjectLibSelectionUI();
+    });
+
+    li.querySelector('.lib-rename-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      startLibRename(li, doc, 'project');
     });
 
     li.querySelector('.lib-download-btn').addEventListener('click', function(e) {
@@ -2448,7 +2643,7 @@
     });
 
     li.addEventListener('click', function(e) {
-      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
+      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-rename-btn') || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
       checkbox.checked = !checkbox.checked;
       projectLibSelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);
@@ -2464,9 +2659,12 @@
     li.setAttribute('data-testid', 'global-doc-' + doc.id);
     li.setAttribute('data-doc-id', doc.id);
     var wc = doc.word_count ? doc.word_count.toLocaleString() + ' words' : '';
+    var dateStr = fmtDocDate(doc.created_at);
+    var meta = (dateStr ? dateStr + ' · ' : '') + wc;
     li.innerHTML = '<label class="lib-checkbox-wrap"><input type="checkbox" class="lib-checkbox" data-testid="lib-check-' + doc.id + '"></label>' +
-      '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name">' + esc(doc.name) + '</span></div>' +
-      '<span class="doc-meta-right">' + esc(wc) + '</span>' +
+      '<div class="doc-left"><span class="doc-icon">&#128196;</span><span class="doc-name" title="' + esc(doc.name) + '">' + esc(doc.name) + '</span></div>' +
+      '<span class="doc-meta-right">' + esc(meta) + '</span>' +
+      '<button class="lib-rename-btn" data-testid="lib-rename-' + doc.id + '" title="Rename">&#9998;</button>' +
       '<button class="lib-download-btn" data-testid="lib-download-' + doc.id + '" title="Download">&#11015;</button>' +
       '<button class="lib-delete-btn" data-testid="lib-delete-' + doc.id + '" title="Delete">&#128465;</button>';
 
@@ -2475,6 +2673,11 @@
       librarySelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);
       updateLibrarySelectionUI();
+    });
+
+    li.querySelector('.lib-rename-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      startLibRename(li, doc, 'global');
     });
 
     li.querySelector('.lib-download-btn').addEventListener('click', function(e) {
@@ -2498,7 +2701,7 @@
     });
 
     li.addEventListener('click', function(e) {
-      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
+      if (e.target.tagName === 'INPUT' || e.target.classList.contains('lib-rename-btn') || e.target.classList.contains('lib-download-btn') || e.target.classList.contains('lib-delete-btn')) return;
       checkbox.checked = !checkbox.checked;
       librarySelection[doc.id] = checkbox.checked;
       li.classList.toggle('lib-selected', checkbox.checked);
@@ -2998,7 +3201,7 @@
         if (!blob) continue;
         var ext = blob.type.split('/')[1] || 'png';
         if (ext === 'jpeg') ext = 'jpg';
-        var fname = 'pasted-image-' + Date.now() + '.' + ext;
+        var fname = friendlyPasteImageName() + '.' + ext;
         var file = new File([blob], fname, { type: blob.type });
         uploadFile(file);
         break;
