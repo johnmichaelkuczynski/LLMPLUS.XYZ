@@ -7,7 +7,7 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from './db.js';
-import { setupOwnerAccess, getOwnerUser } from './auth.js';
+import { setupGoogleAuth, requireGoogleAuth } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +20,8 @@ var allowedOrigins = (function() {
   var origins = new Set();
   (process.env.REPLIT_DOMAINS || '').split(',').forEach(function(d) { d = d.trim(); if (d) origins.add('https://' + d); });
   if (process.env.REPLIT_DEV_DOMAIN) origins.add('https://' + process.env.REPLIT_DEV_DOMAIN);
+  origins.add('https://llmplus.ink');
+  origins.add('https://www.llmplus.ink');
   origins.add('http://localhost:5000');
   origins.add('http://127.0.0.1:5000');
   return origins;
@@ -31,10 +33,7 @@ app.use(cors({
   }
 }));
 app.use(bodyParser.json({ limit: '50mb' }));
-// No login gate. Every request uses the one existing owner record identified
-// by email, so all previously owned projects, chats, and documents stay attached
-// to their original database user ID.
-setupOwnerAccess(app);
+setupGoogleAuth(app);
 app.use('/api', function(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   var origin = req.headers.origin;
@@ -66,34 +65,15 @@ app.use(function(req, res, next) {
 
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
 
-async function getDefaultUserId() {
-  return (await getOwnerUser()).id;
-}
-
 // The former login-event dashboard is retired with the login system. Historical
 // database rows are retained; only the public route is removed.
 app.get('/administrative', function(req, res) {
   res.status(404).send('Not found');
 });
 
-// Resolve every application request to the exact pre-existing owner row.
-// Fail closed if that row is missing or ambiguous; never create a blank user.
-async function requireOwner(req, res, next) {
-  try {
-    var owner = await getOwnerUser();
-    req.user = owner;
-    req.userId = owner.id;
-    next();
-  } catch (error) {
-    console.error('Owner identity resolution failed:', error.message);
-    res.status(503).json({ error: 'Owner data is unavailable' });
-  }
-}
-
-app.use('/api', function(req, res, next) {
-  if (req.path.startsWith('/auth/')) return next();
-  requireOwner(req, res, next);
-});
+// Authentication routes were registered above. Every remaining API request
+// requires a current Google-backed session and uses that user's existing ID.
+app.use('/api', requireGoogleAuth);
 
 async function verifyProjectOwnership(projectId, userId) {
   var r = await pool.query('SELECT id FROM projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
@@ -265,6 +245,17 @@ async function initDB() {
       await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_created_at ON login_events (created_at)");
       await client.query("CREATE INDEX IF NOT EXISTS idx_login_events_email ON login_events (email)");
     } catch (e) { console.error('login_events table init failed:', e.message); }
+    try {
+      await client.query(`CREATE TABLE IF NOT EXISTS google_sessions_v2 (
+        sid VARCHAR NOT NULL,
+        sess JSON NOT NULL,
+        expire TIMESTAMP(6) NOT NULL,
+        CONSTRAINT google_sessions_v2_pkey PRIMARY KEY (sid)
+      )`);
+      await client.query(
+        'CREATE INDEX IF NOT EXISTS google_sessions_v2_expire_idx ON google_sessions_v2 (expire)'
+      );
+    } catch (e) { console.error('Google session table init failed:', e.message); }
     try {
       await client.query("ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id UUID");
       await client.query("ALTER TABLE global_documents ADD COLUMN IF NOT EXISTS user_id UUID");

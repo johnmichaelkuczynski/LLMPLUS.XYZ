@@ -1,0 +1,18 @@
+{
+  "1.0": "QUESTION: Can we achieve complete mathematical certainty in light of Gödel's incompleteness theorems?",
+  "1.1": "ASSERTS: Gödel's incompleteness theorems destabilized the early 20th-century dream of mathematics as a complete, self-contained formal system",
+  "1.2": "ASSERTS: Gödel's theorems do not eliminate mathematical certainty—they relocate and constrain it",
+  "1.3": "REJECTS: Mathematics collapses into skepticism as a result of incompleteness",
+  "1.4": "ASSERTS: The theorems vindicate a kind of mathematical Platonism—truth appears to transcend formalization",
+  "1.5": "RESOLVED: Certainty remains in mathematics; omniscience does not",
+  "1.1.1": "DOCUMENT: First incompleteness theorem shows any consistent formal system powerful enough to express arithmetic contains true statements unprovable within that system",
+  "1.1.2": "DOCUMENT: Second incompleteness theorem demonstrates no such system can prove its own consistency from within",
+  "1.1.3": "ASSERTS: These theorems shattered Hilbert's formalist program, which sought to ground all mathematics in finitary, mechanically verifiable proof",
+  "1.2.1": "ASSERTS: We can achieve certainty about individual proofs—if you've verified a derivation within a formal system, that derivation is certain relative to the axioms",
+  "1.2.2": "REJECTS: We cannot achieve completeness—mathematical truth outstrips what any single axiomatic system can capture",
+  "1.2.3": "ASSERTS: There will always be truths we recognize (often through meta-mathematical reasoning) that our formal system cannot reach",
+  "1.3.1": "ASSERTS: Mathematical knowledge is inherently open-ended—we can always extend systems by adding new axioms, but each extension brings new unprovables",
+  "1.3.2": "ASSERTS: Mathematical certainty exists as a local rather than global property: certain within frameworks, never absolute across all possible mathematical truth",
+  "1.4.1": "ASSERTS: The theorems humble foundationalist ambitions",
+  "1.4.2": "ASSERTS: We navigate mathematics through a plurality of methods: formal proof, semantic intuition, consistency assumptions we cannot fully justify from within"
+}

@@ -4844,7 +4844,7 @@
   });
 
   function initializeApp() {
-    window.__userName = 'JMK';
+    window.__userName = (window.__authUser && (window.__authUser.username || window.__authUser.displayName)) || 'User';
     var visitorChip = document.getElementById('visitor-count-chip');
     fetch('/api/admin/visitor-stats').then(function(r) { return r.ok ? r.json() : null; }).then(function(s) {
       if (!s) return;
@@ -5128,5 +5128,51 @@
     navigator.clipboard.writeText(t).then(function() { notify('Copied B', 'success'); });
   });
 
-  initializeApp();
+  function showLoginError(message) {
+    var errorEl = document.getElementById('login-error');
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  }
+
+  async function bootstrapAuth() {
+    var gate = document.getElementById('login-gate');
+    var app = document.getElementById('app');
+    var errorCode = new URLSearchParams(window.location.search).get('authError');
+    if (errorCode) {
+      showLoginError(errorCode === 'session'
+        ? 'Your sign-in session could not be saved. Please try again.'
+        : 'This Google account is not authorized for this workspace.');
+    }
+
+    try {
+      var response = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (!response.ok) return;
+      var data = await response.json();
+      if (!data.authenticated || !data.user) return;
+
+      window.__authUser = data.user;
+      var chip = document.getElementById('user-chip');
+      if (chip) chip.textContent = data.user.email || data.user.username || '';
+      gate.classList.add('hidden');
+      app.classList.remove('hidden');
+      initializeApp();
+
+      if (errorCode) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (error) {
+      showLoginError('Unable to check sign-in status. Please refresh and try again.');
+    }
+  }
+
+  document.getElementById('btn-signout').addEventListener('click', async function() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      window.location.assign('/');
+    }
+  });
+
+  bootstrapAuth();
 })();

@@ -52,11 +52,10 @@ package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit
 - **Context Management (flat per-turn cost)**: hot paths never load the full transcript — `loadRecentTranscript()` trims to last N in SQL. Chat uses last ~12 msgs; cross-session context only for project-specific queries. On-demand features (report/summarize/profile/paper) still load the full transcript.
 - **Kill switch**: stop button / Escape aborts fetch; server cancels upstream streams and saves partial transcript ("[Stopped by user]").
 
-## Access: no login; fixed existing owner identity
-- The app has no login screen, provider, session, logout, or dev-login route.
-- `server/auth.js` resolves exactly one existing `users` row by the owner email. Every application API request uses that row's unchanged ID, preserving all projects, chats, documents, reminders, and profiles already associated with it.
-- Resolution fails closed if the owner row is missing or duplicated; it never creates a new blank user.
-- All former `/auth/*` and `/api/auth/*` entry points return 404.
+## Access: Google login; one personal owner
+- **Google-only personal access:** `server/auth.js` creates a fresh database-backed Google session. Only the verified `johnmichaelkuczynski@gmail.com` account can sign in; it is linked to the existing database user and no user/project/document record is created or reassigned during sign-in. All other API routes require that session.
+- The login setup fails closed: other Google accounts, unverified emails, missing/duplicate owner rows, and conflicting Google account links are rejected.
+- Sessions use a new cookie and database table so sessions from older authentication implementations cannot become valid.
 - CSRF guard (foreign-Origin rejection on non-GET `/api/*`) and the CORS allowlist remain.
 
 ## Database Tables
