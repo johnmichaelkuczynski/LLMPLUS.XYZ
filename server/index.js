@@ -7,8 +7,7 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool } from './db.js';
-import { setupAuth } from './auth.js';
-import { storage } from './storage.js';
+import { setupOwnerAccess, getOwnerUser } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,53 +31,10 @@ app.use(cors({
   }
 }));
 app.use(bodyParser.json({ limit: '50mb' }));
-// Canonical authentication (server/auth.js): session store, passport, Google
-// OAuth routes, /api/auth/user|me|logout, and owner-only /api/admin/visits.
-setupAuth(app);
-app.use(function(req, res, next) {
-  if (req.secure && req.session && req.session.cookie) {
-    req.session.cookie.sameSite = 'none';
-    req.session.cookie.secure = true;
-  }
-  next();
-});
-
-// ─── DEV-ONLY auto-login for the Replit preview. The route is NOT registered
-// in production: it requires BOTH (a) REPLIT_DEPLOYMENT unset (Replit sets it
-// in published deployments) AND (b) NODE_ENV !== 'production' (npm start sets
-// production). It also only answers when the request's Host is the workspace
-// dev domain or localhost, and every use is logged.
-var IS_DEPLOYMENT = !!process.env.REPLIT_DEPLOYMENT || process.env.NODE_ENV === 'production';
-if (!IS_DEPLOYMENT) {
-  app.get('/api/auth/dev-login', async function(req, res) {
-    var host = String(req.hostname || '').toLowerCase();
-    var devDomain = String(process.env.REPLIT_DEV_DOMAIN || '').toLowerCase();
-    var hostOk = (devDomain && host === devDomain) || host === 'localhost' || host === '127.0.0.1';
-    if (!hostOk) return res.status(404).json({ error: 'Not found' });
-    console.log('[DEV] dev-login used from ' + (req.ip || 'unknown IP') + ' host=' + host);
-    try {
-      var ownerEmail = 'johnmichaelkuczynski@gmail.com';
-      var user = await storage.getUserByEmail(ownerEmail);
-      if (!user) {
-        // Fall back to the JMK workspace user and stamp the owner email on it.
-        var r = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', ['JMK']);
-        if (r.rows.length === 0) {
-          r = await pool.query('INSERT INTO users (username, password_hash, email) VALUES ($1, NULL, $2) RETURNING id', ['JMK', ownerEmail]);
-        } else {
-          await pool.query('UPDATE users SET email = COALESCE(email, $2) WHERE id = $1', [r.rows[0].id, ownerEmail]);
-        }
-        user = await storage.getUserById(r.rows[0].id);
-      }
-      req.login(user, function(err) {
-        if (err) return res.status(500).json({ error: 'Dev login failed: ' + err.message });
-        res.redirect('/');
-      });
-    } catch (e) {
-      res.status(500).json({ error: 'Dev login failed: ' + e.message });
-    }
-  });
-  console.log('[DEV] Preview auto-login enabled at /api/auth/dev-login (disabled in production)');
-}
+// No login gate. Every request uses the one existing owner record identified
+// by email, so all previously owned projects, chats, and documents stay attached
+// to their original database user ID.
+setupOwnerAccess(app);
 app.use('/api', function(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
   var origin = req.headers.origin;
@@ -110,38 +66,33 @@ app.use(function(req, res, next) {
 
 app.use(express.static(path.join(__dirname, '..', 'client'), { etag: false, maxAge: 0 }));
 
-var DEFAULT_USERNAME = 'JMK';
-var defaultUserId = null;
 async function getDefaultUserId() {
-  if (defaultUserId) return defaultUserId;
-  var r = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [DEFAULT_USERNAME]);
-  if (r.rows.length === 0) {
-    r = await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, NULL) RETURNING id', [DEFAULT_USERNAME]);
-  }
-  defaultUserId = r.rows[0].id;
-  return defaultUserId;
+  return (await getOwnerUser()).id;
 }
 
-// ─── Administrative page: served openly; its data API (/api/admin/visits in
-// server/auth.js) is restricted to the owner's Google account.
+// The former login-event dashboard is retired with the login system. Historical
+// database rows are retained; only the public route is removed.
 app.get('/administrative', function(req, res) {
-  res.sendFile(path.join(__dirname, '..', 'client', 'admin.html'));
+  res.status(404).send('Not found');
 });
 
-// Login is REQUIRED: only signed-in Google users may use the app.
-// The owner's Google account (matched by email) maps to the JMK workspace.
-function requireAuth(req, res, next) {
-  if (req.isAuthenticated && req.isAuthenticated() && req.user && req.user.id) {
-    req.userId = req.user.id;
-    return next();
+// Resolve every application request to the exact pre-existing owner row.
+// Fail closed if that row is missing or ambiguous; never create a blank user.
+async function requireOwner(req, res, next) {
+  try {
+    var owner = await getOwnerUser();
+    req.user = owner;
+    req.userId = owner.id;
+    next();
+  } catch (error) {
+    console.error('Owner identity resolution failed:', error.message);
+    res.status(503).json({ error: 'Owner data is unavailable' });
   }
-  res.status(401).json({ error: 'Sign in with Google required' });
 }
 
 app.use('/api', function(req, res, next) {
   if (req.path.startsWith('/auth/')) return next();
-  if (req.path.startsWith('/admin/')) return next();
-  requireAuth(req, res, next);
+  requireOwner(req, res, next);
 });
 
 async function verifyProjectOwnership(projectId, userId) {
@@ -298,11 +249,8 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT");
-      // Owner's Google sign-in claims the JMK workspace via email lookup in server/storage.js
-      await client.query(
-        "UPDATE users SET email = $1 WHERE LOWER(username) = LOWER($2) AND (email IS NULL OR email = '')",
-        ['johnmichaelkuczynski@gmail.com', DEFAULT_USERNAME]
-      );
+      // Identity data is never created or reassigned at startup. Owner
+      // resolution later requires exactly one pre-existing email match.
     } catch (e) { /* columns may already exist */ }
     try {
       await client.query(`CREATE TABLE IF NOT EXISTS login_events (
@@ -1305,14 +1253,9 @@ app.post('/api/projects/:id/remember', async function(req, res) {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Owner-only unique-visitor stats
-var OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
+// Unique-visitor stats. The app intentionally has no login gate.
 app.get('/api/admin/visitor-stats', async function(req, res) {
   try {
-    // /api/admin/* bypasses the global requireAuth, so gate here directly.
-    if (!(req.isAuthenticated && req.isAuthenticated() && req.user)) return res.status(401).json({ error: 'Unauthorized' });
-    var email = String(req.user.email || '').toLowerCase();
-    if (email !== OWNER_EMAIL) return res.status(403).json({ error: 'Forbidden' });
     var r = await pool.query(
       "SELECT COUNT(*)::int AS unique_total, " +
       "COUNT(*) FILTER (WHERE last_seen >= NOW() - INTERVAL '1 day')::int AS active_24h, " +

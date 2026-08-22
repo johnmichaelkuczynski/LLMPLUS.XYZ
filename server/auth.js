@@ -1,374 +1,45 @@
-import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { storage } from "./storage.js";
-import pg from "pg";
+import { pool } from './db.js';
 
-export function setupAuth(app) {
-  // Strip invisible characters (non-breaking spaces, zero-width chars, BOM) and
-  // surrounding whitespace that often sneak in when secrets are copy-pasted.
-  const sanitizeSecret = (v) =>
-    (v || "").replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, "").trim();
+export const OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
 
-  // Google OAuth client credentials (owner-provided).
-  // GOOGLE_CLIENT_ID/SECRET (the owner's current Replit secrets) take priority;
-  // older GOOGLE_LOGIN_* / GOOGLE_OAUTH_* names are legacy fallbacks only.
-  const clientID = sanitizeSecret(
-    process.env.GOOGLE_CLIENT_ID ||
-      process.env.GOOGLE_LOGIN_CLIENT_ID ||
-      process.env.GOOGLE_OAUTH_CLIENT_ID
-  );
-  const clientSecret = sanitizeSecret(
-    process.env.GOOGLE_CLIENT_SECRET ||
-      process.env.GOOGLE_LOGIN_CLIENT_SECRET ||
-      process.env.GOOGLE_OAUTH_CLIENT_SECRET
+export async function getOwnerUser() {
+  const result = await pool.query(
+    `SELECT id, username, email, display_name
+       FROM users
+      WHERE LOWER(email) = LOWER($1)
+      ORDER BY id`,
+    [OWNER_EMAIL]
   );
 
-  const googleEnabled = !!(clientID && clientSecret);
-
-  if (!googleEnabled) {
-    console.warn(
-      "Google OAuth credentials not found (GOOGLE_LOGIN_CLIENT_ID / GOOGLE_LOGIN_CLIENT_SECRET). Google login disabled."
+  if (result.rows.length !== 1) {
+    throw new Error(
+      `Expected exactly one owner record for ${OWNER_EMAIL}; found ${result.rows.length}`
     );
   }
 
-  // Trust proxy for production (behind Replit's proxy)
-  app.set('trust proxy', 1);
-
-  // Database-backed session store
-  const PgSession = connectPgSimple(session);
-  const pool = new pg.Pool({
-    connectionString: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-
-  pool.on('error', (err) => {
-    console.error('Session pool error:', err);
-  });
-
-  pool.on('connect', () => {
-    console.log('Session pool connected to database');
-  });
-
-  // Session setup with database storage
-  const pgStore = new PgSession({
-    pool,
-    tableName: 'user_sessions',
-    createTableIfMissing: true,
-    errorLog: console.error.bind(console, 'Session store error:'),
-  });
-
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  if (isProduction && !process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET environment variable is required in production");
-  }
-
-  app.use(
-    session({
-      store: pgStore,
-      secret: process.env.SESSION_SECRET || "text-intelligence-studio-secret-key",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: isProduction || !!process.env.REPLIT_DEV_DOMAIN,
-        httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      },
-    })
-  );
-
-  console.log(`Session configured. Secure cookies: ${isProduction || !!process.env.REPLIT_DEV_DOMAIN}`);
-
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id, done) => {
-    try {
-      const user = await storage.getUserById(id);
-      done(null, user);
-    } catch (error) {
-      done(error);
-    }
-  });
-
-  // --- Google OAuth 2.0 (optional login: the app itself is fully open) ---
-  if (googleEnabled) {
-    // Callback path is /auth/google/callback to match the redirect URIs
-    // registered in the owner's Google Cloud Console OAuth client.
-    const CALLBACK_PATH = "/auth/google/callback";
-
-    const getCallbackURL = () => {
-      if (process.env.NODE_ENV === "production") {
-        const prodDomain = (process.env.REPLIT_DOMAINS || "")
-          .split(",")[0]
-          ?.trim();
-        return `https://${prodDomain || "llmplus.ink"}${CALLBACK_PATH}`;
-      }
-      if (process.env.REPLIT_DEV_DOMAIN) {
-        return `https://${process.env.REPLIT_DEV_DOMAIN}${CALLBACK_PATH}`;
-      }
-      return `http://localhost:5000${CALLBACK_PATH}`;
-    };
-
-    // Build the callback URL from the domain the visitor is actually on, so
-    // login works from every domain (custom domain, .replit.app, dev preview)
-    // as long as that domain's callback URI is registered in Google Cloud.
-    // Only known app domains are trusted; anything else falls back to the
-    // static default (prevents host-header tampering).
-    const trustedHosts = new Set(
-      [
-        ...(process.env.REPLIT_DOMAINS || "").split(",").map((d) => d.trim()),
-        process.env.REPLIT_DEV_DOMAIN || "",
-        "llmplus.ink",
-        "www.llmplus.ink",
-        "llmplusxyz.replit.app",
-        "localhost:5000",
-      ]
-        .filter(Boolean)
-        .map((h) => h.toLowerCase())
-    );
-
-    const getRequestCallbackURL = (req) => {
-      const host = (req.headers["x-forwarded-host"] || req.headers.host || "")
-        .toString()
-        .split(",")[0]
-        .trim()
-        .toLowerCase();
-      if (host && trustedHosts.has(host)) {
-        const proto = host.startsWith("localhost") ? "http" : "https";
-        return `${proto}://${host}${CALLBACK_PATH}`;
-      }
-      return getCallbackURL();
-    };
-
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID,
-          clientSecret,
-          callbackURL: getCallbackURL(),
-          state: true, // CSRF protection via session-stored state parameter
-          passReqToCallback: false,
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          try {
-            const email = profile.emails?.[0]?.value || null;
-            const displayName = profile.displayName || null;
-            const googleId = profile.id;
-
-            let user = await storage.getUserByGoogleId(googleId);
-
-            if (!user) {
-              if (email) {
-                user = await storage.getUserByEmail(email);
-              }
-
-              if (!user) {
-                const username = email?.split("@")[0] || `user_${googleId.substring(0, 8)}`;
-                user = await storage.createUserWithGoogle({
-                  username,
-                  googleId,
-                  email,
-                  displayName,
-                });
-                console.log(`Google OAuth: Created new user ${user.id} (${user.username})`);
-              } else {
-                user = await storage.updateUserGoogle(user.id, {
-                  googleId,
-                  displayName,
-                });
-              }
-            } else {
-              user = await storage.updateUserGoogle(user.id, {
-                displayName,
-              });
-            }
-
-            console.log(`Google OAuth: Login successful for user ${user.id}`);
-            done(null, user);
-          } catch (error) {
-            console.error("Google auth error:", error);
-            done(error);
-          }
-        }
-      )
-    );
-
-    // Click 1: button links here -> 302 straight to Google's account chooser.
-    // callbackURL is computed per request so login works from every domain.
-    const loginHandler = (req, res, next) =>
-      passport.authenticate("google", {
-        scope: ["openid", "email", "profile"],
-        prompt: "select_account",
-        callbackURL: getRequestCallbackURL(req),
-      })(req, res, next);
-    app.get("/api/auth/google", loginHandler);
-    app.get("/auth/google", loginHandler);
-
-    // Click 2 happens on Google; the callback lands the user inside the app
-    const callbackHandler = [
-      (req, res, next) =>
-        passport.authenticate("google", {
-          failureRedirect: "/?error=auth_failed",
-          callbackURL: getRequestCallbackURL(req),
-        })(req, res, next),
-      (req, res) => {
-        // Record a login event on every successful sign-in
-        (async () => {
-          try {
-            if (req.user) {
-              await storage.recordVisit(req.user.id, req.user.email ?? null);
-            }
-          } catch (visitErr) {
-            console.error("Failed to record login event:", visitErr);
-          }
-        })();
-        req.session.save(() => {
-          res.redirect("/");
-        });
-      },
-    ];
-    app.get(CALLBACK_PATH, ...callbackHandler);
-    // Legacy alias in case the /api-prefixed URI is registered instead
-    app.get("/api/auth/google/callback", ...callbackHandler);
-
-    console.log("Google OAuth configured. Callback URL:", getCallbackURL());
-  }
-
-  app.get("/api/auth/user", (req, res) => {
-    if (req.isAuthenticated() && req.user) {
-      res.json({
-        authenticated: true,
-        user: {
-          id: req.user.id,
-          username: req.user.username,
-          email: req.user.email,
-          displayName: req.user.displayName,
-        },
-      });
-    } else {
-      res.json({ authenticated: false, user: null });
-    }
-  });
-
-  app.get("/api/auth/me", (req, res) => {
-    if (req.isAuthenticated() && req.user) {
-      res.json({
-        id: req.user.id,
-        username: req.user.username,
-        email: req.user.email,
-        displayName: req.user.displayName,
-      });
-    } else {
-      res.status(401).json({ error: "Not authenticated" });
-    }
-  });
-
-  app.post("/api/auth/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Logout failed" });
-      }
-      req.session.destroy(() => {
-        res.clearCookie("connect.sid");
-        res.json({ success: true });
-      });
-    });
-  });
-
-  // --- Admin: visitor analytics (restricted to the site owner) ---
-  app.get("/api/admin/visits", isAdmin, async (_req, res) => {
-    try {
-      const now = Date.now();
-      const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
-      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-      const yearAgo = new Date(now - 365 * 24 * 60 * 60 * 1000);
-
-      const [visitList, allTimestamps] = await Promise.all([
-        storage.getVisits(500),
-        storage.getVisitTimestampsSince(null),
-      ]);
-
-      const times = allTimestamps.map((t) => new Date(t).getTime());
-      const stats = {
-        allTime: times.length,
-        last24Hours: times.filter((t) => t >= dayAgo.getTime()).length,
-        lastWeek: times.filter((t) => t >= weekAgo.getTime()).length,
-        lastMonth: times.filter((t) => t >= monthAgo.getTime()).length,
-        lastYear: times.filter((t) => t >= yearAgo.getTime()).length,
-      };
-
-      // Build bucketed series for graphs
-      const buildSeries = (start, bucketMs, buckets, labelFn) => {
-        const counts = new Array(buckets).fill(0);
-        for (const t of times) {
-          if (t >= start) {
-            const idx = Math.min(Math.floor((t - start) / bucketMs), buckets - 1);
-            counts[idx]++;
-          }
-        }
-        return counts.map((count, i) => ({
-          label: labelFn(new Date(start + i * bucketMs)),
-          count,
-        }));
-      };
-
-      const HOUR = 60 * 60 * 1000;
-      const DAY = 24 * HOUR;
-      const series = {
-        last24Hours: buildSeries(now - 24 * HOUR, HOUR, 24, (d) =>
-          d.toLocaleTimeString("en-US", { hour: "numeric", hour12: true })),
-        lastWeek: buildSeries(now - 7 * DAY, DAY, 7, (d) =>
-          d.toLocaleDateString("en-US", { weekday: "short", day: "numeric" })),
-        lastMonth: buildSeries(now - 30 * DAY, DAY, 30, (d) =>
-          d.toLocaleDateString("en-US", { month: "short", day: "numeric" })),
-        lastYear: buildSeries(now - 365 * DAY, 365 / 12 * DAY, 12, (d) =>
-          d.toLocaleDateString("en-US", { month: "short", year: "2-digit" })),
-        allTime: (() => {
-          const earliest = times.length ? Math.min(...times) : now;
-          const span = Math.max(now - earliest, DAY);
-          const buckets = Math.min(24, Math.max(6, Math.ceil(span / (30 * DAY))));
-          return buildSeries(earliest, span / buckets, buckets, (d) =>
-            d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }));
-        })(),
-      };
-
-      res.json({
-        stats,
-        series,
-        visits: visitList.map((v) => ({
-          id: v.id,
-          email: v.email,
-          visitedAt: v.visitedAt,
-        })),
-      });
-    } catch (error) {
-      console.error("Admin visits error:", error);
-      res.status(500).json({ error: "Failed to load visitor data" });
-    }
-  });
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    username: row.username,
+    email: row.email,
+    displayName: row.display_name || null
+  };
 }
 
-const ADMIN_EMAIL = "johnmichaelkuczynski@gmail.com";
-
-export const isAdmin = (req, res, next) => {
-  if (req.isAuthenticated() && req.user?.email?.toLowerCase() === ADMIN_EMAIL) {
-    return next();
-  }
-  res.status(403).json({ error: "Not authorized" });
-};
-
-export const isAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ error: "Not authenticated" });
-};
+export function setupOwnerAccess(app) {
+  // Explicitly retire every former sign-in/session route instead of allowing
+  // the SPA catch-all to make an old login URL appear to work.
+  app.all([
+    '/auth/google',
+    '/auth/google/callback',
+    '/api/auth/google',
+    '/api/auth/google/callback',
+    '/api/auth/dev-login',
+    '/api/auth/logout',
+    '/api/auth/user',
+    '/api/auth/me',
+    '/api/admin/visits'
+  ], function(_req, res) {
+    res.status(404).json({ error: 'Login has been removed' });
+  });
+}

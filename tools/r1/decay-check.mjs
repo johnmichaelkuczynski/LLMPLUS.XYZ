@@ -3,7 +3,7 @@
 // the system prompt actually changes chat answers on a degraded project.
 //
 // Method:
-//   1. dev-login for a session cookie.
+//   1. direct access (the app intentionally has no login gate).
 //   2. Create ONE identically-seeded project PER TRIAL per arm (degraded /
 //      control). /api/chat deliberately injects prior sessions from the same
 //      project, so per-trial projects are the only way to keep trials
@@ -37,8 +37,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url + '/../../../'); // resolve from repo root
 const { Pool } = require('pg');
 
-// dev-login's session cookie is Secure (sameSite=none) — it is NOT set over
-// plain-http localhost, so default to the HTTPS dev domain when available.
+// Use the development domain when available so this check exercises the same
+// proxied route as the app preview.
 const APP_URL = process.env.APP_URL ||
   (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
 const TRIALS = parseInt(process.env.DECAY_CHECK_TRIALS || '3', 10);
@@ -186,12 +186,9 @@ async function main() {
   const failures = [];
   const created = [];
 
-  // 1. Auth
-  const login = await fetch(APP_URL + '/api/auth/dev-login', { redirect: 'manual' });
-  const setCookie = login.headers.get('set-cookie');
-  if (!setCookie) throw new Error('dev-login returned no cookie (status ' + login.status + ')');
-  const cookie = setCookie.split(';')[0];
-  console.log('[1] dev-login OK');
+  // 1. The app intentionally has no login gate.
+  const cookie = '';
+  console.log('[1] no-login access OK');
 
   try {
     const tag = Date.now().toString(36);

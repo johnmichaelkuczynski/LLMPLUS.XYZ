@@ -4843,99 +4843,18 @@
     } catch (e) {}
   });
 
-  // Mandatory login: without Google sign-in only the login gate is visible.
-  document.getElementById('btn-administrative').addEventListener('click', function() {
-    window.location.href = '/administrative';
-  });
-
-  var ADMIN_EMAIL = 'johnmichaelkuczynski@gmail.com';
-
-  async function fetchAuthState() {
-    try {
-      var r = await fetch('/api/auth/user');
-      if (r.ok) return await r.json();
-    } catch (e) {}
-    return { authenticated: false, user: null };
-  }
-
-  document.getElementById('btn-gate-signin').addEventListener('click', function() {
-    var inIframe = false;
-    try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
-    if (inIframe) {
-      // Google blocks OAuth inside iframes (Replit preview) — open a tab and poll for completion.
-      var w = window.open('/auth/google', '_blank');
-      document.getElementById('gate-waiting').classList.remove('hidden');
-      var poll = setInterval(async function() {
-        var auth = await fetchAuthState();
-        if (auth.authenticated) {
-          clearInterval(poll);
-          try { if (w && !w.closed) w.close(); } catch (e) {}
-          window.location.reload();
-        }
-      }, 2000);
-      setTimeout(function() { clearInterval(poll); }, 180000);
-    } else {
-      window.location.href = '/auth/google';
-    }
-  });
-
-  document.getElementById('btn-signout').addEventListener('click', async function() {
-    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
-    window.location.reload();
-  });
-
-  // Login is REQUIRED: without Google sign-in, only the login gate is shown.
-  // In the Replit DEV PREVIEW only, the server exposes /api/auth/dev-login
-  // (absent in production) so the owner can debug without the OAuth dance.
-  var isDevHost = /\.replit\.dev$|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
-  async function checkAuth() {
-    var auth = await fetchAuthState();
-    var gate = document.getElementById('login-gate');
-    if ((!auth.authenticated || !auth.user) && isDevHost) {
-      try {
-        var dl = await fetch('/api/auth/dev-login');
-        if (dl.ok) auth = await fetchAuthState();
-      } catch (e) {}
-      if ((!auth.authenticated || !auth.user) && !sessionStorage.getItem('devLoginTried')) {
-        sessionStorage.setItem('devLoginTried', '1');
-        window.location.href = '/api/auth/dev-login';
-        return;
-      }
-    }
-    if (!auth.authenticated || !auth.user) {
-      appEl.classList.add('hidden');
-      gate.classList.remove('hidden');
-      return;
-    }
-    gate.classList.add('hidden');
-    appEl.classList.remove('hidden');
-
-    var chip = document.getElementById('user-chip');
-    chip.classList.remove('hidden');
-    document.getElementById('user-chip-name').textContent =
-      auth.user.displayName || auth.user.username || auth.user.email || 'Signed in';
-    window.__userName = auth.user.displayName || auth.user.username || '';
-
-    // Administrative button only appears for the owner
-    var adminBtn = document.getElementById('btn-administrative');
+  function initializeApp() {
+    window.__userName = 'JMK';
     var visitorChip = document.getElementById('visitor-count-chip');
-    if ((auth.user.email || '').toLowerCase() === ADMIN_EMAIL) {
-      adminBtn.classList.remove('hidden');
-      // Owner-only unique visitor count (server also enforces the email check)
-      fetch('/api/admin/visitor-stats').then(function(r) { return r.ok ? r.json() : null; }).then(function(s) {
-        if (!s) return;
-        visitorChip.innerHTML = '\u{1F441} ' + s.unique_total.toLocaleString() + ' visitor' + (s.unique_total !== 1 ? 's' : '');
-        visitorChip.title = 'Unique visitors: ' + s.unique_total.toLocaleString() +
-          ' | active last 24h: ' + s.active_24h.toLocaleString() +
-          ' | new last 7 days: ' + s.new_7d.toLocaleString() +
-          ' | total page loads: ' + s.total_visits.toLocaleString() + ' (only you can see this)';
-        visitorChip.classList.remove('hidden');
-      }).catch(function() {});
-    } else {
-      adminBtn.classList.add('hidden');
-      visitorChip.classList.add('hidden');
-    }
-
+    fetch('/api/admin/visitor-stats').then(function(r) { return r.ok ? r.json() : null; }).then(function(s) {
+      if (!s) return;
+      visitorChip.innerHTML = '\u{1F441} ' + s.unique_total.toLocaleString() + ' visitor' + (s.unique_total !== 1 ? 's' : '');
+      visitorChip.title = 'Unique visitors: ' + s.unique_total.toLocaleString() +
+        ' | active last 24h: ' + s.active_24h.toLocaleString() +
+        ' | new last 7 days: ' + s.new_7d.toLocaleString() +
+        ' | total page loads: ' + s.total_visits.toLocaleString();
+      visitorChip.classList.remove('hidden');
+    }).catch(function() {});
     setGreeting();
     loadProjects();
     updateReminderDot();
@@ -5209,5 +5128,5 @@
     navigator.clipboard.writeText(t).then(function() { notify('Copied B', 'success'); });
   });
 
-  checkAuth();
+  initializeApp();
 })();

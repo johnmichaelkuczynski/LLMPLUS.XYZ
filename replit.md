@@ -12,12 +12,12 @@ Minimalist web chat app connecting to Anthropic Claude (plus ChatGPT, DeepSeek, 
 ## File Structure
 ```
 server/index.js   - Express server, all API routes, chat SSE, coherence engine, Tractatus
-server/auth.js    - Google OAuth (canonical, DO NOT rewrite); server/storage.js - pg storage shim
+server/auth.js    - fixed single-owner identity resolver and retired-login route blockers
 server/db.js      - pg Pool connection to Neon PostgreSQL
 client/index.html - Single page HTML (white theme, bottom input bar)
 client/style.css  - All styles (white UI, no dark mode)
 client/app.js     - Frontend logic (vanilla JS, drag-drop, SSE, modals)
-package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit, mammoth, pdf-parse, passport(+google-oauth20), connect-pg-simple
+package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit, mammoth, pdf-parse
 ```
 
 ## Key Features (one-liner each; see code for detail)
@@ -44,7 +44,7 @@ package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit
 - **Per-Chat Ground Rules** (⚖): optional standing rules set on New Chat; stored in `sessions.ground_rules`; injected near the top AND as the absolute last line (appended after length/target notes in the route handlers so recency wins). Only an explicit per-message override sets them aside. `/api/sessions/:id/ground-rules`.
 - **Memory Health (decay meter & rip cord)**: composite 0-100 score (age + compression count/tier + prompt-budget truncation + archive-vs-live ratio) via `GET /api/projects/:id/memory-health` (`/staleness` is an alias). Always-visible 🧠 badge in topbar (green/yellow/orange/red) with click-through factor breakdown; warning/critical shows a rip-cord banner (Pin Facts 📌 / Run Audit 🔍 / View Memory 🧠); in-prompt decay notice scales with severity, telling the model to hedge names/dates/figures instead of confabulating. Replaces the old days-only staleness banner.
 - **SEO**: full meta set in `client/index.html` (title, description, canonical → https://llmplus.ink/, Open Graph, Twitter card, JSON-LD WebApplication schema, noscript content), plus `client/robots.txt` and `client/sitemap.xml`. Note: the `.replit.dev` proxy injects `x-robots-tag: noindex` — production (llmplus.ink) does not.
-- **Unique visitor counter (owner-only)**: cookie-based (`llmplus_vid`, 2-yr) middleware upserts into `site_visitors`; `GET /api/admin/visitor-stats` is gated to johnmichaelkuczynski@gmail.com via `req.user.email` (NOT `req.userId` — `/api/admin/*` bypasses global requireAuth). Owner sees a 👁 chip in the topbar; distinct from the older login-event tracker at `/api/admin/visits` (auth.js). Highlight-to-Remember: selecting text in any chat message shows a floating 📌 Remember button that appends the snippet to pinned context via `POST /api/projects/:id/remember` (max 10/day per project, 500 chars each, deduped, 8000-char Ground Truth cap).
+- **Unique visitor counter**: cookie-based (`llmplus_vid`, 2-yr) middleware upserts into `site_visitors`; `GET /api/admin/visitor-stats` supplies the 👁 topbar chip. Historical access-event rows remain stored but their former login dashboard and API are retired. Highlight-to-Remember: selecting text in any chat message shows a floating 📌 Remember button that appends the snippet to pinned context via `POST /api/projects/:id/remember` (max 10/day per project, 500 chars each, deduped, 8000-char Ground Truth cap).
 - **Anti-Sycophancy**: universal truthfulness rules in every stance; preserved through tree updates/compression.
 - **Compare Stances** (⚖ Compare): dual-column overlay streaming two stances concurrently; does not write transcript. `POST /api/chat/compare`.
 - **Stance Toggle**: Agreeable / Neutral / Mildly Critical / Strongly Critical — a CONTENT directive, all bound by truthfulness rules.
@@ -52,20 +52,18 @@ package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit
 - **Context Management (flat per-turn cost)**: hot paths never load the full transcript — `loadRecentTranscript()` trims to last N in SQL. Chat uses last ~12 msgs; cross-session context only for project-specific queries. On-demand features (report/summarize/profile/paper) still load the full transcript.
 - **Kill switch**: stop button / Escape aborts fetch; server cancels upstream streams and saves partial transcript ("[Stopped by user]").
 
-## Authentication: MANDATORY Google login via canonical server/auth.js
-- `server/auth.js` is a verbatim port (only domain values changed). **Do NOT rewrite its logic.**
-- **Login REQUIRED**: no Google sign-in → no site. Client shows a full-screen login gate; `requireAuth` returns 401 for anonymous requests. Signed-in users get their own workspace; the owner's Google email maps to the JMK workspace (seeded at boot).
-- **This breaks the R1 Beta Test harness** (it relied on the anonymous workspace) — expected, not a regression.
-- setupAuth: passport + passport-google-oauth20 + connect-pg-simple sessions (`user_sessions`), session-state CSRF, per-request callback URL from trusted hosts. Secrets: GOOGLE_CLIENT_ID/SECRET (legacy GOOGLE_LOGIN_*/GOOGLE_OAUTH_* are fallbacks). Routes under `/auth/google*` and `/api/auth/*` (both callback paths must be registered in Google Cloud Console).
-- **Admin = Google email match** `johnmichaelkuczynski@gmail.com` (hardcoded ADMIN_EMAIL; mirrored client-side only for button visibility). Admin dashboard at `/administrative` (data API 403 until owner signs in); visit buckets 24h/week/month/year/all + sign-in list.
-- **DEV-ONLY preview auto-login**: `GET /api/auth/dev-login` exists only when `REPLIT_DEPLOYMENT` is unset; client auto-calls it on `.replit.dev`/localhost so the preview is always signed in. Production requires real Google login.
-- CSRF guard (foreign-Origin rejection on non-GET `/api/*`) + CORS allowlist remain; sameSite=None cookie mutation for the iframe preview runs after setupAuth.
+## Access: no login; fixed existing owner identity
+- The app has no login screen, provider, session, logout, or dev-login route.
+- `server/auth.js` resolves exactly one existing `users` row by the owner email. Every application API request uses that row's unchanged ID, preserving all projects, chats, documents, reminders, and profiles already associated with it.
+- Resolution fails closed if the owner row is missing or duplicated; it never creates a new blank user.
+- All former `/auth/*` and `/api/auth/*` entry points return 404.
+- CSRF guard (foreign-Origin rejection on non-GET `/api/*`) and the CORS allowlist remain.
 
 ## Database Tables
-users, projects (user_id FK, tractatus_tier, parent_project_id, pinned_context, audit_lessons), sessions (ground_rules), project_documents, global_documents (user_id FK), document_jobs (user_id FK), document_chunks, tractatus_archive, user_analytics (user_id UNIQUE, profile_tree JSONB), profile_snapshots, reminders, user_sessions (auth), login_events.
+users, projects (user_id FK, tractatus_tier, parent_project_id, pinned_context, audit_lessons), sessions (ground_rules), project_documents, global_documents (user_id FK), document_jobs (user_id FK), document_chunks, tractatus_archive, user_analytics (user_id UNIQUE, profile_tree JSONB), profile_snapshots, reminders, login_events (historical).
 
 ## Environment Variables
-ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, XAI_API_KEY, VENICE_API_KEY, DATABASE_URL, GOOGLE_CLOUD_VISION_API_KEY, GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET, ASSEMBLYAI_API_KEY, SESSION_SECRET, PORT (default 5000). Anthropic key prefers Replit AI integration (AI_INTEGRATIONS_ANTHROPIC_API_KEY/_BASE_URL) with fallback to ANTHROPIC_API_KEY.
+ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, XAI_API_KEY, VENICE_API_KEY, DATABASE_URL, GOOGLE_CLOUD_VISION_API_KEY, ASSEMBLYAI_API_KEY, PORT (default 5000). Anthropic key prefers Replit AI integration (AI_INTEGRATIONS_ANTHROPIC_API_KEY/_BASE_URL) with fallback to ANTHROPIC_API_KEY.
 
 ## Replit Environment / Deployment
 - Run: `npm run dev` (dev) / `npm start` (prod) — both run `node server/index.js` on port 5000; no build step. Deployment: autoscale.
