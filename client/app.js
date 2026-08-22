@@ -5130,6 +5130,8 @@
 
   async function bootstrapAuth() {
     var app = document.getElementById('app');
+    var signIn = document.getElementById('btn-google-login');
+    var signOut = document.getElementById('btn-signout');
     var errorCode = new URLSearchParams(window.location.search).get('authError');
 
     try {
@@ -5139,6 +5141,8 @@
       if (!data.authenticated || !data.user) return;
 
       window.__authUser = data.user;
+      if (signIn) signIn.classList.add('hidden');
+      if (signOut) signOut.classList.toggle('hidden', Boolean(data.developmentPreview));
       var chip = document.getElementById('user-chip');
       if (chip) chip.textContent = data.user.email || data.user.username || '';
       app.classList.remove('hidden');

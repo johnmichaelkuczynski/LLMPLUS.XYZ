@@ -112,7 +112,8 @@
         <button class="topbar-btn" id="btn-download-session" data-testid="btn-download-session" title="Download this chat session">&#11015; Download chat</button>
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
         <button class="topbar-btn topbar-btn-diagnostic" id="btn-diagnostic" data-testid="btn-diagnostic" title="Run a full system check">&#129514; Diagnostic</button>
-        <button class="topbar-btn" id="btn-signout" data-testid="btn-signout" title="Sign out">Sign out</button>
+        <a class="topbar-btn" id="btn-google-login" data-testid="btn-google-login" href="/api/auth/google" title="Sign in to open your personal workspace">Sign in with Google</a>
+        <button class="topbar-btn hidden" id="btn-signout" data-testid="btn-signout" title="Sign out">Sign out</button>
       </header>
 
       <div id="diagnostic-modal" class="modal hidden" data-testid="diagnostic-modal">
@@ -565,6 +566,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=40"></script>
+  <script src="/app.js?v=41"></script>
 </body>
 </html>

@@ -398,6 +398,8 @@ html, body {
 }
 
 .topbar-btn {
+  display: inline-flex;
+  align-items: center;
   padding: 6px 12px;
   font-size: 13px;
   border: 1px solid #e5e7eb;
@@ -407,6 +409,7 @@ html, body {
   cursor: pointer;
   font-weight: 500;
   white-space: nowrap;
+  text-decoration: none;
   transition: background 0.15s;
 }
 
