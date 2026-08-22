@@ -56,6 +56,7 @@ package.json      - express, pg, dotenv, cors, body-parser, multer, docx, pdfkit
 - **Google-only personal access:** `server/auth.js` creates a fresh database-backed Google session. Only the verified `johnmichaelkuczynski@gmail.com` account can sign in; it is linked to the existing database user and no user/project/document record is created or reassigned during sign-in. All other API routes require that session.
 - The login setup fails closed: other Google accounts, unverified emails, missing/duplicate owner rows, and conflicting Google account links are rejected.
 - Sessions use a new cookie and database table so sessions from older authentication implementations cannot become valid.
+- **Development preview:** requests on the configured Replit development host (and local app preview) resolve directly to that same existing owner row so the original workspace loads without a login wall. This exception is disabled in production.
 - CSRF guard (foreign-Origin rejection on non-GET `/api/*`) and the CORS allowlist remain.
 
 ## Database Tables

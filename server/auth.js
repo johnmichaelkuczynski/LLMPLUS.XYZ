@@ -104,6 +104,29 @@ function callbackUrlForRequest(req) {
   return `${isLocal ? 'http' : 'https'}://${host}${CALLBACK_PATH}`;
 }
 
+function isDevelopmentPreviewRequest(req) {
+  const developmentHost = String(process.env.REPLIT_DEV_DOMAIN || '').trim().toLowerCase();
+  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim().toLowerCase();
+  const requestHost = forwardedHost || String(req.get('host') || '').toLowerCase();
+  const isLocalPreview = requestHost.startsWith('localhost:') || requestHost.startsWith('127.0.0.1:');
+  return process.env.NODE_ENV === 'development' &&
+    ((Boolean(developmentHost) && requestHost === developmentHost) || isLocalPreview);
+}
+
+async function getPersonalOwner() {
+  const result = await pool.query(
+    `SELECT id, username, email, display_name, google_id
+       FROM users
+      WHERE LOWER(email) = LOWER($1)
+      ORDER BY id`,
+    [PERSONAL_OWNER_EMAIL]
+  );
+  if (result.rows.length !== 1) {
+    throw new Error('Personal workspace owner is unavailable');
+  }
+  return result.rows[0];
+}
+
 export function setupGoogleAuth(app) {
   const clientID = cleanSecret(process.env.GOOGLE_CLIENT_ID);
   const clientSecret = cleanSecret(process.env.GOOGLE_CLIENT_SECRET);
@@ -211,7 +234,17 @@ export function setupGoogleAuth(app) {
     });
   });
 
-  app.get('/api/auth/me', (req, res) => {
+  app.get('/api/auth/me', async (req, res) => {
+    if (isDevelopmentPreviewRequest(req)) {
+      try {
+        const owner = await getPersonalOwner();
+        res.set('Cache-Control', 'no-store');
+        return res.json({ authenticated: true, user: publicUser(owner), developmentPreview: true });
+      } catch (error) {
+        console.error('Development preview owner lookup failed:', error.message);
+        return res.status(503).json({ authenticated: false, user: null });
+      }
+    }
     if (!req.isAuthenticated() || !req.user) {
       res.set('Cache-Control', 'no-store');
       return res.json({ authenticated: false, user: null });
@@ -239,7 +272,18 @@ export function setupGoogleAuth(app) {
   console.log('Fresh Google authentication configured');
 }
 
-export function requireGoogleAuth(req, res, next) {
+export async function requireGoogleAuth(req, res, next) {
+  if (isDevelopmentPreviewRequest(req)) {
+    try {
+      const owner = await getPersonalOwner();
+      req.user = owner;
+      req.userId = owner.id;
+      return next();
+    } catch (error) {
+      console.error('Development preview owner lookup failed:', error.message);
+      return res.status(503).json({ error: 'Personal workspace is unavailable' });
+    }
+  }
   if (
     !req.isAuthenticated?.() ||
     !req.user ||

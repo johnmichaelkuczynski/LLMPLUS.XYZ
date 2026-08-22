@@ -1,5 +1,5 @@
 - [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
-- [No-login owner access](replit-auth-no-packages.md) — the app intentionally has no login; resolve the exact pre-existing owner row and never create a replacement identity.
+- [Personal Google access](replit-auth-no-packages.md) — production data requires the exact owner's Google account; development preview opens the same existing owner workspace without a login wall.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.
 - [Chat context-build latency](chat-context-latency.md) — per-turn chat latency must NOT scale with project size; trim transcript tails in SQL, gate cross-session behind includeProjectContext, keep raw history lean (memory tree carries continuity).
 - [Assistant verbosity & mission drift](assistant-verbosity-mission-drift.md) — highest-priority prompt block makes the assistant obey "read and take note" (brief confirm, no lecture) and stay on mission; keep it ABOVE any rigor/analysis framing.
