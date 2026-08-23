@@ -1007,6 +1007,7 @@ function normalizeAnalysisMode(value) {
 function analysisModePrompt(value) {
   var mode = normalizeAnalysisMode(value);
   var block = '\n\nANALYSIS MODE — this controls interpretive breadth and reasoning strategy, NOT tone or response length. The explicit user instruction, chat ground rules, selected length, selected format, and anti-fabrication rules remain controlling.';
+  block += '\n- Apply the mode internally and answer naturally. Do not announce the mode, recite your reasoning procedure, force a checklist, or mechanically include every possible analytical category. Let the substance of the specific question or document determine the shape of the response.';
   if (mode === 'hyper_conservative') {
     block += '\n\n**ANALYSIS MODE: HYPER-CONSERVATIVE.** Interpret the request as literally and narrowly as reasonably possible. Answer only what is explicitly asked. Make no unstated assumptions, infer no broader objective, and do not extrapolate beyond facts directly supplied or firmly established. When language permits multiple readings, use the narrowest defensible reading and identify the ambiguity briefly rather than choosing an expansive interpretation.';
   } else if (mode === 'conservative') {
@@ -1021,6 +1022,94 @@ function analysisModePrompt(value) {
     block += '\n\n**ANALYSIS MODE: MODERATE.** Use balanced reasoning and reasonable inference. Address the direct request while considering relevant implications and plausible alternatives when they materially improve the answer. Do not interpret the request artificially narrowly, but do not speculate beyond what the evidence can support.';
   }
   return block;
+}
+
+function isTitleLikeDocumentInstruction(value) {
+  var text = String(value || '').trim();
+  if (!text || text.length > 180) return false;
+  if (/\.(pdf|docx?|txt|rtf|odt)$/i.test(text)) return true;
+  if (/[?!.;]/.test(text)) return false;
+  if (/^(?:transcript|hearing|document|report|agreement|contract|letter|memorandum|memo|filing|motion|brief|deposition|statement|affidavit|exhibit|minutes|notes)(?:\s+(?:of|for|with|from|regarding|about)\b|$)/i.test(text)) return true;
+  return false;
+}
+
+function isAttachmentIntakeOnlyInstruction(value) {
+  var text = String(value || '').trim();
+  if (!text || text.indexOf('?') !== -1) return false;
+  var forbidsAnalysis = /\b(?:do\s+not|don't|without|avoid(?:ing)?)\s+(?:analy[sz](?:e|ing)|analysis|summari[sz](?:e|ing)|review(?:ing)?)\b/i.test(text);
+  var beginsWithIntake = /(?:^|[:—-]\s*)(?:please\s+)?(?:read|note|remember|retain|store|keep|file|save|hold|archive|log|ingest|defer)\b/i.test(text);
+  if (forbidsAnalysis) return true;
+  if (!beginsWithIntake) return false;
+  var asksForWork = /\b(analy[sz]e|summari[sz]e|review|compare|explain|identify|extract|find|locate|list|outline|draft|write|rewrite|check|audit|evaluate|assess|critique|translate|calculate|answer|tell\s+me|give\s+me|show\s+me|look\s+for|focus\s+on|respond\s+to)\b/i.test(text);
+  return !asksForWork;
+}
+
+function truncateAttachmentBlock(text, limit) {
+  var value = String(text || '');
+  if (limit <= 0) return '';
+  if (value.length <= limit) return value;
+  var marker = '\n\n[...middle of this attached document omitted to fit the request limit...]\n\n';
+  if (limit <= marker.length + 2) {
+    var compactHead = Math.ceil(limit / 2);
+    var compactTail = Math.floor(limit / 2);
+    return value.substring(0, compactHead) + value.substring(value.length - compactTail);
+  }
+  var available = Math.max(0, limit - marker.length);
+  var head = Math.ceil(available * 0.6);
+  var tail = Math.floor(available * 0.4);
+  return value.substring(0, head) + marker + value.substring(value.length - tail);
+}
+
+function boundAttachedDocuments(value, budget) {
+  var sourceSeparator = '\n\n---\n\n';
+  var outputSeparator = '\n---\n';
+  var blocks = String(value || '').split(sourceSeparator);
+  var separatorCost = outputSeparator.length * Math.max(0, blocks.length - 1);
+  if (separatorCost >= budget) {
+    outputSeparator = '';
+    separatorCost = 0;
+  }
+  var available = Math.max(0, budget - separatorCost);
+  var perBlock = Math.floor(available / Math.max(1, blocks.length));
+  var remainder = available - (perBlock * blocks.length);
+  var bounded = [];
+  for (var i = 0; i < blocks.length; i++) {
+    bounded.push(truncateAttachmentBlock(blocks[i], perBlock + (i < remainder ? 1 : 0)));
+  }
+  return bounded.join(outputSeparator);
+}
+
+function parseAttachedDocumentRequest(message) {
+  var raw = String(message || '');
+  var hasAttachment = /^\[Attached document:/i.test(raw.trim());
+  if (!hasAttachment) {
+    return { hasAttachment: false, rawUserInstruction: raw, userInstruction: raw, generationMessage: raw, defaultAnalysisAdded: false, payloadTruncated: false, instructionTruncated: false, intakeOnly: false };
+  }
+
+  var marker = '\n\n---\n\nUser message:';
+  var markerIndex = raw.lastIndexOf(marker);
+  var documentsPart = markerIndex >= 0 ? raw.substring(0, markerIndex) : raw;
+  var instruction = markerIndex >= 0 ? raw.substring(markerIndex + marker.length).trim() : '';
+  var shouldAnalyze = !instruction || isTitleLikeDocumentInstruction(instruction);
+  var defaultTask = 'Read the attached document closely and respond now with exactly one substantive, natural paragraph. Lead with what genuinely matters most in this specific document, then say enough to demonstrate attentive understanding and engaged judgment—not merely receipt. Stay anchored to what the document actually establishes, distinguish inference from fact, and do not import legal standards, motives, or consequences that the text and supplied project context do not support. Do not use a heading, bullets, section breaks, a generic checklist, or a fixed summary/facts/timeline/risks/next-steps formula.';
+  var generationInstruction = shouldAnalyze
+    ? (instruction ? instruction + '\n\n' + defaultTask : defaultTask)
+    : instruction;
+  var boundedInstruction = truncateAttachmentBlock(generationInstruction, 12000);
+
+  var suffix = marker + ' ' + boundedInstruction;
+  var payloadBudget = Math.max(0, 78000 - suffix.length);
+  var boundedDocuments = boundAttachedDocuments(documentsPart, payloadBudget);
+  return {
+    hasAttachment: true,
+    rawUserInstruction: instruction,
+    userInstruction: boundedInstruction,
+    generationMessage: boundedDocuments + suffix,
+    defaultAnalysisAdded: shouldAnalyze,
+    payloadTruncated: boundedDocuments.length < documentsPart.length,
+    instructionTruncated: boundedInstruction.length < generationInstruction.length,
+    intakeOnly: !shouldAnalyze && isAttachmentIntakeOnlyInstruction(instruction)
+  };
 }
 
 function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, includeProjectContext, stalenessInfo, stance, auditLessons, pinnedContext, groundRules, queryText, analysisMode) {
@@ -1061,6 +1150,12 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   prompt += '\n- STAY ON MISSION. When the user has stated an overall goal (e.g. producing a specific legal document with surgical references), keep that goal in view and do exactly the step requested — do not drift into tangents on your own initiative.';
   prompt += '\n- Only ask a clarifying question if an instruction is genuinely self-contradictory or impossible; otherwise carry it out as given rather than stalling.';
   prompt += '\n- Two equal failures: (a) burying the user\'s task under unrequested analysis, and (b) refusing or skimping on work the user actually asked for. Avoid both by doing precisely what was instructed.';
+  prompt += '\n\nNATURAL RESPONSE — DISCIPLINED DOES NOT MEAN MECHANICAL:';
+  prompt += '\n- Respond like an intelligent collaborator who understands the conversation, not like a form, compliance checklist, or grading rubric.';
+  prompt += '\n- Lead with the point that matters most. Let the substance determine the structure. Do not automatically produce headings, equal-sided sections, inventories of facts, timelines, risks, implications, caveats, or next steps.';
+  prompt += '\n- Make reasonable inferences when the evidence supports them and label genuine uncertainty plainly. Do not become artificially narrow merely to avoid making a judgment.';
+  prompt += '\n- Be direct, engaged, and human. Never sound scolding, defensive, bureaucratic, clinically detached, or pleased with your own rigor.';
+  prompt += '\n- Preserve discipline where it matters: factual accuracy, source fidelity, explicit instructions, and honest uncertainty. Everything else should feel natural and responsive to the moment.';
   prompt += analysisModePrompt(analysisMode);
 
   if (groundRules && String(groundRules).trim().length > 0) {
@@ -1080,7 +1175,7 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   } else if (stance === 'strongly_critical') {
     prompt += '\n\n**STANCE: STRONGLY CRITICAL.** Steel-man the CONTRARY position. Build the strongest defensible case AGAINST what the user is proposing or believes. Marshal the best counter-evidence, the most damaging precedents, the structural weaknesses in the user\'s reasoning, and the arguments an adversary would make. Your goal is to give the user the most rigorous opposition possible so they can stress-test their view. Do not soften the critique to spare feelings; the user has explicitly asked for adversarial pressure. CRITICAL: Do not invent counter-evidence that does not exist. If the contrary case is in fact weak, say so honestly — strong critique within truth, not contrarianism for its own sake. End with a single-sentence summary of whether, on balance, the user should reconsider.';
   } else {
-    prompt += '\n\n**STANCE: NEUTRAL.** Weigh both sides even-handedly. Present the strongest case for the user\'s position and the strongest case against it with roughly equal rigor. Conclude with your honest assessment of where the balance lies, with appropriate confidence calibration.';
+    prompt += '\n\n**STANCE: NEUTRAL.** Approach the material without a predetermined side. Give the clearest honest assessment the evidence supports. When genuinely competing interpretations matter, consider the strongest support for each fairly—but do not manufacture false balance, force every issue into a two-sided debate, or use a repetitive “on one hand / on the other hand” structure. Let the actual material determine whether one view, several views, or no adversarial framing is appropriate.';
   }
 
   if (responseLength === 'concise') {
@@ -1619,6 +1714,8 @@ app.post('/api/chat', async function(req, res) {
     var sessionId = req.body.sessionId;
     var projectId = req.body.projectId;
     var message = req.body.message;
+    var attachmentRequest = parseAttachedDocumentRequest(message);
+    var generationMessage = attachmentRequest.generationMessage;
     var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
     var validFormats = ['prose', 'bullets'];
@@ -1652,13 +1749,12 @@ app.post('/api/chat', async function(req, res) {
     var grRes = await pool.query('SELECT ground_rules FROM sessions WHERE id = $1', [sessionId]);
     var groundRules = grRes.rows[0] ? (grRes.rows[0].ground_rules || '') : '';
 
-    var userOwnWords = message || '';
-    var attachIdx = userOwnWords.indexOf('\n\n---\n[Attached document:');
-    if (attachIdx === -1) attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
+    var userOwnWords = attachmentRequest.hasAttachment ? attachmentRequest.rawUserInstruction : (message || '');
+    var attachIdx = userOwnWords.indexOf('\n\n---\n[Document:');
     if (attachIdx > 0) userOwnWords = userOwnWords.substring(0, attachIdx);
     if (userOwnWords.length > 2000) userOwnWords = userOwnWords.substring(0, 2000);
 
-    var includeProjectContext = isProjectSpecificQuery(userOwnWords, tree, transcript);
+    var includeProjectContext = attachmentRequest.hasAttachment || isProjectSpecificQuery(userOwnWords, tree, transcript);
     // Fallback: if the message plainly references a stored document/case artifact
     // or asks to recall prior work, include project context even when the keyword
     // heuristic missed the exact phrasing (architect: don't let a phrasing miss
@@ -1672,7 +1768,7 @@ app.post('/api/chat', async function(req, res) {
     // so only pay for it then. Trim each session's transcript to its last 6
     // messages IN SQL so we never transfer/parse whole megabyte transcripts.
     var crossSessionContext = '';
-    if (includeProjectContext) {
+    if (includeProjectContext && !attachmentRequest.hasAttachment) {
       var otherSessions = await pool.query(
         "SELECT title, (SELECT COALESCE(jsonb_agg(e ORDER BY ord), '[]'::jsonb) " +
         "FROM (SELECT e, ord FROM jsonb_array_elements(CASE WHEN jsonb_typeof(transcript)='array' THEN transcript ELSE '[]'::jsonb END) WITH ORDINALITY AS x(e, ord) " +
@@ -1701,7 +1797,7 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var stalenessInfo = null;
-    if (includeProjectContext) {
+    if (includeProjectContext && !attachmentRequest.hasAttachment) {
       var chatArch = await getArchiveStats(projectId);
       var chatHealth = computeMemoryHealthFromData({
         lastUpdate: projRow.last_tree_update,
@@ -1720,7 +1816,7 @@ app.post('/api/chat', async function(req, res) {
     // fresh chat can answer questions about documents reviewed in an earlier,
     // now-frozen chat. The compressed tree alone loses specific figures/dates.
     var docContext = '';
-    if (includeProjectContext) {
+    if (includeProjectContext && !attachmentRequest.hasAttachment) {
       // Cap each doc's read in SQL (LEFT) so one huge document can't blow up
       // memory/latency; selectDocExcerpts then trims to the 40K prompt budget.
       var docRows = await pool.query(
@@ -1755,7 +1851,7 @@ app.post('/api/chat', async function(req, res) {
       if (totalChars > charBudget) break;
       msgs.unshift({ role: recent[i].role, content: content });
     }
-    var userContent = message;
+    var userContent = generationMessage;
     if (userContent.length > 80000) {
       userContent = userContent.substring(0, 80000) + '\n\n[...content truncated for context length...]';
     }
@@ -1786,6 +1882,11 @@ app.post('/api/chat', async function(req, res) {
       systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. HARD CAP: your ENTIRE reply must be the shortest accurate answer — usually ONE sentence, never more than ~100 words even for complex questions (complete lists are the only exception). Never produce essays, multi-section documents, explanations, or caveats in this mode. Exceeding the cap is a failure.';
     } else if (responseLength === 'normal') {
       systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. A yes/no, confirmation, or simple factual question gets a sentence or two and nothing more. NO multi-section analyses, NO clause-by-clause or exhibit-by-exhibit reviews, NO headed essays, NO bullet-point dumps — regardless of what the conversation is about — unless the user EXPLICITLY asked you to analyze, review, or write a document (in which case they should use Detailed mode or a word count). Exceeding the cap is a failure.';
+    }
+    if (attachmentRequest.intakeOnly) {
+      systemPrompt += '\n\nFINAL REMINDER — ATTACHMENT INTAKE ONLY. The user asked only to read, note, remember, retain, store, keep, file, save, hold, archive, log, ingest, or defer this material. Reply with ONE brief, natural sentence confirming receipt and retention, then STOP. Do not summarize, list key points, or analyze. A short identifying phrase is acceptable when it helps distinguish the document.';
+    } else if (attachmentRequest.defaultAnalysisAdded) {
+      systemPrompt += '\n\nFINAL REMINDER — UNACCOMPANIED DOCUMENT. The user supplied the document without a substantive task. Reply with EXACTLY ONE coherent paragraph: no heading, no bullets, no numbered list, and no section breaks. Make it substantive enough to show that you read closely, understood what matters, and are genuinely engaged with the material. Lead with the central point rather than announcing that you received or reviewed the document. Stay source-grounded and stop after that single paragraph.';
     }
     systemPrompt += groundRulesFinalReminder(groundRules);
     var continuationCount = 0;
@@ -1929,7 +2030,7 @@ app.post('/api/chat', async function(req, res) {
     }
 
     var isLongform = (responseLength === 'detailed' || responseLength === 'exhaustive') && isLongformRequest(userOwnWords);
-    console.log('[Chat] model=' + modelChoice + ' responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' analysisMode=' + analysisMode + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
+    console.log('[Chat] model=' + modelChoice + ' responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' analysisMode=' + analysisMode + ' attachmentDefaultAnalysis=' + attachmentRequest.defaultAnalysisAdded + ' attachmentIntakeOnly=' + attachmentRequest.intakeOnly + ' attachmentPayloadTruncated=' + attachmentRequest.payloadTruncated + ' attachmentInstructionTruncated=' + attachmentRequest.instructionTruncated + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
     var lastResult = await streamOneCall(msgs);
     fullText = lastResult.segmentText;
     continuationCount = 1;

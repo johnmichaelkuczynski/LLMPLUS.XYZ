@@ -13,3 +13,4 @@
 - [Server ESM & route-prefix gotchas](server-esm-gotchas.md) — index.js is ESM (require() throws, silently in try/catch); API prefixes skipped by owner middleware need intentional handling.
 - [Rollback workflow restart](rollback-workflow-restart.md) — restoring files does not replace code already loaded by a running workflow; restart before judging whether rollback worked.
 - [Source-check gating](source-check-gating.md) — never gate ordinary chat output behind the model-based source verifier; it falsely withheld valid and basic responses.
+- [Attachment default analysis](attachment-default-analysis.md) — blank/title-only document submissions require substantive analysis; explicit intake or other tasks must remain controlling.
