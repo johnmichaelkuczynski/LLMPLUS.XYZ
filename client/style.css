@@ -501,61 +501,6 @@ html, body {
   color: #374151;
 }
 
-.grounding-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #1e40af;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.grounding-status .thinking-indicator {
-  margin: 0;
-}
-
-.grounding-verified {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 12px;
-  padding: 5px 9px;
-  border: 1px solid #a7f3d0;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.grounding-alarm {
-  padding: 13px 14px;
-  border: 2px solid #dc2626;
-  border-radius: 9px;
-  background: #fef2f2;
-  color: #991b1b;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.55;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
-}
-
-.grounding-alarm p:first-child {
-  margin-top: 0;
-}
-
-.grounding-alarm p:last-child {
-  margin-bottom: 0;
-}
-
-.message.grounding-failed .msg-role {
-  color: #b91c1c;
-}
-
 .msg-actions-row {
   margin-top: 8px;
   display: flex;

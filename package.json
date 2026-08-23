@@ -8,8 +8,7 @@
     "start": "NODE_ENV=production node server/index.js",
     "build": "mkdir -p dist && cp deploy-entry.cjs dist/index.cjs",
     "check": "tsc",
-    "db:push": "drizzle-kit push",
-    "test:grounding": "node tools/grounding-regression.mjs"
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

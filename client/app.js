@@ -985,17 +985,15 @@
     }
     els.welcome.style.display = 'none';
     for (var i = 0; i < transcript.length; i++) {
-      addMessage(transcript[i].role, transcript[i].content, transcript[i].grounding);
+      addMessage(transcript[i].role, transcript[i].content);
     }
     scrollBottom();
   }
 
-  function addMessage(role, content, grounding) {
+  function addMessage(role, content) {
     els.welcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message ' + role;
-    var isGroundingAlarm = role === 'assistant' && ((grounding && grounding.status === 'failed') || /^⚠️ SOURCE CHECK FAILED/i.test(content || ''));
-    if (isGroundingAlarm) div.classList.add('grounding-failed');
     var avatar = role === 'user' ? 'U' : 'C';
     var label = role === 'user' ? 'You' : 'Claude';
     var words = content.split(/\s+/).length;
@@ -1012,28 +1010,13 @@
       bodyHtml += '<button class="btn-expand" data-testid="btn-expand">Show full text</button>';
       bodyHtml += '</div>';
     } else {
-      bodyHtml = '<div class="msg-text">' + (isGroundingAlarm
-        ? '<div class="grounding-alarm" data-testid="grounding-alarm">' + fmt(content) + '</div>'
-        : fmt(content)) + '</div>';
+      bodyHtml = '<div class="msg-text">' + fmt(content) + '</div>';
     }
 
     var copyBtnHtml = role === 'assistant' ? '<button class="msg-copy-btn" data-testid="btn-copy-response" title="Copy to clipboard">&#128203;</button>' : '';
     var auditRowHtml = role === 'assistant' ? '<div class="msg-actions-row"><button class="msg-audit-btn" data-testid="btn-audit" title="Fact-check this response against project memory">Audit</button></div>' : '';
     div.innerHTML = '<div class="msg-avatar">' + avatar + '</div>' +
       '<div class="msg-body"><div class="msg-role">' + label + copyBtnHtml + '</div>' + bodyHtml + auditRowHtml + '</div>';
-
-    if (role === 'assistant' && grounding && grounding.status === 'verified') {
-      var restoredBadge = document.createElement('div');
-      restoredBadge.className = 'grounding-verified';
-      restoredBadge.setAttribute('data-testid', 'grounding-verified');
-      var restoredSelected = Array.isArray(grounding.selectedSources) ? grounding.selectedSources.length : Number(grounding.selectedSources || 0);
-      var restoredLabel = '✓ Verified against ' + restoredSelected + ' source' + (restoredSelected === 1 ? '' : 's');
-      if (grounding.totalDocuments) restoredLabel += ' selected from all ' + grounding.totalDocuments + ' project documents';
-      if (grounding.claimsChecked) restoredLabel += ' · ' + grounding.claimsChecked + ' claim' + (grounding.claimsChecked === 1 ? '' : 's') + ' checked';
-      restoredBadge.textContent = restoredLabel;
-      var restoredText = div.querySelector('.msg-text');
-      if (restoredText) restoredText.appendChild(restoredBadge);
-    }
 
     if (isLarge) {
       var btn = div.querySelector('.btn-expand');
@@ -1232,24 +1215,6 @@
     var streamDone = false;
     var finalized = false;
     var rafId = null;
-    var sourceDiagnostics = null;
-    var groundingVerified = null;
-    var groundingAlarm = null;
-
-    function showGroundingStatus(message) {
-      if (fullText || groundingAlarm) return;
-      textEl.innerHTML = '<div class="grounding-status" data-testid="grounding-status"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span><span>' + esc(message || 'Checking project sources...') + '</span></div>';
-    }
-
-    function verifiedLabel(meta) {
-      var selected = meta && meta.selectedSources ? meta.selectedSources.length : 0;
-      var total = meta && meta.totalDocuments ? meta.totalDocuments : (sourceDiagnostics && sourceDiagnostics.totalDocuments ? sourceDiagnostics.totalDocuments : 0);
-      var claims = meta && meta.claimsChecked ? meta.claimsChecked : 0;
-      var label = 'Verified against ' + selected + ' source' + (selected === 1 ? '' : 's');
-      if (total) label += ' selected from all ' + total + ' project documents';
-      if (claims) label += ' · ' + claims + ' claim' + (claims === 1 ? '' : 's') + ' checked';
-      return label;
-    }
 
     function finalizeRender() {
       if (finalized) return;
@@ -1260,19 +1225,8 @@
       if (ti2) ti2.remove();
       var c = textEl.querySelector('.cursor-blink');
       if (c) c.remove();
-      if (groundingAlarm) {
-        textEl.innerHTML = '<div class="grounding-alarm" data-testid="grounding-alarm">' + fmt(fullText || groundingAlarm.message || '⚠️ SOURCE CHECK FAILED') + '</div>';
-      } else {
-        textEl.innerHTML = fmt(fullText);
-      }
-      if (!groundingAlarm && groundingVerified) {
-        var verification = document.createElement('div');
-        verification.className = 'grounding-verified';
-        verification.setAttribute('data-testid', 'grounding-verified');
-        verification.textContent = '✓ ' + verifiedLabel(groundingVerified);
-        textEl.appendChild(verification);
-      }
-      if (!groundingAlarm && isDocumentArtifact(fullText)) {
+      textEl.innerHTML = fmt(fullText);
+      if (isDocumentArtifact(fullText)) {
         var artTitle = extractArtifactTitle(fullText);
         var viewBtn = document.createElement('button');
         viewBtn.className = 'artifact-link';
@@ -1281,14 +1235,7 @@
         viewBtn.addEventListener('click', function() { showArtifact(fullText, artTitle); });
         textEl.appendChild(viewBtn);
       }
-      if (onDone) onDone(
-        fullText,
-        groundingAlarm
-          ? { status: 'failed', code: groundingAlarm.code, reason: groundingAlarm.reason, totalDocuments: groundingAlarm.totalDocuments, selectedSources: groundingAlarm.selectedSources }
-          : groundingVerified
-            ? { status: 'verified', confidence: groundingVerified.confidence, claimsChecked: groundingVerified.claimsChecked, totalDocuments: groundingVerified.totalDocuments, selectedSources: groundingVerified.selectedSources }
-            : undefined
-      );
+      if (onDone) onDone(fullText);
     }
 
     // Smooth typewriter renderer: drains received text at a steady pace
@@ -1365,19 +1312,7 @@
             try {
               var parsed = JSON.parse(data);
               if (parsed.type === 'status') {
-                if (parsed.status === 'retrieving_sources' || parsed.status === 'drafting' || parsed.status === 'verifying') {
-                  showGroundingStatus(parsed.message);
-                }
-              } else if (parsed.type === 'source_diagnostics') {
-                sourceDiagnostics = parsed;
-              } else if (parsed.type === 'grounding_verified') {
-                groundingVerified = parsed;
-                showGroundingStatus('Source verification passed. Preparing answer...');
-              } else if (parsed.type === 'grounding_alarm') {
-                groundingAlarm = parsed;
-                fullText = parsed.message || '⚠️ SOURCE CHECK FAILED\n\nThe answer was withheld because its factual support could not be verified.';
-                shownLen = fullText.length;
-                textEl.innerHTML = '<div class="grounding-alarm" data-testid="grounding-alarm">' + fmt(fullText) + '</div>';
+                // status events (thinking, etc.) — no action needed, indicator already shown
               } else if (parsed.type === 'text') {
                 fullText += parsed.text;
                 ensureLoop();
@@ -1676,10 +1611,10 @@
         signal: state.abortController.signal
       });
 
-      streamSSE(res, textEl, function(fullText, grounding) {
+      streamSSE(res, textEl, function(fullText) {
         if (sendingSession && fullText) {
           sendingSession.transcript = sendingSession.transcript || [];
-          sendingSession.transcript.push({ role: 'assistant', content: fullText, grounding: grounding });
+          sendingSession.transcript.push({ role: 'assistant', content: fullText });
         }
         state.streaming = false;
         state.abortController = null;
@@ -5147,23 +5082,8 @@
             var ev = JSON.parse(data);
             if (ev.type === 'text' && (ev.lane === 'A' || ev.lane === 'B')) {
               appendLane(ev.lane, ev.text || '');
-            } else if (ev.type === 'lane_status' && (ev.lane === 'A' || ev.lane === 'B')) {
-              statusEl.textContent = 'Lane ' + ev.lane + ': ' + (ev.message || 'Verifying project sources...');
-            } else if (ev.type === 'lane_verified' && (ev.lane === 'A' || ev.lane === 'B')) {
-              var verifiedBody = ev.lane === 'A' ? aBody : bBody;
-              var verifiedBadge = document.createElement('div');
-              verifiedBadge.className = 'grounding-verified compare-grounding-verified';
-              verifiedBadge.textContent = '✓ Verified against ' + (ev.selectedSources ? ev.selectedSources.length : 0) + ' sources selected from all ' + (ev.totalDocuments || 0) + ' project documents';
-              verifiedBody.appendChild(verifiedBadge);
-            } else if (ev.type === 'lane_alarm' && (ev.lane === 'A' || ev.lane === 'B')) {
-              var alarmBody = ev.lane === 'A' ? aBody : bBody;
-              var alarmText = ev.message || '⚠️ SOURCE CHECK FAILED\n\nThis stance was withheld.';
-              alarmBody.innerHTML = '<div class="grounding-alarm" data-testid="compare-grounding-alarm-' + ev.lane.toLowerCase() + '">' + fmt(alarmText) + '</div>';
-              if (ev.lane === 'A') textA = alarmText; else textB = alarmText;
             } else if (ev.type === 'lane_end' && (ev.lane === 'A' || ev.lane === 'B')) {
               endLane(ev.lane);
-            } else if (ev.type === 'status' && ev.message) {
-              statusEl.textContent = ev.message;
             } else if (ev.type === 'error') {
               statusEl.textContent = 'Error: ' + ev.error;
             }
