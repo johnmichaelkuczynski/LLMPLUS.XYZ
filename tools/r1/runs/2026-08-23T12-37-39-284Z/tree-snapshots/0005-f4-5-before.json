@@ -1,0 +1,21 @@
+{
+  "1.0": "DOCUMENT: Fundamental tensions between Wittgenstein's early picture theory (Tractatus) and later language-game approach (Philosophical Investigations)",
+  "1.1": "ASSERTS: The core tension is a shift from essentialism to pluralism about meaning",
+  "1.2": "ASSERTS: Philosophical Investigations rejects the monolithic account of the Tractatus",
+  "2.0": "QUESTION: Can the early and later positions be reconciled philosophically?",
+  "2.1": "REJECTS: Reconciliation as complementary theories—they make incompatible claims about meaning's nature",
+  "2.2": "OPEN: Possible genealogical reconciliation where Tractatus identifies one important function but mistakes part for whole",
+  "2.3": "OPEN: Possible continuity in therapeutic method—both aim to dissolve philosophical confusion by clarifying language's workings",
+  "3.0": "RESOLVED: As theories of meaning, the positions remain fundamentally opposed—one seeking essence, the other denying essence exists",
+  "1.1.1": "ASSERTS: Tractatus presents meaning as rooted in single logical structure where propositions picture facts through isomorphic logical form",
+  "1.1.2": "ASSERTS: Tractatus requires all meaningful language to decompose into elementary propositions mirroring atomic facts",
+  "1.1.3": "ASSERTS: Tractatus demands determinate sense—each proposition is either true or false based on correspondence with reality",
+  "1.2.1": "ASSERTS: Later view treats meaning as use in context across different language-games (commanding, joking, praying)",
+  "1.2.2": "ASSERTS: No language-game is privileged as the essence of language",
+  "1.2.3": "ASSERTS: Picture theory's demand for logical determinacy gives way to family resemblances where concepts have no common essence",
+  "1.2.4": "ASSERTS: Language is embedded in forms of life rather than floating above reality in logical space",
+  "2.2.1": "ASSERTS: Tractatus correctly identifies pictorial representation as one function of language",
+  "2.2.2": "ASSERTS: Tractatus error was universalizing what was actually particular",
+  "2.2.3": "ASSERTS: Later view subsumes pictorial representation as one language-game among many",
+  "2.3.1": "ASSERTS: Both works share therapeutic aim despite diagnosing confusion differently"
+}
