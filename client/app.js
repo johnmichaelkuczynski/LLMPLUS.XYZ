@@ -4696,6 +4696,12 @@
     diagModal.classList.remove('active');
     diagModal.classList.add('hidden');
   });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && diagModal.classList.contains('active')) {
+      diagModal.classList.remove('active');
+      diagModal.classList.add('hidden');
+    }
+  });
   diagModal.addEventListener('mousedown', function(e) {
     if (e.target === diagModal) {
       diagModal.classList.remove('active');
@@ -4712,7 +4718,7 @@
     summary.textContent = '';
     body.innerHTML = '';
 
-    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', cleanup: 'Cleanup' };
+    var categoryLabels = { env: 'Environment', db: 'Database', llm: 'External LLM APIs', func: 'Functional CRUD', behavior: 'Behavioral Proof', cleanup: 'Cleanup' };
     var categoryEls = {};
     var rows = {};
     var passCount = 0, failCount = 0, totalCount = 0;

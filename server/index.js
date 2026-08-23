@@ -5504,6 +5504,7 @@ app.post('/api/diagnostic/run', async function(req, res) {
     var testSessionId = null;
     var testReminderId = null;
     var testDocId = null;
+    var testProjectDocId = null;
     var diagMarker = '__DIAGNOSTIC_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
     await runStep('Create project', 'func', async function() {
@@ -5552,6 +5553,46 @@ app.post('/api/diagnostic/run', async function(req, res) {
       if (r.rows.length === 0) throw new Error('Doc not retrievable');
       if (r.rows[0].raw_content !== 'test content') throw new Error('Content mismatch');
       return 'matches';
+    });
+
+    await runStep('Uploaded document text reaches the answer', 'behavior', async function() {
+      if (!testProjectId) throw new Error('No test project');
+      var documentMarker = 'DOC-' + Date.now().toString(36).toUpperCase();
+      var inserted = await pool.query(
+        'INSERT INTO project_documents (project_id, name, raw_content) VALUES ($1, $2, $3) RETURNING id',
+        [testProjectId, diagMarker + '_uploaded_text', 'The diagnostic document marker is ' + documentMarker + '.']
+      );
+      testProjectDocId = inserted.rows[0].id;
+      var stored = await pool.query(
+        'SELECT name, LEFT(raw_content, 300000) AS raw_content FROM project_documents WHERE project_id = $1 ORDER BY created_at DESC LIMIT 8',
+        [testProjectId]
+      );
+      var excerpt = selectDocExcerpts(stored.rows, 'What is the diagnostic document marker?', 8000);
+      if (excerpt.indexOf(documentMarker) === -1) throw new Error('Stored document marker was not retrieved');
+      var answer = await callClaude(
+        [{ role: 'user', content: 'Using only the supplied document text, return the diagnostic document marker exactly.' }],
+        'Use the document text below as source evidence. Return only the marker value.' + excerpt,
+        false,
+        80
+      );
+      if (String(answer || '').indexOf(documentMarker) === -1) {
+        throw new Error('Model answer did not use the retrieved document marker');
+      }
+      return 'stored text retrieved and marker reproduced';
+    });
+
+    await runStep('Chat response completes', 'behavior', async function() {
+      var responseMarker = 'CHAT-' + Date.now().toString(36).toUpperCase();
+      var answer = await callClaude(
+        [{ role: 'user', content: 'Return exactly this token and nothing else: ' + responseMarker }],
+        'Follow the user instruction exactly.',
+        false,
+        80
+      );
+      if (String(answer || '').indexOf(responseMarker) === -1) {
+        throw new Error('Chat generation returned without the requested completion token');
+      }
+      return 'completed with verified response token';
     });
 
     await runStep('Create reminder', 'func', async function() {
@@ -5607,6 +5648,10 @@ app.post('/api/diagnostic/run', async function(req, res) {
     });
     await runStep('Cleanup: delete document', 'cleanup', async function() {
       if (testDocId) await pool.query('DELETE FROM global_documents WHERE id = $1', [testDocId]);
+      return 'deleted';
+    });
+    await runStep('Cleanup: delete uploaded test document', 'cleanup', async function() {
+      if (testProjectDocId) await pool.query('DELETE FROM project_documents WHERE id = $1', [testProjectDocId]);
       return 'deleted';
     });
     await runStep('Cleanup: delete session', 'cleanup', async function() {
