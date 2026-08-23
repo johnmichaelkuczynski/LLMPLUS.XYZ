@@ -10,6 +10,7 @@
     responseLength: 'normal',
     responseFormat: 'prose',
     stance: 'neutral',
+    analysisMode: 'moderate',
     model: 'claude'
   };
 
@@ -1605,6 +1606,7 @@
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
           stance: state.stance,
+          analysisMode: state.analysisMode,
           model: state.model,
           targetWords: getTargetWords()
         }),
@@ -2336,7 +2338,8 @@
         body: JSON.stringify({
           sessionId: state.currentSession.id,
           projectId: state.currentProject.id,
-          message: claudeMsg
+          message: claudeMsg,
+          analysisMode: state.analysisMode
         })
       });
 
@@ -2467,7 +2470,8 @@
         body: JSON.stringify({
           sessionId: state.currentSession.id,
           projectId: state.currentProject.id,
-          message: claudeMsg
+          message: claudeMsg,
+          analysisMode: state.analysisMode
         })
       });
 
@@ -3252,6 +3256,14 @@
       document.querySelectorAll('.rs-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.stance = btn.getAttribute('data-stance');
+    });
+  });
+
+  document.querySelectorAll('.ra-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.ra-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.analysisMode = btn.getAttribute('data-analysis-mode');
     });
   });
 
@@ -4880,6 +4892,7 @@
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
           stance: state.stance,
+          analysisMode: state.analysisMode,
           targetWords: getTargetWords()
         })
       });
@@ -5061,6 +5074,7 @@
           stanceB: stanceB,
           responseLength: state.responseLength,
           responseFormat: state.responseFormat,
+          analysisMode: state.analysisMode,
           model: state.model,
           targetWords: getTargetWords()
         }),

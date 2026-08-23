@@ -236,6 +236,15 @@
           <button class="rs-btn" data-stance="strongly_critical" data-testid="rs-strongly-critical" title="Steel-man the contrary; push the user to reconsider">Strongly Critical</button>
           <button class="rs-btn rs-compare-btn" id="btn-compare-stances" data-testid="btn-compare-stances" title="Compare two stances side by side" type="button">&#9878; Compare</button>
         </div>
+        <div class="analysis-mode-bar" data-testid="analysis-mode-bar">
+          <span class="rl-label">Analysis Mode:</span>
+          <button class="ra-btn" data-analysis-mode="hyper_conservative" data-testid="ra-hyper-conservative" title="Interpret the request literally and narrowly; avoid assumptions and extrapolation">Hyper-Conservative</button>
+          <button class="ra-btn" data-analysis-mode="conservative" data-testid="ra-conservative" title="Use restrained inference and favor conventional, well-supported interpretations">Conservative</button>
+          <button class="ra-btn active" data-analysis-mode="moderate" data-testid="ra-moderate" title="Use balanced reasoning and reasonable inference without overreaching">Moderate</button>
+          <button class="ra-btn" data-analysis-mode="deeply_analytical" data-testid="ra-deeply-analytical" title="Examine assumptions, implications, counterarguments, edge cases, and causal links">Deeply Analytical</button>
+          <button class="ra-btn" data-analysis-mode="deeply_analytical_outside_box" data-testid="ra-outside-box" title="Combine deep analysis with unconventional hypotheses, analogies, and novel strategies">Deeply Analytical and Thinks Outside the Box</button>
+          <button class="ra-btn" data-analysis-mode="mastermind" data-testid="ra-mastermind" title="Maximum strategic synthesis: scenarios, second-order effects, adversarial thinking, and prioritized action">Mastermind</button>
+        </div>
         <div class="input-box" id="input-box">
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>
           <button class="icon-btn analyze-btn" id="btn-auto-analyze" title="Upload &amp; Auto-Analyze" data-testid="btn-auto-analyze" type="button">&#128300;</button>
@@ -566,6 +575,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=43"></script>
+  <script src="/app.js?v=44"></script>
 </body>
 </html>
