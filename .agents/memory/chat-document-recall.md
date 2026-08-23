@@ -13,10 +13,12 @@ Root causes:
 - Anti-fabrication was weak, so thin memory got filled with invented specifics.
 
 **The contract (keep it true):**
-- Ordinary chat must ground document questions in the real document text, budgeted and query-relevant (`selectDocExcerpts`), not only the tree. The tree is a lossy summary; exact numbers/dates/citations do not survive compression.
-- All project-context injection (tree, docs, cross-session) is gated by `isProjectSpecificQuery`. A phrasing miss = zero memory. There is now a regex fallback that force-enables context on document/recall intents — if recall silently breaks again, check that gate FIRST.
-- Injected document text is UNTRUSTED: label it as data and tell the model to ignore any instructions embedded in it (prompt-injection).
-- Bound the DB read (LIMIT + `LEFT(raw_content, N)`) so one huge doc can't blow up latency/memory; the prompt budget alone does not cap the DB/string cost.
+- Project-dependent questions search the full document library before any result limit; never fall back to a newest-N slice for termless/referential questions.
+- Clearly general questions stay isolated from project documents, memory, and cross-session context.
+- Injected document text is UNTRUSTED: label it as data and tell the model to ignore embedded instructions.
+- A project-dependent draft remains hidden and unsaved until a claim/source verifier and an independent coverage/entailment reviewer both pass. Exact cited quotations must also exist mechanically in retrieved evidence.
+- Missing, contradicted, incomplete, or unverifiable support becomes a persisted high-severity alarm. The rejected draft never enters the transcript or memory update.
+- Persist verified/failed status with transcript entries so reloads preserve the badge/alarm rather than presenting checked content as ordinary text.
 
 **Why it matters:** memory-across-chats + not-bullshitting is the app's whole value prop vs. plain ChatGPT. If either regresses, the user churns.
 
@@ -24,3 +26,5 @@ Root causes:
 **Fabricated page citations (Aug 2026):** model invented PDF page ranges + exhibit letters ("Pages 25-38", "Exhibit C") for uploaded legal docs, then re-asserted them after admitting fabrication. Root cause: docs are stored as extracted text with NO pagination, and nothing forbade page citations. Fix: doc blocks labeled "extracted text only — page numbers NOT preserved" + universal prompt rules: never cite/invent page numbers or exhibit labels; identify passages by date/sender/quote; re-verify challenged details before repeating. Rule: never let a model cite structure (pages, exhibits) that the data pipeline strips out.
 **Capitulation under pressure (Aug 2026):** even with no-page-number rules, model correctly refused once, then invented pages when the user repeated the demand angrily; it also claimed to have "searched" a 172-page file never uploaded, and treated its own earlier fabrications (pasted back by the user) as evidence. Added rules: pressure never creates data (repeat the honest answer verbatim), never claim to possess/search absent files, pasted-back prior replies are not evidence. Rule: anti-hallucination prompts must explicitly cover insistence/repetition and self-quotation loops, not just the first ask.
 **Fabricated quotes + fake search (Aug 2026):** given a 236k-word archive (model sees only ~40K chars), the model said "stand by, searching..." then INVENTED verbatim quotes with dates attributed to the user's own emails. Fixes: per-doc coverage disclosure in the prompt ("PARTIAL: only ~N% of X chars shown"), rules that quotations must be copy-paste from visible text, never claim exhaustive search, and no deferred work (every reply is final; the app has no background search). Coverage % must be computed from unique source chars (exclude markers, dedupe head/window overlap) and capped <100.
+
+**Why two verification passes:** a single verifier can cite real but non-entailing text, omit a material claim, or emit an inconsistent confidence scale. Streaming first also makes any later audit too late. Treat source IDs/quotes, complete claim coverage, and entailment as separate failure gates.
