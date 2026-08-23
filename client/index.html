@@ -88,7 +88,7 @@
           <button class="sidebar-btn" id="btn-ground-rules" data-testid="btn-ground-rules" style="background:#b45309;color:#fff;margin-top:6px">&#9878; Ground Rules</button>
           <button class="sidebar-btn" id="btn-view-tractatus" data-testid="btn-view-tractatus" style="background:#059669;color:#fff;margin-top:6px">&#127795; View Tractatus Tree</button>
           <button class="sidebar-btn" id="btn-memory-hierarchy" data-testid="btn-memory-hierarchy" style="background:#047857;color:#fff;margin-top:6px">&#129504; Memory Hierarchy</button>
-          <button class="sidebar-btn" id="btn-report-generator" data-testid="btn-report-generator" style="background:#1d4ed8;color:#fff;margin-top:6px">&#128220; Report Generator</button>
+          <button class="sidebar-btn" id="btn-report-generator" data-testid="btn-report-generator" style="background:#1d4ed8;color:#fff;margin-top:6px">&#128220; Project Essence Report</button>
           <button class="sidebar-btn" id="btn-tractator" data-testid="btn-tractator" style="background:#0d9488;color:#fff;margin-top:6px">&#128302; Tractator</button>
           <button class="sidebar-btn" id="btn-profile-me" data-testid="btn-profile-me" style="background:#b45309;color:#fff;margin-top:6px">&#128100; Profile Me</button>
           <button class="sidebar-btn" id="btn-reminders" data-testid="btn-reminders" style="background:#dc2626;color:#fff;margin-top:6px;position:relative">&#128204; Reminders <span id="reminder-dot" class="reminder-dot hidden" data-testid="reminder-dot"></span></button>
@@ -228,6 +228,7 @@
           <span class="rl-label">Format:</span>
           <button class="rf-btn active" data-format="prose" data-testid="rf-prose" title="Full developed prose paragraphs">Prose</button>
           <button class="rf-btn" data-format="bullets" data-testid="rf-bullets" title="Bullet point lists">Bullets</button>
+          <button class="rf-btn" data-format="tractatus" data-testid="rf-tractatus" title="Numbered hierarchical Tractatus reasoning tree">Tractatus Tree</button>
           <span class="rl-divider"></span>
           <span class="rl-label">Stance:</span>
           <button class="rs-btn" data-stance="agreeable" data-testid="rs-agreeable" title="Steel-man the user's position; supportive within truth">Agreeable</button>
@@ -489,19 +490,78 @@
   <div class="modal-bg" id="report-generator-modal">
     <div class="modal" style="width:520px;max-height:80vh;display:flex;flex-direction:column">
       <div class="modal-head">
-        <span class="modal-title">&#128220; Report Generator</span>
+        <span class="modal-title">&#128220; Project Essence Report</span>
         <button class="modal-x" id="close-report-gen" data-testid="close-report-gen">&times;</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto">
+        <p style="font-size:13px;line-height:1.5;color:#4b5563;margin:0 0 14px">Ask the app to expose its current understanding of the project: what it treats as central, what it has deprioritized, and where memory may be incomplete or distorted.</p>
+        <div style="margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Report Type</label>
+          <select class="text-input" id="report-type" data-testid="report-type" style="width:100%">
+            <option value="essence">Project Essence — the app's current mental model</option>
+            <option value="general">General Project Report</option>
+          </select>
+        </div>
         <div style="margin-bottom:14px">
           <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Report Scope</label>
           <select class="text-input" id="report-scope" data-testid="report-scope" style="width:100%">
             <option value="project">Entire Project</option>
           </select>
         </div>
+        <div class="report-control-grid">
+          <div>
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Length</label>
+            <select class="text-input" id="report-length" data-testid="report-length" style="width:100%">
+              <option value="auto">Automatic</option>
+              <option value="500">1 page (~500 words)</option>
+              <option value="1500">3 pages (~1,500 words)</option>
+              <option value="2500">5 pages (~2,500 words)</option>
+              <option value="custom">Custom word count</option>
+            </select>
+            <input type="number" class="text-input" id="report-custom-words" data-testid="report-custom-words" min="100" max="30000" step="100" placeholder="Words" style="width:100%;margin-top:6px;display:none">
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Format</label>
+            <select class="text-input" id="report-format" data-testid="report-format" style="width:100%">
+              <option value="prose">Prose</option>
+              <option value="bullets">Bullet Points</option>
+              <option value="tractatus">Tractatus Tree</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Model</label>
+            <select class="text-input" id="report-model" data-testid="report-model" style="width:100%">
+              <option value="claude">Claude</option>
+              <option value="chatgpt">ChatGPT</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="grok">Grok</option>
+              <option value="venice">Venice</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Stance</label>
+            <select class="text-input" id="report-stance" data-testid="report-stance" style="width:100%">
+              <option value="neutral">Neutral</option>
+              <option value="agreeable">Agreeable</option>
+              <option value="mildly_critical">Mildly Critical</option>
+              <option value="strongly_critical">Strongly Critical</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Analysis Depth</label>
+          <select class="text-input" id="report-analysis-mode" data-testid="report-analysis-mode" style="width:100%">
+            <option value="hyper_conservative">Hyper-Conservative</option>
+            <option value="conservative">Conservative</option>
+            <option value="moderate">Moderate</option>
+            <option value="deeply_analytical">Deeply Analytical</option>
+            <option value="deeply_analytical_outside_box">Deeply Analytical and Thinks Outside the Box</option>
+            <option value="mastermind">Mastermind</option>
+          </select>
+        </div>
         <div style="margin-bottom:14px">
           <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Additional Instructions (optional)</label>
-          <textarea class="text-input" id="report-instructions" data-testid="report-instructions" placeholder="e.g. Focus on unresolved issues, highlight key evidence..." style="min-height:60px;resize:vertical;font-family:inherit"></textarea>
+          <textarea class="text-input" id="report-instructions" data-testid="report-instructions" placeholder="e.g. Focus on where memory may be wrong; distinguish confirmed facts from assumptions..." style="min-height:70px;resize:vertical;font-family:inherit"></textarea>
         </div>
         <div id="report-gen-status" style="display:none;margin-bottom:14px" data-testid="report-gen-status">
           <div class="cc-status" style="display:block">
@@ -575,6 +635,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=45"></script>
+  <script src="/app.js?v=46"></script>
 </body>
 </html>

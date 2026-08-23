@@ -14,3 +14,4 @@
 - [Rollback workflow restart](rollback-workflow-restart.md) — restoring files does not replace code already loaded by a running workflow; restart before judging whether rollback worked.
 - [Source-check gating](source-check-gating.md) — never gate ordinary chat output behind the model-based source verifier; it falsely withheld valid and basic responses.
 - [Attachment default analysis](attachment-default-analysis.md) — blank/title-only document submissions require substantive analysis; explicit intake or other tasks must remain controlling.
+- [Project Essence diagnostics](project-essence-diagnostics.md) — Essence reports expose the app’s current project-memory model, not an idealized fresh summary; stored context is untrusted data.

@@ -1317,6 +1317,9 @@
               } else if (parsed.type === 'text') {
                 fullText += parsed.text;
                 ensureLoop();
+              } else if (parsed.type === 'replace_text') {
+                fullText = parsed.text || '';
+                ensureLoop();
               } else if (parsed.type === 'error') {
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {
@@ -3557,7 +3560,14 @@
 
   // --- Tractator ---
   var reportGenModal = document.getElementById('report-generator-modal');
+  var reportGenType = document.getElementById('report-type');
   var reportGenScope = document.getElementById('report-scope');
+  var reportGenLength = document.getElementById('report-length');
+  var reportGenCustomWords = document.getElementById('report-custom-words');
+  var reportGenFormat = document.getElementById('report-format');
+  var reportGenModel = document.getElementById('report-model');
+  var reportGenStance = document.getElementById('report-stance');
+  var reportGenAnalysisMode = document.getElementById('report-analysis-mode');
   var reportGenInstructions = document.getElementById('report-instructions');
   var reportGenStatus = document.getElementById('report-gen-status');
   var reportGenStatusText = document.getElementById('report-gen-status-text');
@@ -3574,6 +3584,22 @@
     reportGenGoBtn.disabled = false;
     reportGenInstructions.value = '';
     reportGenFill.style.width = '0%';
+    reportGenType.value = 'essence';
+    syncReportScopeToType();
+    reportGenFormat.value = state.responseFormat;
+    reportGenModel.value = state.model;
+    reportGenStance.value = state.stance;
+    reportGenAnalysisMode.value = state.analysisMode;
+    var toolbarWords = getTargetWords();
+    if (toolbarWords > 0) {
+      reportGenLength.value = 'custom';
+      reportGenCustomWords.value = toolbarWords;
+      reportGenCustomWords.style.display = 'block';
+    } else {
+      reportGenLength.value = 'auto';
+      reportGenCustomWords.value = '';
+      reportGenCustomWords.style.display = 'none';
+    }
 
     reportGenScope.innerHTML = '<option value="project">Entire Project</option>';
     try {
@@ -3603,6 +3629,17 @@
     if (e.target === reportGenModal) reportGenModal.classList.remove('active');
   });
   reportGenModal.querySelector('.modal').addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  function syncReportScopeToType() {
+    var isEssence = reportGenType.value === 'essence';
+    if (isEssence) reportGenScope.value = 'project';
+    reportGenScope.disabled = isEssence;
+    reportGenScope.title = isEssence ? 'Project Essence always evaluates the entire project memory model' : '';
+  }
+  reportGenType.addEventListener('change', syncReportScopeToType);
+  reportGenLength.addEventListener('change', function() {
+    reportGenCustomWords.style.display = reportGenLength.value === 'custom' ? 'block' : 'none';
+    if (reportGenLength.value === 'custom') reportGenCustomWords.focus();
+  });
 
   reportGenGoBtn.addEventListener('click', async function() {
     if (!state.currentProject) return;
@@ -3613,6 +3650,11 @@
 
     var scope = reportGenScope.value;
     var instructions = reportGenInstructions.value.trim();
+    var lengthValue = reportGenLength.value;
+    var targetWords = lengthValue === 'custom'
+      ? parseInt(reportGenCustomWords.value, 10)
+      : parseInt(lengthValue, 10);
+    if (!(targetWords >= 100 && targetWords <= 30000)) targetWords = 0;
     var fullReport = '';
 
     try {
@@ -3622,7 +3664,14 @@
         body: JSON.stringify({
           projectId: state.currentProject.id,
           scope: scope,
-          instructions: instructions
+          instructions: instructions,
+          reportType: reportGenType.value,
+          targetWords: targetWords,
+          responseFormat: reportGenFormat.value,
+          model: reportGenModel.value,
+          stance: reportGenStance.value,
+          analysisMode: reportGenAnalysisMode.value,
+          responseLength: state.responseLength
         })
       });
 
@@ -3662,7 +3711,8 @@
 
       if (fullReport.trim()) {
         var scopeLabel = reportGenScope.options[reportGenScope.selectedIndex].text;
-        var title = 'Report — ' + scopeLabel + ' — ' + (state.currentProject ? state.currentProject.name : 'Project');
+        var reportLabel = reportGenType.value === 'essence' ? 'Project Essence' : 'Report';
+        var title = reportLabel + ' — ' + scopeLabel + ' — ' + (state.currentProject ? state.currentProject.name : 'Project');
         reportGenModal.classList.remove('active');
         showArtifact(fullReport, title, { raw: false });
       }

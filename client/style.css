@@ -1908,6 +1908,19 @@ html, body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+.report-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .report-control-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .btn-ok {
   padding: 8px 16px;
   background: #2563eb;
