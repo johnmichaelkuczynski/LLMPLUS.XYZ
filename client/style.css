@@ -337,6 +337,54 @@ html, body {
   border-top: 1px solid #e5e7eb;
 }
 
+.company-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.zhi-logo-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid #d6d3d1;
+  border-radius: 8px;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.zhi-logo-link:hover {
+  border-color: #9a3412;
+  box-shadow: 0 2px 8px rgba(120, 53, 15, 0.16);
+  transform: translateY(-1px);
+}
+
+.zhi-logo-link img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+
+.contact-us-link {
+  color: #78350f;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 7px 9px;
+  border-radius: 6px;
+}
+
+.contact-us-link:hover {
+  color: #9a3412;
+  background: #f5f0e8;
+  text-decoration: underline;
+}
+
 .cc-status {
   padding: 10px;
   background: #eff6ff;
