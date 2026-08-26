@@ -1,0 +1,22 @@
+{
+  "1.0": "QUESTION: Can democratic legitimacy and technocratic expertise be fully reconciled in contemporary governance?",
+  "1.1": "ASSERTS: The fundamental tension rests on competing sources of authority—democratic legitimacy flows from popular consent and accountability, while technocratic expertise claims authority through specialized knowledge and instrumental rationality.",
+  "1.2": "ASSERTS: Each embodies a different answer to who should decide—those affected by decisions versus those best equipped to make them correctly.",
+  "2.0": "DOCUMENT: Irreducible frictions between democratic and technocratic governance",
+  "2.1": "ASSERTS: Experts often favor long-term optimization over short-term democratic preferences.",
+  "2.2": "ASSERTS: Technical complexity can make meaningful public deliberation impossible, yet delegation without understanding erodes self-governance.",
+  "2.3": "ASSERTS: Experts themselves disagree profoundly on value-laden questions disguised as technical ones—optimal inequality levels, acceptable climate risk, pandemic trade-offs.",
+  "2.4": "ASSERTS: Democratic publics routinely reject expert consensus when it conflicts with lived experience, distributive concerns, or moral intuitions the expert framework doesn't capture.",
+  "3.0": "RESOLVED: Full reconciliation is likely impossible.",
+  "3.1": "ASSERTS: The tension reflects a genuine philosophical dilemma, not a mere institutional design flaw.",
+  "3.2": "ASSERTS: Democratic legitimacy and technical correctness are distinct goods that sometimes conflict.",
+  "3.3": "ASSERTS: This represents the problem of the second best—neither pure democracy nor pure technocracy is sustainable or desirable, yet hybrid arrangements inherit weaknesses from both.",
+  "4.0": "ASSERTS: The more realistic goal is productive management of the tension rather than resolution.",
+  "4.1": "DOCUMENT: Mechanisms for managing the tension",
+  "4.2": "ASSERTS: The tension itself may be a feature, not a bug—forcing ongoing negotiation between knowledge and consent prevents either from becoming tyrannical.",
+  "2.3.1": "ASSERTS: This disagreement exposes that expertise cannot eliminate political choice.",
+  "4.1.1": "ASSERTS: Transparent expert advisory roles with democratic override authority.",
+  "4.1.2": "ASSERTS: Participatory processes that educate while preserving choice.",
+  "4.1.3": "ASSERTS: Requiring experts to articulate value assumptions explicitly.",
+  "4.1.4": "ASSERTS: Cultivating democratic competence without pretending all citizens can master every domain."
+}
