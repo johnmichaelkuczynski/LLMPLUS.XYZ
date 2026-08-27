@@ -53,7 +53,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=13">
+  <link rel="stylesheet" href="/style.css?v=15">
 </head>
 <body>
   <noscript>
@@ -251,6 +251,21 @@
           <button class="ra-btn" data-analysis-mode="deeply_analytical" data-testid="ra-deeply-analytical" title="Examine assumptions, implications, counterarguments, edge cases, and causal links">Deeply Analytical</button>
           <button class="ra-btn" data-analysis-mode="deeply_analytical_outside_box" data-testid="ra-outside-box" title="Combine deep analysis with unconventional hypotheses, analogies, and novel strategies">Deeply Analytical and Thinks Outside the Box</button>
           <button class="ra-btn" data-analysis-mode="mastermind" data-testid="ra-mastermind" title="Maximum strategic synthesis: scenarios, second-order effects, adversarial thinking, and prioritized action">Mastermind</button>
+        </div>
+        <div class="diary-controls hidden" id="diary-controls" data-testid="diary-controls">
+          <div class="diary-mode">
+            <span class="diary-kicker">Idea Diary</span>
+            <label class="diary-toggle">
+              <input type="checkbox" id="diary-response-toggle" data-testid="diary-response-toggle">
+              <span class="diary-switch" aria-hidden="true"></span>
+              <span id="diary-response-label">OFF · save silently</span>
+            </label>
+          </div>
+          <div class="diary-actions">
+            <button type="button" class="diary-action" id="btn-diary-list" data-testid="btn-diary-list">Make List of Ideas</button>
+            <button type="button" class="diary-action" id="btn-diary-analytics" data-testid="btn-diary-analytics">Cognitive Analytics</button>
+          </div>
+          <span class="diary-status" id="diary-status" aria-live="polite"></span>
         </div>
         <div class="input-box" id="input-box">
           <button class="icon-btn" id="btn-library" title="General Library" data-testid="btn-library" type="button">&#128218;</button>
@@ -633,6 +648,11 @@
       </div>
       <div class="modal-body">
         <input type="text" class="text-input" id="project-name-input" placeholder="Project name" data-testid="input-project-name">
+        <fieldset class="project-type-choice">
+          <legend>Project type</legend>
+          <label><input type="radio" name="project-type" value="standard" checked data-testid="project-type-standard"> <span>Standard Project</span><small>Chat with full AI responses</small></label>
+          <label><input type="radio" name="project-type" value="idea_diary" data-testid="project-type-idea-diary"> <span>Idea Diary</span><small>Capture thoughts, silently by default</small></label>
+        </fieldset>
       </div>
       <div class="modal-foot">
         <button class="btn-cancel" id="cancel-project">Cancel</button>
@@ -641,6 +661,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=46"></script>
+  <script src="/app.js?v=48"></script>
 </body>
 </html>

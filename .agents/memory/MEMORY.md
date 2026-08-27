@@ -15,3 +15,4 @@
 - [Source-check gating](source-check-gating.md) — never gate ordinary chat output behind the model-based source verifier; it falsely withheld valid and basic responses.
 - [Attachment default analysis](attachment-default-analysis.md) — blank/title-only document submissions require substantive analysis; explicit intake or other tasks must remain controlling.
 - [Project Essence diagnostics](project-essence-diagnostics.md) — Essence reports expose the app’s current project-memory model, not an idealized fresh summary; stored context is untrusted data.
+- [Diary AI refusals and safety](diary-ai-refusals-safety.md) — 200 responses can be refusal-empty; durable capture needs a deterministic fallback, and safety checks must scan adversative clauses.

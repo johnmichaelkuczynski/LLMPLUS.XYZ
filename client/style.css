@@ -3270,3 +3270,81 @@ html, body{
 #clerk-signin { display: flex; justify-content: center; }
 
 #signin-wait { background: #eef6ee; color: #1a6b2f; border: 1px solid #bfe3c8; }
+
+/* ---- Idea Diary controls (scoped addition; standard projects are untouched) ---- */
+.diary-controls{
+  max-width:740px;
+  margin:0 auto 7px;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  border:1px solid #e6d8c8;
+  border-radius:12px;
+  background:#fffaf4;
+  color:#5d5148;
+}
+.diary-mode{display:flex;align-items:center;gap:10px;min-height:26px}
+.diary-kicker{
+  color:#9a5b38;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+}
+.diary-toggle{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:650;cursor:pointer;white-space:nowrap}
+.diary-toggle input{position:absolute;opacity:0;pointer-events:none}
+.diary-switch{width:30px;height:17px;border-radius:10px;background:#c8bdb2;position:relative;transition:background .18s}
+.diary-switch:after{content:"";position:absolute;width:13px;height:13px;left:2px;top:2px;border-radius:50%;background:#fff;transition:transform .18s}
+.diary-toggle input:checked + .diary-switch{background:#a75c35}
+.diary-toggle input:checked + .diary-switch:after{transform:translateX(13px)}
+.diary-toggle input:focus-visible + .diary-switch{outline:3px solid rgba(167,92,53,.22)}
+.diary-actions{display:flex;gap:5px;margin-left:auto}
+.diary-action{
+  border:1px solid #dec7b4;border-radius:8px;padding:5px 9px;background:#fff;color:#8b4f32;
+  font:600 11px inherit;cursor:pointer;transition:background .15s,border-color .15s
+}
+.diary-action:hover{background:#f7ece2;border-color:#b98564}
+.diary-action:disabled{opacity:.55;cursor:wait}
+.diary-status{font-size:10px;color:#9a8171;margin-left:auto}
+.diary-badge{
+  flex-shrink:0;border:1px solid #d9b59a;border-radius:5px;padding:2px 4px;color:#9a5b38;
+  background:#fff5eb;font-size:8px;font-weight:800;letter-spacing:.06em
+}
+.sidebar-item.active .diary-badge{color:#fff;border-color:#a75c35;background:#a75c35}
+.topbar-project.idea-diary-project{
+  display:inline-flex;align-items:center;gap:7px;color:#985b39;font-weight:700
+}
+.topbar-project.idea-diary-project:before{content:"Idea Diary";border:1px solid #d9b59a;border-radius:5px;padding:2px 5px;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+.project-type-choice{border:0;margin:16px 0 0;padding:0;display:grid;gap:8px}
+.project-type-choice legend{font-size:12px;font-weight:700;color:#68707b;margin-bottom:7px}
+.project-type-choice label{
+  display:grid;grid-template-columns:16px 1fr;column-gap:7px;align-items:center;padding:9px 10px;
+  border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;font-size:13px;cursor:pointer
+}
+.project-type-choice label:has(input:checked){border-color:#c59a7d;background:#fff7f0}
+.project-type-choice small{grid-column:2;color:#8b929c;font-size:11px;margin-top:2px}
+@media (max-width:700px){
+  body.idea-diary-active .sidebar{
+    width:112px;
+    min-width:112px;
+  }
+  body.idea-diary-active .sidebar-header{padding:12px 9px}
+  body.idea-diary-active .sidebar-header h1{font-size:16px}
+  body.idea-diary-active .sidebar-section{padding:12px 6px 5px}
+  body.idea-diary-active .sidebar-footer{display:none}
+  body.idea-diary-active .diary-badge{display:none}
+  body.idea-diary-active .doc-panel{display:none}
+  body.idea-diary-active .main{width:calc(100vw - 112px)}
+  body.idea-diary-active .topbar{
+    min-height:auto;
+    padding:8px 10px;
+    flex-wrap:wrap;
+  }
+  body.idea-diary-active .topbar-title,
+  body.idea-diary-active .user-chip,
+  body.idea-diary-active .visitor-count-chip,
+  body.idea-diary-active .topbar-btn{display:none}
+  body.idea-diary-active .topbar-project{flex:1 1 100%;font-size:12px}
+  .diary-controls{align-items:flex-start}
+  .diary-actions{width:100%;margin-left:0}
+  .diary-action{flex:1}
+  .diary-status{width:100%;margin-left:0}
+}

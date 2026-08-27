@@ -14,6 +14,14 @@
     model: 'claude'
   };
 
+  function isIdeaDiary(project) {
+    return !!project && (project.project_type === 'idea_diary' || project.projectType === 'idea_diary');
+  }
+  function diaryRespond(project) {
+    if (!project) return false;
+    try { return localStorage.getItem('idea-diary-response-' + project.id) === 'true'; } catch (e) { return false; }
+  }
+
   function getTargetWords() {
     var el = document.getElementById('target-words-input');
     if (!el) return 0;
@@ -59,6 +67,12 @@
     artifactCopy: document.getElementById('artifact-copy'),
     artifactWordcount: document.getElementById('artifact-wordcount')
   };
+  els.diaryControls = document.getElementById('diary-controls');
+  els.diaryToggle = document.getElementById('diary-response-toggle');
+  els.diaryResponseLabel = document.getElementById('diary-response-label');
+  els.diaryStatus = document.getElementById('diary-status');
+  els.diaryList = document.getElementById('btn-diary-list');
+  els.diaryAnalytics = document.getElementById('btn-diary-analytics');
 
   var currentArtifact = null;
 
@@ -537,6 +551,111 @@
     }, 3000);
   }
 
+  function updateDiaryToggleLabel() {
+    if (!els.diaryResponseLabel || !els.diaryToggle) return;
+    els.diaryResponseLabel.textContent = els.diaryToggle.checked ? 'ON · AI replies' : 'OFF · save silently';
+  }
+
+  async function runDiaryReport(kind) {
+    if (!isIdeaDiary(state.currentProject) || !state.currentProject) return;
+    var button = kind === 'list' ? els.diaryList : els.diaryAnalytics;
+    var title = (kind === 'list' ? 'Ideas — ' : 'Cognitive Patterns — ') + state.currentProject.name;
+    var endpoint = kind === 'list' ? '/api/idea-diary/list' : '/api/idea-diary/analytics';
+    var projectId = state.currentProject.id;
+    var status = els.diaryStatus;
+    button.disabled = true;
+    status.textContent = 'Preparing…';
+    var output = '';
+    showArtifact('Preparing diary report…', title, { raw: true });
+    try {
+      var res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: projectId, model: state.model })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      var reader = res.body.getReader(), decoder = new TextDecoder(), buffer = '';
+      function consume(line) {
+        if (!line.startsWith('data:')) return;
+        var raw = line.slice(5).trim();
+        if (!raw || raw === '[DONE]' || raw === 'DONE') return;
+        try {
+          var event = JSON.parse(raw);
+          if (event.type === 'status') status.textContent = event.message || event.status || 'Working…';
+          if (event.type === 'token' || event.type === 'text') {
+            output += event.token || event.text || '';
+            status.textContent = 'Writing…';
+            if (output) showArtifact(output, title, { raw: true });
+          }
+          if (event.type === 'complete') { output = event.content || event.text || event.output || output; status.textContent = 'Complete'; }
+          if (event.type === 'error') throw new Error(event.error || 'Diary report failed');
+        } catch (e) {
+          if (e.message && e.message !== 'Unexpected end of JSON input') throw e;
+        }
+      }
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split('\n'); buffer = lines.pop();
+        lines.forEach(consume);
+      }
+      if (buffer) consume(buffer);
+      // Idea lists are intentionally plain numbered text; do not run them
+      // through the general markdown/artifact formatter.
+      showArtifact(output || (kind === 'list' ? '' : 'No diary data was returned yet.'), title, { raw: kind === 'list' });
+      status.textContent = 'Ready';
+    } catch (err) {
+      status.textContent = 'Could not complete';
+      notify(err.message || 'Diary report failed', 'error');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function streamSilentDiary(response, sendingSession, text) {
+    if (!response.ok) {
+      var errorBody = await response.text();
+      throw new Error(errorBody || 'Diary save failed');
+    }
+    if (!response.body) throw new Error('Diary save returned no response stream');
+    var reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
+    var saved = false;
+    var memoryUpdated = false;
+    var streamError = '';
+    function consume(line) {
+      if (!line.startsWith('data:')) return;
+      var raw = line.slice(5).trim();
+      if (!raw || raw === '[DONE]' || raw === 'DONE') return;
+      try {
+        var event = JSON.parse(raw);
+        if (event.type === 'saved') saved = true;
+        if (event.type === 'status') els.diaryStatus.textContent = event.message || 'Saving…';
+        if (event.type === 'tractatus_trigger') startTractatusUpdate(event.projectId, event.userMessage || text, event.assistantResponse || '');
+        if (event.type === 'complete') memoryUpdated = true;
+        if (event.type === 'error') streamError = event.error || event.message || 'Diary save failed';
+      } catch (e) {
+        if (e && e.name === 'SyntaxError') return;
+        throw e;
+      }
+    }
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var lines = buffer.split('\n'); buffer = lines.pop();
+      lines.forEach(consume);
+    }
+    if (buffer) consume(buffer);
+    if (streamError) throw new Error(streamError);
+    if (!saved) throw new Error('Diary entry was not confirmed as saved');
+    els.diaryStatus.textContent = memoryUpdated ? 'Saved quietly · memory updated' : 'Saved quietly · memory update queued';
+    state.streaming = false; state.abortController = null;
+    els.btnSend.innerHTML = '&#9654;'; els.btnSend.classList.remove('stop-mode'); els.btnSend.disabled = false;
+    if (sendingSession && sendingSession.title && sendingSession.title !== 'New Chat') renderSessions();
+    return '';
+  }
+
   function fmtDocDate(isoStr) {
     if (!isoStr) return '';
     var d = new Date(isoStr);
@@ -707,7 +826,9 @@
       var d = document.createElement('div');
       d.className = 'sidebar-item' + (state.currentProject && state.currentProject.id === p.id ? ' active' : '');
       d.setAttribute('data-testid', 'project-' + p.id);
-      d.innerHTML = '<span class="si-icon">&#128193;</span><span class="si-text">' + esc(p.name) + '</span>' +
+       var diary = isIdeaDiary(p);
+       d.innerHTML = '<span class="si-icon">' + (diary ? '&#9998;' : '&#128193;') + '</span><span class="si-text">' + esc(p.name) + '</span>' +
+         (diary ? '<span class="diary-badge">DIARY</span>' : '') +
         '<span class="si-actions">' +
         '<button class="si-btn si-btn-rename" data-testid="btn-rename-project-' + p.id + '" title="Rename">&#9998;</button>' +
         '<button class="si-btn si-btn-delete" data-testid="btn-delete-project-' + p.id + '" title="Delete">&#128465;</button>' +
@@ -741,6 +862,9 @@
         renderSessions();
         showWelcome();
         els.topbarProject.textContent = '';
+        els.topbarProject.classList.remove('idea-diary-project');
+        if (els.diaryControls) els.diaryControls.classList.add('hidden');
+        document.body.classList.remove('idea-diary-active');
       }
       renderProjects();
       notify('Project deleted', 'success');
@@ -795,12 +919,22 @@
   async function selectProject(p) {
     var token = ++projectSwitchToken;
     state.currentProject = p;
+    document.body.classList.toggle('idea-diary-active', isIdeaDiary(p));
     try { localStorage.setItem('llmplus_last_project', p.id); } catch (e) {}
     // Clear the previous project's session immediately so its chat can never
     // linger (or receive messages) under the newly selected project.
     state.currentSession = null;
     state.sessions = [];
     els.topbarProject.textContent = p.name;
+    els.topbarProject.classList.toggle('idea-diary-project', isIdeaDiary(p));
+    if (els.diaryControls) {
+      els.diaryControls.classList.toggle('hidden', !isIdeaDiary(p));
+      if (isIdeaDiary(p)) {
+        els.diaryToggle.checked = diaryRespond(p);
+        updateDiaryToggleLabel();
+        els.diaryStatus.textContent = '';
+      }
+    }
     renderProjects();
     renderSessions();
     showWelcome();
@@ -1314,8 +1448,8 @@
               var parsed = JSON.parse(data);
               if (parsed.type === 'status') {
                 // status events (thinking, etc.) — no action needed, indicator already shown
-              } else if (parsed.type === 'text') {
-                fullText += parsed.text;
+              } else if (parsed.type === 'text' || parsed.type === 'token') {
+                fullText += parsed.text || parsed.token || '';
                 ensureLoop();
               } else if (parsed.type === 'replace_text') {
                 fullText = parsed.text || '';
@@ -1598,7 +1732,8 @@
     els.btnSend.disabled = false;
 
     try {
-      var textEl = startStreaming();
+      var silentDiary = isIdeaDiary(sendingProject) && !diaryRespond(sendingProject);
+      var textEl = silentDiary ? null : startStreaming();
       var res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1611,11 +1746,27 @@
           stance: state.stance,
           analysisMode: state.analysisMode,
           model: state.model,
-          targetWords: getTargetWords()
+          targetWords: getTargetWords(),
+          respond: !isIdeaDiary(sendingProject) || diaryRespond(sendingProject)
         }),
         signal: state.abortController.signal
       });
 
+      if (silentDiary) {
+        await streamSilentDiary(res, sendingSession, text);
+        if (needsAutoTitle && sendingSession) {
+          api('/api/sessions/' + sendingSession.id + '/auto-title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userMessage: text, assistantResponse: '' })
+          }).then(function(data) {
+            if (data && data.title && sendingSession.title === optimisticTitle) {
+              sendingSession.title = data.title; renderSessions();
+            }
+          }).catch(function() {});
+        }
+        return;
+      }
       streamSSE(res, textEl, function(fullText) {
         if (sendingSession && fullText) {
           sendingSession.transcript = sendingSession.transcript || [];
@@ -1642,13 +1793,13 @@
       });
     } catch (err) {
       if (err.name === 'AbortError') {
-        var c = textEl.querySelector('.cursor-blink');
+        var c = textEl && textEl.querySelector('.cursor-blink');
         if (c) c.remove();
-        var ti = textEl.querySelector('.thinking-indicator');
+        var ti = textEl && textEl.querySelector('.thinking-indicator');
         if (ti) ti.remove();
-        if (textEl.textContent.trim() === '') {
+        if (textEl && textEl.textContent.trim() === '') {
           textEl.innerHTML = '<em style="color:#9ca3af">[Stopped]</em>';
-        } else {
+        } else if (textEl) {
           textEl.innerHTML = fmt(textEl.textContent) + '\n<em style="color:#9ca3af">[Stopped by user]</em>';
         }
       } else {
@@ -3283,17 +3434,21 @@
   els.btnNewProject.addEventListener('click', function() {
     els.projectModal.classList.add('active');
     els.projectNameInput.value = '';
+    var defaultType = document.querySelector('input[name="project-type"][value="standard"]');
+    if (defaultType) defaultType.checked = true;
     els.projectNameInput.focus();
   });
 
   document.getElementById('confirm-project').addEventListener('click', async function() {
     var name = els.projectNameInput.value.trim();
     if (!name) return;
+    var typeInput = document.querySelector('input[name="project-type"]:checked');
+    var projectType = typeInput ? typeInput.value : 'standard';
     try {
       var p = await api('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name })
+        body: JSON.stringify({ name: name, projectType: projectType })
       });
       els.projectModal.classList.remove('active');
       await loadProjects();
@@ -3313,6 +3468,16 @@
   document.getElementById('close-project-modal').addEventListener('click', function() {
     els.projectModal.classList.remove('active');
   });
+
+  if (els.diaryToggle) {
+    els.diaryToggle.addEventListener('change', function() {
+      if (!state.currentProject || !isIdeaDiary(state.currentProject)) return;
+      try { localStorage.setItem('idea-diary-response-' + state.currentProject.id, String(els.diaryToggle.checked)); } catch (e) {}
+      updateDiaryToggleLabel();
+    });
+  }
+  if (els.diaryList) els.diaryList.addEventListener('click', function() { runDiaryReport('list'); });
+  if (els.diaryAnalytics) els.diaryAnalytics.addEventListener('click', function() { runDiaryReport('analytics'); });
 
   els.btnNewSession.addEventListener('click', function() {
     if (!state.currentProject) {
