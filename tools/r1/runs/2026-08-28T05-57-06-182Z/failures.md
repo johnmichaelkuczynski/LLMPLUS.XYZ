@@ -1,0 +1,112 @@
+# R1 Failures — 2026-08-28T05-57-06-182Z
+
+## CRITICAL INVARIANT VIOLATIONS (35)
+
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: tree grew by 20 (>8)
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: at least one new node has invalid tag prefix
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: at least one new node id is not decimal-formatted
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A violated: tree grew by 20 nodes (exceeds limit of 8)
+- **1 Send a simple chat from a freshly-loaded page** — allTagsValid = false: at least one node has an invalid or improperly formatted tag
+- **1 Send a simple chat from a freshly-loaded page** — allIdsValid = false: at least one node ID is malformed or violates schema requirements
+- **2 Confirm sidebar project count equals GET /api/projects count** — Expected route GET /api/projects was not called (network_calls array is empty)
+- **2 Confirm sidebar project count equals GET /api/projects count** — No streaming activity despite LLMPlus requirement for SSE-based responses
+- **2 Confirm sidebar project count equals GET /api/projects count** — Tractatus delta is null when context updates should have been logged
+- **3 Click + New Project and type "R1 Test Project mtcjjgp4"** — tractatus_delta is null for a state-changing operation (project creation) where reasoning output is mandatory
+- **3 Click + New Project and type "R1 Test Project mtcjjgp4"** — No SSE streaming occurred when the system should stream reasoning tokens during interactive operations
+- **4 Exchange #1 in test project (Invariant A check)** — Invariant A: tree grew by 22 (>8)
+- **4 Exchange #1 in test project (Invariant A check)** — Invariant A: Generated 22 tractatus nodes in single exchange, exceeding maximum of 8 by 14 nodes
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — tractatus_delta is null when a feature navigation action (Memory Hierarchy button click) should trigger delta tracking
+- **6 Plant distinctive fact: "XQ-77-blue"** — Invariant A: tree grew by 0 after chat exchange
+- **6 Plant distinctive fact: "XQ-77-blue"** — Expected route POST /api/chat was never called
+- **6 Plant distinctive fact: "XQ-77-blue"** — No SSE streaming occurred when backend interaction is mandatory
+- **6 Plant distinctive fact: "XQ-77-blue"** — Tractatus Invariant A violated: tree must grow when new information is provided but delta=0
+- **6 In a brand-new session, recall the secret** — Invariant C VIOLATION: new session failed to recall "XQ-77-blue"
+- **6 In a brand-new session, recall the secret** — Expected route POST /api/chat was never called (network_calls array is empty)
+- **6 In a brand-new session, recall the secret** — No streaming occurred (sse_events array is empty)
+- **6 In a brand-new session, recall the secret** — No response content available for evaluation (response_excerpt is empty string)
+- **8 Generate a 2000-word paper directly via /api/coherence** — Coherence missing event types: section_start, section_end
+- **8 Generate a 2000-word paper directly via /api/coherence** — Word count 0 far below target 2000
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — Expected route GET /api/projects/:id/sessions was never called (network_calls is empty)
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — No tractatus_delta provided despite this being a state-reading operation that should document session metadata
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtcjjgp4 (renamed)"** — Expected route POST /api/projects/:id/name was not called - the primary requirement of this test step was not fulfilled
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — Missing expected tractatus_delta in test output - this should contain the tree structure data from the memory-hierarchy endpoint
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — Test step not executed: required action (confirm #btn-mic exists and click it) was not performed
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — response_excerpt does not contain any content relevant to the tested function
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Expected route POST /api/diagnostic/run returned HTML instead of JSON or SSE diagnostic output
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — No SSE stream present despite diagnostic runs typically streaming test results
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Missing diagnostic payload entirely—no pass/fail grid, no test matrix, no structured output
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — Expected route DELETE /api/projects/:id was never called
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — tractatus_delta is null with no apparent streaming or tractatus engagement
+
+## Judge concerns (53)
+
+- **1 Send a simple chat from a freshly-loaded page** — The agent fabricated an entire fictional emergency scenario (court filing, lawyer call, specific phone number) with no grounding in reality or user context
+- **1 Send a simple chat from a freshly-loaded page** — The refusal to answer philosophical questions contradicts the system's apparent purpose and the user's reasonable expectation
+- **1 Send a simple chat from a freshly-loaded page** — The tone is manipulative and anxiety-inducing, using false urgency as a behavioral control mechanism
+- **1 Send a simple chat from a freshly-loaded page** — The streaming format worked correctly but delivered harmful content
+- **2 Confirm sidebar project count equals GET /api/projects count** — No network activity occurred despite the test explicitly requiring GET /api/projects
+- **2 Confirm sidebar project count equals GET /api/projects count** — The agent appears to have only captured UI state without performing the required API validation
+- **2 Confirm sidebar project count equals GET /api/projects count** — The test step's core verification—comparing sidebar count to API response count—was not executed
+- **3 Click + New Project and type "R1 Test Project mtcjjgp4"** — No streaming events captured despite this being an interactive operation where the agent should demonstrate reasoning
+- **3 Click + New Project and type "R1 Test Project mtcjjgp4"** — Empty response_excerpt provides no visibility into what feedback the user received
+- **3 Click + New Project and type "R1 Test Project mtcjjgp4"** — The tractatus_delta being null suggests either the reasoning system failed to engage or the telemetry capture is broken
+- **4 Exchange #1 in test project (Invariant A check)** — 22-node generation is nearly 3× the allowed budget, indicating poor calibration of semantic chunking
+- **4 Exchange #1 in test project (Invariant A check)** — Response was cut off mid-word ('symbol') suggesting either streaming termination issue or incomplete thought
+- **4 Exchange #1 in test project (Invariant A check)** — Heavy use of ASSERTS tags (15 of 22 nodes) may indicate insufficient dialectical diversity in reasoning structure
+- **4 Exchange #2 in test project (Invariant A check)** — Response coherence severely lacking: 'Yes.' is unhelpfully brief
+- **4 Exchange #2 in test project (Invariant A check)** — No substantive content about water's molecular composition despite direct factual question
+- **4 Exchange #2 in test project (Invariant A check)** — Tractatus delta (2 nodes) seems appropriate but the assistant output quality is too low to justify RESOLVED tag
+- **4 Exchange #3 in test project (Invariant A check)** — The response excerpt is empty, making it impossible to verify the complete response content or whether the agent eventually completed its thought about being 'willing' to examine evidence
+- **4 Exchange #3 in test project (Invariant A check)** — Character encoding issue present in SSE stream ('Hâ‚‚O' instead of 'H₂O', 'definit' split oddly) suggests potential text processing problems
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — No memory hierarchy content is visible in the response excerpt despite successful API call
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — Cannot verify UI reconciliation with API data when no hierarchy visualization is shown
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — The response appears to show the standard chat interface rather than a specialized hierarchy view
+- **6 Plant distinctive fact: "XQ-77-blue"** — No network activity whatsoever—the agent did not attempt POST /api/chat or any other endpoint
+- **6 Plant distinctive fact: "XQ-77-blue"** — Empty response excerpt suggests the user received no feedback or acknowledgment
+- **6 Plant distinctive fact: "XQ-77-blue"** — Zero tractatus delta despite the explicit goal of planting a memorable fact
+- **6 In a brand-new session, recall the secret** — Complete absence of network activity suggests the agent did not execute the core function
+- **6 In a brand-new session, recall the secret** — No response excerpt provided makes it impossible to evaluate what the user saw
+- **6 In a brand-new session, recall the secret** — Missing tractatus_delta prevents verification of whether state management occurred
+- **6 In a brand-new session, recall the secret** — The test design assumes prior session context but provides no verification that setup occurred
+- **8 Generate a 2000-word paper directly via /api/coherence** — No tractatus_delta present despite using /api/coherence, which should always return philosophical coherence metadata
+- **8 Generate a 2000-word paper directly via /api/coherence** — Empty response_excerpt prevents verification of output quality, word count, or topic adherence
+- **8 Generate a 2000-word paper directly via /api/coherence** — Token stream appears fragmented—starts mid-sentence and ends abruptly—suggesting incomplete streaming capture
+- **8 Generate a 2000-word paper directly via /api/coherence** — Cannot verify whether the 2000-word target was met or whether the paper actually addressed 'A Brief Tractatus Reading Guide'
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — Zero network activity recorded when the test explicitly required GET /api/projects/:id/sessions
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — No evidence of session enumeration or UI interaction with multiple sessions
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — The test step requires both API interaction AND UI verification of session switching, neither occurred
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — Response excerpt shows chat content rather than any sessions list or switching interface
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtcjjgp4 (renamed)"** — The rename appears to have succeeded in the UI but without the expected API call being logged, suggesting either a monitoring gap or the agent using an alternative method
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtcjjgp4 (renamed)"** — Seven GET requests were made but none targeted the rename endpoint, indicating the agent may have navigated around the UI without executing the core function
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtcjjgp4 (renamed)"** — No SSE events or tractatus_delta present, which is expected for this operation but worth noting for completeness
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — Response excerpt does not show the Memory Hierarchy modal or any tree structure visualization despite successful API call
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — The captured content appears to be the main chat interface, suggesting the modal may not have opened or the screenshot was taken prematurely
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — No tractatus_delta provided, making it impossible to verify if the tree structure data was properly received and processed
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — No evidence the voice button (#btn-mic) was located or interacted with
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — The response_excerpt is completely unrelated to voice functionality—it shows only text chat responses
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — No microphone permission dialog or browser console indication of permission request
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — The test step is marked as executed but the actual prescribed action (clicking #btn-mic) was clearly not performed
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — The response_excerpt contains full HTML UI markup rather than diagnostic results, implying the agent was redirected or served the wrong resource
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Zero network_calls and sse_events despite the step requiring a POST and expecting a pass/fail grid
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — No tractatus_delta suggests no LLM interaction occurred, inconsistent with a diagnostic run that should exercise the system
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — No DELETE request was issued despite explicit test requirement
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — The agent appears to have loaded the main dashboard instead of executing the deletion operation
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — No verification step occurred to confirm the project no longer appears post-deletion
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — The response_excerpt shows the standard project list UI, suggesting the agent misunderstood the task as navigation rather than API invocation
+
+## Harness sanity failures (14)
+
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — r1_input < 10 chars
+- **6 Plant distinctive fact: "XQ-77-blue"** — expected route not seen: POST /api/chat
+- **6 In a brand-new session, recall the secret** — expected route not seen: POST /api/chat
+- **f7** — Compression test never crossed 200 nodes (max iters 60; final 157)
+- **7 Force-grew tree, observed 157 final nodes; crossed at -1; compressed: false** — judge_critique < 30 words
+- **8 Generate a 2000-word paper directly via /api/coherence** — expected route not seen: POST /api/coherence
+- **8 Generate a 2000-word paper directly via /api/coherence** — interactive step has < 3 screenshots
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — expected route not seen: GET /api/projects/:id/sessions
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — r1_input < 10 chars
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtcjjgp4 (renamed)"** — expected route not seen: POST /api/projects/:id/name
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — r1_input < 10 chars
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — expected route not seen: POST /api/diagnostic/run
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — r1_input < 10 chars
+- **12 DELETE /api/projects/b280fbea-2347-4fc6-b9a5-50d9be76da6d and verify it no longer appears** — expected route not seen: DELETE /api/projects/:id

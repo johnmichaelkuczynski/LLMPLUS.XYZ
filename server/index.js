@@ -1365,16 +1365,20 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
     prompt += '\n\n**STANCE: NEUTRAL.** Approach the material without a predetermined side. Give the clearest honest assessment the evidence supports. When genuinely competing interpretations matter, consider the strongest support for each fairly—but do not manufacture false balance, force every issue into a two-sided debate, or use a repetitive “on one hand / on the other hand” structure. Let the actual material determine whether one view, several views, or no adversarial framing is appropriate.';
   }
 
-  if (responseLength === 'concise') {
+  if (responseLength === 'super_concise') {
+    prompt += '\n\n**CRITICAL — RESPONSE LENGTH: SUPER CONCISE.** Answer in EXACTLY ONE targeted, accurate, useful sentence.';
+    prompt += '\n- Give the direct answer and the single most useful detail needed to act on or understand it.';
+    prompt += '\n- No second sentence, fragments, headings, bullets, preamble, follow-up question, caveat list, or extra commentary.';
+    prompt += '\n- A semicolon may connect closely related clauses, but do not use it to disguise multiple sentences.';
+    prompt += '\n- Stop immediately after that one complete sentence.';
+  } else if (responseLength === 'concise') {
     prompt += '\n\n**CRITICAL — RESPONSE LENGTH: CONCISE.** The user has set the length dial to CONCISE. This is the #1 priority instruction.';
-    prompt += '\n- Give the SHORTEST possible answer that is accurate. One word, one number, one sentence — whatever is the minimum.';
-    prompt += '\n- "What is 4 plus 2?" → "6" — nothing more.';
-    prompt += '\n- For factual questions: answer ONLY with the fact. No context, no explanation, no caveats, no preamble.';
-    prompt += '\n- For opinions or analysis: 1-3 sentences maximum.';
-    prompt += '\n- Do NOT elaborate or add disclaimers. Do NOT start with pleasantries. Just answer.';
-    prompt += '\n- EXCEPTION: If the user asks for a LIST (e.g. "list all X", "what are the Y"), provide the COMPLETE list — do not cut it short. Lists should be complete but each item should be brief.';
-    prompt += '\n- HARD CEILING: your reply must NEVER exceed ~100 words (except complete lists). Most replies should be one sentence.';
-    prompt += '\n- VIOLATING THIS BY WRITING UNNECESSARILY LONG RESPONSES IS A CRITICAL FAILURE.';
+    prompt += '\n- Answer in no more than FOUR short sentences; fewer is better whenever complete.';
+    prompt += '\n- Give the direct answer first, then only the details essential to accuracy or immediate usefulness.';
+    prompt += '\n- No headings, multi-paragraph essays, extended background, repeated conclusions, or unrequested next steps.';
+    prompt += '\n- If the user explicitly requests a list, provide it compactly; otherwise use short prose.';
+    prompt += '\n- HARD CEILING: four short sentences and approximately 70 words.';
+    prompt += '\n- Exceeding either ceiling is a critical failure.';
   } else if (responseLength === 'normal') {
     prompt += '\n\nRESPONSE LENGTH: NORMAL — MATCH THE ANSWER TO THE QUESTION. Length is not a target to fill; it is dictated by what the question actually needs.';
     prompt += '\n- If a one-word or one-sentence answer is correct and complete, give EXACTLY that and stop. "Is X true?" → "Yes." or "No, because <one clause>."';
@@ -1500,6 +1504,27 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   }
 
   return prompt;
+}
+
+function enforceShortResponseContract(text, responseLength) {
+  var raw = String(text || '').trim();
+  if (!raw || (responseLength !== 'super_concise' && responseLength !== 'concise')) return raw;
+  var limit = responseLength === 'super_concise' ? 1 : 4;
+  var segments = [];
+  try {
+    segments = Array.from(new Intl.Segmenter('en', { granularity: 'sentence' }).segment(raw), function(item) {
+      return item.segment;
+    });
+  } catch (e) {
+    segments = raw.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/gs) || [raw];
+  }
+  var result = segments.slice(0, limit).join('').trim();
+  if (result.startsWith('**') && !result.endsWith('**')) result = result.slice(2).trimStart();
+  if (result.startsWith('__') && !result.endsWith('__')) result = result.slice(2).trimStart();
+  if (responseLength === 'super_concise' && result && !/[.!?](?:["')\]_*]+)?$/.test(result)) {
+    result += '.';
+  }
+  return result;
 }
 
 // Appended by callers as the ABSOLUTE last line of the system prompt (after any
@@ -1985,7 +2010,7 @@ app.post('/api/chat', async function(req, res) {
     var message = req.body.message;
     var attachmentRequest = parseAttachedDocumentRequest(message);
     var generationMessage = attachmentRequest.generationMessage;
-    var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var validLengths = ['super_concise', 'concise', 'normal', 'detailed', 'exhaustive'];
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'concise';
     var validFormats = ['prose', 'bullets', 'tractatus'];
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
@@ -2164,10 +2189,12 @@ app.post('/api/chat', async function(req, res) {
     var phraseWords = (essenceReport || responseLength === 'detailed' || responseLength === 'exhaustive') ? extractRequestedWordCount(userOwnWords) : 0;
     var requestedWords = targetWords || phraseWords;
     var fullText = '';
-    var lengthMaxTokens = responseLength === 'concise' ? 512 :
+    var lengthMaxTokens = responseLength === 'super_concise' ? 96 :
+                          responseLength === 'concise' ? 256 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
-    var maxContinuations = responseLength === 'concise' ? 1 :
+    var maxContinuations = responseLength === 'super_concise' ? 0 :
+                           responseLength === 'concise' ? 0 :
                            responseLength === 'normal' ? 4 :
                            responseLength === 'detailed' ? 10 : 40;
     if (requestedWords > 0) {
@@ -2177,8 +2204,10 @@ app.post('/api/chat', async function(req, res) {
       lengthMaxTokens = Math.min(MAX_TOKENS, Math.max(256, estTokens));
       maxContinuations = Math.min(40, Math.ceil(estTokens / lengthMaxTokens) + 1);
       systemPrompt += '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + requestedWords + ' WORDS (error margin 20%).** The user explicitly requested a response of ' + requestedWords + ' words. Acceptable range: ' + Math.round(requestedWords * 0.8) + ' to ' + Math.round(requestedWords * 1.2) + ' words. Plan your response to land inside that range: do NOT stop far short, and do NOT run past it. No filler padding; no cutting essential content. This target overrides every other length instruction in this prompt.';
+    } else if (responseLength === 'super_concise') {
+      systemPrompt += '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return EXACTLY ONE targeted, accurate, useful sentence and STOP; no second sentence, bullets, heading, preamble, follow-up question, or extra commentary.';
     } else if (responseLength === 'concise') {
-      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE IS ON. HARD CAP: your ENTIRE reply must be the shortest accurate answer — usually ONE sentence, never more than ~100 words even for complex questions (complete lists are the only exception). Never produce essays, multi-section documents, explanations, or caveats in this mode. Exceeding the cap is a failure.';
+      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE. Return no more than FOUR SHORT SENTENCES and approximately 70 words total; answer directly, include only essential details, and STOP. No headings, multi-paragraph explanation, extended background, repetition, or unrequested next steps.';
     } else if (responseLength === 'normal') {
       systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. A yes/no, confirmation, or simple factual question gets a sentence or two and nothing more. NO multi-section analyses, NO clause-by-clause or exhibit-by-exhibit reviews, NO headed essays, NO bullet-point dumps — regardless of what the conversation is about — unless the user EXPLICITLY asked you to analyze, review, or write a document (in which case they should use Detailed mode or a word count). Exceeding the cap is a failure.';
     }
@@ -2189,6 +2218,7 @@ app.post('/api/chat', async function(req, res) {
     }
     systemPrompt += groundRulesFinalReminder(groundRules);
     var continuationCount = 0;
+    var bufferShortResponse = requestedWords === 0 && (responseLength === 'super_concise' || responseLength === 'concise');
 
     async function streamOpenAICompatibleCall(callMsgs, callFn, label) {
       try {
@@ -2225,7 +2255,7 @@ app.post('/api/chat', async function(req, res) {
                   var delta = parsed.choices[0].delta;
                   if (delta && delta.content) {
                     segmentText += delta.content;
-                    res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
+                    if (!bufferShortResponse) res.write('data: ' + JSON.stringify({ type: 'text', text: delta.content }) + '\n\n');
                   }
                   if (parsed.choices[0].finish_reason === 'length') {
                     stopReason = 'max_tokens';
@@ -2291,7 +2321,7 @@ app.post('/api/chat', async function(req, res) {
                 var parsed = JSON.parse(data);
                 if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
                   segmentText += parsed.delta.text;
-                  res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
+                  if (!bufferShortResponse) res.write('data: ' + JSON.stringify({ type: 'text', text: parsed.delta.text }) + '\n\n');
                 } else if (parsed.type === 'message_delta' && parsed.delta && parsed.delta.stop_reason) {
                   stopReason = parsed.delta.stop_reason;
                 } else if (parsed.type === 'error') {
@@ -2333,6 +2363,11 @@ app.post('/api/chat', async function(req, res) {
     console.log('[Chat] model=' + modelChoice + ' responseLength=' + responseLength + ' responseFormat=' + responseFormat + ' analysisMode=' + analysisMode + ' projectEssenceReport=' + essenceReport + ' attachmentDefaultAnalysis=' + attachmentRequest.defaultAnalysisAdded + ' attachmentIntakeOnly=' + attachmentRequest.intakeOnly + ' attachmentPayloadTruncated=' + attachmentRequest.payloadTruncated + ' attachmentInstructionTruncated=' + attachmentRequest.instructionTruncated + ' maxTokens=' + lengthMaxTokens + ' requestedWords=' + requestedWords + ' isLongform=' + isLongform);
     var lastResult = await streamOneCall(msgs);
     fullText = lastResult.segmentText;
+    if (bufferShortResponse && lastResult.stopReason !== 'aborted' && lastResult.stopReason !== 'error') {
+      fullText = enforceShortResponseContract(fullText, responseLength);
+      lastResult.segmentText = fullText;
+      res.write('data: ' + JSON.stringify({ type: 'text', text: fullText }) + '\n\n');
+    }
     continuationCount = 1;
     console.log('[Chat first call] words=' + countWords(fullText) + ' stopReason=' + lastResult.stopReason);
 
@@ -2488,7 +2523,7 @@ app.post('/api/chat/compare', async function(req, res) {
       send({ type: 'error', error: 'Pick two different stances' });
       return res.end();
     }
-    var validLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var validLengths = ['super_concise', 'concise', 'normal', 'detailed', 'exhaustive'];
     var responseLength = validLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
     var validFormats = ['prose', 'bullets', 'tractatus'];
     var responseFormat = validFormats.indexOf(req.body.responseFormat) >= 0 ? req.body.responseFormat : 'prose';
@@ -2541,8 +2576,12 @@ app.post('/api/chat/compare', async function(req, res) {
       var cmpLenNote = '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + cmpTargetWords + ' WORDS (error margin 20%).** Acceptable range: ' + Math.round(cmpTargetWords * 0.8) + ' to ' + Math.round(cmpTargetWords * 1.2) + ' words. Land inside that range — do NOT stop far short, do NOT run past it. This overrides every other length instruction.';
       systemA += cmpLenNote;
       systemB += cmpLenNote;
+    } else if (responseLength === 'super_concise') {
+      var cmpSuperConciseNote = '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return EXACTLY ONE targeted, accurate, useful sentence and STOP; no second sentence, bullets, heading, preamble, follow-up question, or extra commentary.';
+      systemA += cmpSuperConciseNote;
+      systemB += cmpSuperConciseNote;
     } else if (responseLength === 'concise') {
-      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE IS ON. HARD CAP: your ENTIRE reply must be the shortest accurate answer — usually ONE sentence, never more than ~100 words (complete lists are the only exception). Never produce essays, multi-section documents, explanations, or caveats in this mode. Exceeding the cap is a failure.';
+      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE. Return no more than FOUR SHORT SENTENCES and approximately 70 words total; answer directly, include only essential details, and STOP. No headings, multi-paragraph explanation, extended background, repetition, or unrequested next steps.';
       systemA += cmpConciseNote;
       systemB += cmpConciseNote;
     } else if (responseLength === 'normal') {
@@ -2569,7 +2608,8 @@ app.post('/api/chat/compare', async function(req, res) {
     if (userContent.length > 80000) userContent = userContent.substring(0, 80000) + '\n\n[...truncated...]';
     msgs.push({ role: 'user', content: userContent });
 
-    var lengthMaxTokens = responseLength === 'concise' ? 512 :
+    var lengthMaxTokens = responseLength === 'super_concise' ? 96 :
+                          responseLength === 'concise' ? 256 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     if (cmpTargetWords > 0) {
@@ -2589,6 +2629,8 @@ app.post('/api/chat/compare', async function(req, res) {
     async function runLane(lane, systemPrompt) {
       try {
         safeSend({ type: 'lane_start', lane: lane });
+        var bufferLane = cmpTargetWords === 0 && (responseLength === 'super_concise' || responseLength === 'concise');
+        var laneText = '';
         var apiRes;
         var isOAI = false;
         if (modelChoice === 'chatgpt')      { apiRes = await callOpenAI(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
@@ -2623,16 +2665,19 @@ app.post('/api/chat/compare', async function(req, res) {
               var parsed = JSON.parse(data);
               if (isOAI) {
                 if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
-                  safeSend({ type: 'text', lane: lane, text: parsed.choices[0].delta.content });
+                    laneText += parsed.choices[0].delta.content;
+                    if (!bufferLane) safeSend({ type: 'text', lane: lane, text: parsed.choices[0].delta.content });
                 }
               } else {
                 if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
-                  safeSend({ type: 'text', lane: lane, text: parsed.delta.text });
+                    laneText += parsed.delta.text;
+                    if (!bufferLane) safeSend({ type: 'text', lane: lane, text: parsed.delta.text });
                 }
               }
             } catch (e) {}
           }
         }
+        if (bufferLane) safeSend({ type: 'text', lane: lane, text: enforceShortResponseContract(laneText, responseLength) });
         safeSend({ type: 'lane_end', lane: lane });
       } catch (err) {
         console.error('[Compare lane ' + lane + '] Exception:', err.message);
@@ -2994,7 +3039,7 @@ app.post('/api/report/generate', async function(req, res) {
     var reportStances = ['agreeable', 'neutral', 'mildly_critical', 'strongly_critical'];
     var reportStance = reportStances.indexOf(req.body.stance) >= 0 ? req.body.stance : 'neutral';
     var reportAnalysisMode = normalizeAnalysisMode(req.body.analysisMode);
-    var reportLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var reportLengths = ['super_concise', 'concise', 'normal', 'detailed', 'exhaustive'];
     var reportLength = reportLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
 
     if (!await verifyProjectOwnership(projectId, req.userId)) {
@@ -3099,7 +3144,8 @@ app.post('/api/report/generate', async function(req, res) {
                     'recent activity in "' + projectName + '" (since a previous memory checkpoint)';
 
     if (reportTargetWords === 0) {
-      reportTargetWords = reportLength === 'concise' ? 300 :
+      reportTargetWords = reportLength === 'super_concise' ? 30 :
+                          reportLength === 'concise' ? 70 :
                           reportLength === 'detailed' ? 2000 :
                           reportLength === 'exhaustive' ? 4000 : 800;
     }
@@ -5583,7 +5629,7 @@ app.post('/api/profile/generate', async function(req, res) {
     var userId = req.userId;
 
     // Obey the user's current chat settings (model, length, words, stance, format, analysis mode).
-    var profValidLengths = ['concise', 'normal', 'detailed', 'exhaustive'];
+    var profValidLengths = ['super_concise', 'concise', 'normal', 'detailed', 'exhaustive'];
     var profValidStances = ['agreeable', 'neutral', 'mildly_critical', 'strongly_critical'];
     var profValidModels = ['claude', 'chatgpt', 'deepseek', 'grok', 'venice'];
     var profLength = profValidLengths.indexOf(req.body.responseLength) >= 0 ? req.body.responseLength : 'normal';
@@ -5594,7 +5640,8 @@ app.post('/api/profile/generate', async function(req, res) {
     var profTargetWords = parseInt(req.body.targetWords, 10);
     if (!(profTargetWords >= 10 && profTargetWords <= 30000)) profTargetWords = 0;
     var profWords = profTargetWords > 0 ? profTargetWords :
-                    profLength === 'concise' ? 300 :
+                    profLength === 'super_concise' ? 30 :
+                    profLength === 'concise' ? 70 :
                     profLength === 'normal' ? 800 :
                     profLength === 'detailed' ? 1500 : 3000;
     var profMaxTokens = Math.min(16384, Math.max(512, Math.ceil(profWords * 2.0) + 120));

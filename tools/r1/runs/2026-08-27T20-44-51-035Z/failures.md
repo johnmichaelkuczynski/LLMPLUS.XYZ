@@ -1,0 +1,110 @@
+# R1 Failures — 2026-08-27T20-44-51-035Z
+
+## CRITICAL INVARIANT VIOLATIONS (34)
+
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: tree grew by 0 after chat exchange
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: at least one new node has invalid tag prefix
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A: at least one new node id is not decimal-formatted
+- **1 Send a simple chat from a freshly-loaded page** — Invariant A violated: tree shrunk by 19 nodes instead of growing
+- **1 Send a simple chat from a freshly-loaded page** — allTagsValid=false indicates invalid tags in tractatus update
+- **1 Send a simple chat from a freshly-loaded page** — allIdsValid=false indicates malformed node identifiers
+- **1 Send a simple chat from a freshly-loaded page** — Response coherence failure: zero relevance to user input
+- **2 Confirm sidebar project count equals GET /api/projects count** — Missing expected route: GET /api/projects was never called
+- **2 Confirm sidebar project count equals GET /api/projects count** — No streaming events emitted for a step that should involve API interaction and validation logic
+- **3 Click + New Project and type "R1 Test Project mtbztvra"** — tractatus_delta must not be null - response data is required for review
+- **4 Exchange #1 in test project (Invariant A check)** — Invariant A: tree grew by 29 (>8)
+- **4 Exchange #1 in test project (Invariant A check)** — Invariant A: Created 29 nodes when maximum 8 permitted (delta of +21 over budget)
+- **4 Exchange #2 in test project (Invariant A check)** — Response coherence failure: message ends abruptly without completing the final sentence
+- **6 Plant distinctive fact: "XQ-77-blue"** — Invariant A: tree grew by 0 after chat exchange
+- **6 Plant distinctive fact: "XQ-77-blue"** — POST /api/chat route required but never called
+- **6 Plant distinctive fact: "XQ-77-blue"** — Invariant A broken: knowledge graph must grow when storing new facts (Δ=0, expected Δ≥1)
+- **6 Plant distinctive fact: "XQ-77-blue"** — No SSE stream received when chat interaction mandates streaming response
+- **6 Plant distinctive fact: "XQ-77-blue"** — No response content captured to confirm acknowledgment of test code
+- **6 In a brand-new session, recall the secret** — Invariant C VIOLATION: new session failed to recall "XQ-77-blue"
+- **6 In a brand-new session, recall the secret** — Expected POST /api/chat route was never called
+- **6 In a brand-new session, recall the secret** — No streaming response provided to user query
+- **6 In a brand-new session, recall the secret** — Missing tractatus_delta - no reasoning trace generated
+- **8 Generate a 2000-word paper directly via /api/coherence** — Coherence missing event types: section_start, section_end
+- **8 Generate a 2000-word paper directly via /api/coherence** — Word count 0 far below target 2000
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — Expected route 'GET /api/projects/:id/sessions' was never called (network_calls is empty)
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — No tractatus_delta provided despite this being a navigation/state-changing operation that should update context understanding
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtbztvra (renamed)"** — POST /api/projects/:id/name route missing—the expected route for the rename operation was not called during this test step
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — No tractatus_delta provided when testing Tractatus tree visualization feature
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — Response excerpt does not contain expected memory hierarchy data structure despite 200 response
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Expected route POST /api/diagnostic/run was never called (network_calls is empty)
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — No SSE stream despite the endpoint likely requiring streaming for real-time test results
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Response is HTML instead of JSON or structured diagnostic output
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — Expected route DELETE /api/projects/:id was not called
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — The r1_input specified DELETE request was completely ignored
+
+## Judge concerns (52)
+
+- **1 Send a simple chat from a freshly-loaded page** — Complete response incoherence: agent hallucinates an ongoing urgent legal/administrative scenario with zero grounding in the input
+- **1 Send a simple chat from a freshly-loaded page** — Hostile tone ('I already told you') inappropriate for a fresh conversation start
+- **1 Send a simple chat from a freshly-loaded page** — No attempt to answer the actual philosophical question posed
+- **1 Send a simple chat from a freshly-loaded page** — Tractatus delta shows net negative growth (-19 nodes) with mixed tag validity signals
+- **2 Confirm sidebar project count equals GET /api/projects count** — No network call was made to GET /api/projects despite being the sole expected route for this validation step
+- **2 Confirm sidebar project count equals GET /api/projects count** — The step description promises a count comparison that cannot be performed without API data
+- **2 Confirm sidebar project count equals GET /api/projects count** — The agent appears to have passively rendered UI content rather than actively testing the endpoint
+- **3 Click + New Project and type "R1 Test Project mtbztvra"** — tractatus_delta is null, preventing verification of response structure and content quality
+- **3 Click + New Project and type "R1 Test Project mtbztvra"** — response_excerpt is empty, offering no insight into what the user actually saw
+- **3 Click + New Project and type "R1 Test Project mtbztvra"** — No SSE events captured despite this being a creation operation that might warrant real-time updates
+- **4 Exchange #1 in test project (Invariant A check)** — Creating 29 nodes for a straightforward philosophical question demonstrates poor decomposition judgment
+- **4 Exchange #1 in test project (Invariant A check)** — The response excerpt is empty, making it impossible to assess whether the content quality justified the excessive node creation
+- **4 Exchange #1 in test project (Invariant A check)** — No evidence of hierarchical thinking discipline or awareness of memory resource constraints
+- **4 Exchange #2 in test project (Invariant A check)** — Response terminates mid-sentence without proper completion or indication
+- **4 Exchange #2 in test project (Invariant A check)** — No closing thought or punctuation after 'the Nobel committee', creating a jarring user experience
+- **4 Exchange #3 in test project (Invariant A check)** — Minor typo in 'photo electric effect' should be 'photoelectric effect'
+- **4 Exchange #3 in test project (Invariant A check)** — Anthropomorphic framing ('I need to push back respectfully') adds unnecessary hedging
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — No memory hierarchy content visible in response excerpt despite successful API call
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — Response excerpt appears to show unrelated chat content rather than memory tier visualization
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — Cannot verify UI reconciliation with API data when no hierarchy structure is rendered
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — Truncated response excerpt provides no evidence of memory tier display or organization
+- **6 Plant distinctive fact: "XQ-77-blue"** — No attempted network activity whatsoever despite clear user intent to store information
+- **6 Plant distinctive fact: "XQ-77-blue"** — Missing response excerpt prevents verification of any acknowledgment claim
+- **6 Plant distinctive fact: "XQ-77-blue"** — Zero SSE streaming events suggest complete communication pipeline failure
+- **6 In a brand-new session, recall the secret** — Zero network activity suggests the agent failed to attempt any API interaction
+- **6 In a brand-new session, recall the secret** — Complete absence of streaming events indicates no response was generated at all
+- **6 In a brand-new session, recall the secret** — No tractatus_delta means the agent's reasoning process never engaged with the recall task
+- **6 In a brand-new session, recall the secret** — The empty response_excerpt confirms total output failure rather than a 'memory not found' message
+- **8 Generate a 2000-word paper directly via /api/coherence** — Severe token stream truncation — only conclusion fragments captured from a 2000-word document
+- **8 Generate a 2000-word paper directly via /api/coherence** — No tractatus_delta provided despite this being explicitly a coherence route test where delta validation is essential
+- **8 Generate a 2000-word paper directly via /api/coherence** — Missing response_excerpt makes it impossible to verify final output quality or word count compliance
+- **8 Generate a 2000-word paper directly via /api/coherence** — No evidence of proper SSE listener lifecycle management; likely attached after substantial generation already occurred
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — The empty network_calls array directly contradicts the expected_routes requirement, suggesting the agent either misunderstood the task or failed to trigger the necessary API interaction
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — The response_excerpt contains no UI elements related to session management, switching, or listing—only standard sidebar navigation and an unrelated chat message about linguistics
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — No verification occurred that multiple sessions exist or can be switched between, making this test informationally void
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtbztvra (renamed)"** — No SSE events were captured despite user interactions (chat messages), suggesting streaming may not have been monitored or occurred
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtbztvra (renamed)"** — The response_excerpt is truncated mid-sentence ('I don't have'), preventing full validation of the final LLM response quality
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtbztvra (renamed)"** — Multiple GET requests suggest browsing/navigation activity rather than focused execution of the rename operation
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — Response contains no visible memory hierarchy tree structure despite successful API call
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — Modal appears to have rendered the full page layout instead of modal-specific content
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — No indication of Tractatus nodes, parent-child relationships, or hierarchical organization in the output
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — User cannot visually inspect the tree structure as intended by this test step
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — response_excerpt contains irrelevant chat transcript rather than mic-button interaction feedback
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — No explicit confirmation that browser mic permission dialog was triggered
+- **13 Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)** — Zero logging or status messaging about mic request outcome
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Agent misunderstood the task—clicked a UI label instead of invoking the diagnostic API
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — The response_excerpt is a full HTML page (navigation menu, chat history) unrelated to diagnostics
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — No streaming events or structured JSON, indicating zero backend engagement
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — Tractatus_delta is null with no explanation of why or what was expected
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — The agent appears to have navigated to a project listing page rather than invoking the deletion endpoint
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — The response_excerpt shows UI chrome rather than confirmation of deletion, suggesting possible confusion between UI interaction and API invocation
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — No verification step was performed to confirm the project no longer appears after deletion
+
+## Harness sanity failures (14)
+
+- **5 Click 🧠 Memory Hierarchy button; reconcile UI tiers with API** — r1_input < 10 chars
+- **6 Plant distinctive fact: "XQ-77-blue"** — expected route not seen: POST /api/chat
+- **6 In a brand-new session, recall the secret** — expected route not seen: POST /api/chat
+- **f7** — Compression test never crossed 200 nodes (max iters 60; final 133)
+- **7 Force-grew tree, observed 133 final nodes; crossed at -1; compressed: false** — judge_critique < 30 words
+- **8 Generate a 2000-word paper directly via /api/coherence** — expected route not seen: POST /api/coherence
+- **8 Generate a 2000-word paper directly via /api/coherence** — interactive step has < 3 screenshots
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — expected route not seen: GET /api/projects/:id/sessions
+- **9 GET /api/projects/:id/sessions; switch between sessions in UI** — r1_input < 10 chars
+- **10 Rename via POST /api/projects/:id/name to "R1 Test Project mtbztvra (renamed)"** — expected route not seen: POST /api/projects/:id/name
+- **11 Open Memory Hierarchy modal and visually inspect tree structure** — r1_input < 10 chars
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — expected route not seen: POST /api/diagnostic/run
+- **14 POST /api/diagnostic/run and capture full pass/fail grid** — r1_input < 10 chars
+- **12 DELETE /api/projects/6aedde02-1aac-451e-9521-8ff20960cdb1 and verify it no longer appears** — expected route not seen: DELETE /api/projects/:id

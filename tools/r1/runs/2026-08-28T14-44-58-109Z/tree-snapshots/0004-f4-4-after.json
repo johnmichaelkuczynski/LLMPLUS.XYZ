@@ -1,0 +1,23 @@
+{
+  "1.0": "QUESTION: Can phenomenological reduction and naturalistic inquiry in philosophy of mind be reconciled?",
+  "1.1": "ASSERTS: Core tension lies in method and ontological commitment between phenomenological reduction and naturalistic inquiry",
+  "1.2": "ASSERTS: Three fundamental conflicts emerge between these approaches",
+  "1.3": "ASSERTS: Reconciliation attempts exist but face serious challenges",
+  "1.4": "OPEN: The tension may be productive rather than resolvable—each exposing the other's blind spots without requiring synthesis",
+  "1.1.1": "ASSERTS: Phenomenological reduction (epoché) brackets the natural attitude, suspending beliefs about external existence to access pure consciousness as lived experience",
+  "1.1.2": "ASSERTS: Naturalistic inquiry treats mental phenomena as part of the natural order, accessible through third-person empirical methods",
+  "1.1.3": "ASSERTS: One demands first-person suspension of metaphysical commitments; the other builds on them",
+  "1.2.1": "ASSERTS: First conflict: the explanatory gap problem manifests differently in each framework",
+  "1.2.2": "ASSERTS: Second conflict: disagreement on evidential primacy",
+  "1.2.3": "ASSERTS: Third conflict: normativity divides them",
+  "1.3.1": "DOCUMENT: Neurophenomenology (Varela) uses first-person reports to constrain neuroscientific models while grounding phenomenological claims in biological mechanisms",
+  "1.3.2": "DOCUMENT: Dual-aspect theories treat phenomenological and naturalistic descriptions as complementary perspectives on a single reality",
+  "1.3.3": "ASSERTS: These hybrids face accusations of incoherence",
+  "1.2.1.1": "ASSERTS: Phenomenology insists subjective character is sui generis—irreducible to functional or neural description",
+  "1.2.1.2": "ASSERTS: Naturalism seeks to close the gap through reductive or non-reductive physicalism, treating the gap as epistemic rather than ontological",
+  "1.2.2.1": "ASSERTS: Husserlian phenomenology claims immediate access to consciousness provides apodictic certainty that third-person methods cannot match",
+  "1.2.2.2": "ASSERTS: Naturalists counter that introspection is fallible, theory-laden, and requires external validation",
+  "1.2.3.1": "ASSERTS: Phenomenology identifies constitutive structures of experience (intentionality, temporality) as normative constraints on what counts as minded",
+  "1.2.3.2": "ASSERTS: Naturalism treats norms as evolved patterns requiring genealogical explanation, not transcendental validation",
+  "1.3.3.1": "ASSERTS: Either the epoché genuinely suspends naturalism (rendering integration impossible) or it's merely heuristic (collapsing into naturalism)"
+}
