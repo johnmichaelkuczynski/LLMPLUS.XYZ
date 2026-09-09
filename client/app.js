@@ -87,6 +87,30 @@
     return text.trim();
   }
 
+  // The model may emit Markdown in complete pairs or expose half-finished
+  // markers while streaming. Never let those control characters reach the UI.
+  function stripMarkdownSyntax(text) {
+    return String(text || '')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+      .replace(/```(?:[a-z0-9_-]+)?\s*/gi, '')
+      .replace(/`+/g, '')
+      .replace(/\*/g, '')
+      .replace(/~~/g, '')
+      .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+      .replace(/^\s{0,3}>\s?/gm, '')
+      .replace(/^\s*(?:---+|___+)\s*$/gm, '');
+  }
+
+  function removeUnrenderedMarkdown(html) {
+    return String(html || '')
+      .replace(/\*/g, '')
+      .replace(/`+/g, '')
+      .replace(/~~/g, '')
+      .replace(/(^|\n)\s*#{1,6}\s*/g, '$1')
+      .replace(/(^|\n)\s*&gt;\s?/g, '$1');
+  }
+
   function isDocumentArtifact(text) {
     if (!text || text.length < 300) return false;
     var cleaned = stripTractatusContent(text);
@@ -445,7 +469,7 @@
 
   function showArtifact(text, title, opts) {
     opts = opts || {};
-    var cleaned = opts.raw ? text : stripTractatusContent(text);
+    var cleaned = stripMarkdownSyntax(opts.raw ? text : stripTractatusContent(text));
     currentArtifact = { text: cleaned, title: title || extractArtifactTitle(cleaned) };
     els.artifactTitle.textContent = currentArtifact.title;
     els.artifactBody.innerHTML = opts.raw ? '<pre style="white-space:pre-wrap;word-break:break-word;font-family:\'SF Mono\',Consolas,monospace;font-size:12px;line-height:1.6">' + esc(cleaned) + '</pre>' : formatArtifactHtml(cleaned);
@@ -816,7 +840,7 @@
     h = h.replace(/^## (.+)$/gm, '<strong style="font-size:16px;display:block;margin:14px 0 4px">$1</strong>');
     h = h.replace(/^# (.+)$/gm, '<strong style="font-size:18px;display:block;margin:16px 0 6px">$1</strong>');
     h = h.replace(/^- (.+)$/gm, '\u2022 $1');
-    return h;
+    return removeUnrenderedMarkdown(h);
   }
 
   // Copy with formatting preserved: writes both rich HTML and plain text to the
@@ -5336,9 +5360,8 @@
     function appendLane(lane, t) {
       var body = lane === 'A' ? aBody : bBody;
       if (lane === 'A') textA += t; else textB += t;
-      var cursor = body.querySelector('.compare-cursor');
-      var node = document.createTextNode(t);
-      if (cursor) body.insertBefore(node, cursor); else body.appendChild(node);
+      var rendered = lane === 'A' ? textA : textB;
+      body.innerHTML = fmt(rendered) + '<span class="compare-cursor"></span>';
       body.scrollTop = body.scrollHeight;
     }
 

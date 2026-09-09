@@ -9,6 +9,7 @@
     "build": "mkdir -p dist && cp deploy-entry.cjs dist/index.cjs",
     "check": "tsc",
     "check:response-length": "node tools/response-length-check.mjs",
+    "check:plain-output": "node tools/plain-output-check.mjs",
     "check:idea-diary": "node tools/r1/idea-diary-check.mjs",
     "db:push": "drizzle-kit push"
   },
