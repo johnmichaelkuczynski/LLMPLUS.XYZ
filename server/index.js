@@ -6,8 +6,9 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import Stripe from 'stripe';
 import { pool } from './db.js';
-import { setupGoogleAuth, requireGoogleAuth } from './auth.js';
+import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,59 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.set('trust proxy', 1);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+// Stripe requires the untouched request body for signature verification.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async function(req, res) {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe is not configured');
+  var event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (error) {
+    console.error('[Stripe webhook signature]', error.message);
+    return res.status(400).send('Invalid webhook');
+  }
+  var client;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    var accepted = await client.query(
+      'INSERT INTO stripe_events (event_id, event_type) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING event_id',
+      [event.id, event.type]
+    );
+    if (accepted.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.json({ received: true, duplicate: true });
+    }
+    var object = event.data.object;
+    if (event.type === 'checkout.session.completed') {
+      var subscription = await stripe.subscriptions.retrieve(object.subscription);
+      var hasConfiguredPrice = subscription.items.data.some(function(item) {
+        return item.price && item.price.id === process.env.STRIPE_PRICE_ID;
+      });
+      if (!hasConfiguredPrice) throw new Error('Checkout subscription does not contain the configured price');
+      await client.query(
+        `UPDATE users SET stripe_customer_id = $1, stripe_subscription_id = $2, subscription_status = $3
+         WHERE id = $4 AND (stripe_subscription_id IS NULL OR stripe_subscription_id = $2)`,
+        [object.customer, subscription.id, subscription.status, object.client_reference_id]
+      );
+    } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+      await client.query(
+        `UPDATE users SET stripe_subscription_id = $1, subscription_status = $2
+         WHERE stripe_customer_id = $3 AND (stripe_subscription_id IS NULL OR stripe_subscription_id = $1)`,
+        [object.id, object.status, object.customer]
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ received: true });
+  } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(function() {});
+    console.error('[Stripe webhook processing]', error.message);
+    res.status(500).send('Webhook processing failed');
+  } finally {
+    if (client) client.release();
+  }
+});
 
 var allowedOrigins = (function() {
   var origins = new Set();
@@ -52,7 +106,7 @@ app.use(function(req, res, next) {
     var isNew = !vid;
     if (!vid) vid = globalThis.crypto.randomUUID();
     if (isNew) {
-      res.append('Set-Cookie', VISITOR_COOKIE + '=' + vid + '; Path=/; Max-Age=63072000; SameSite=Lax' + (req.secure || (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''));
+      res.append('Set-Cookie', VISITOR_COOKIE + '=' + vid + '; Path=/; Max-Age=63072000; SameSite=Lax; HttpOnly' + (req.secure || (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''));
     }
     // fire-and-forget; never block page load on analytics
     pool.query(
@@ -71,9 +125,135 @@ app.get('/administrative', function(req, res) {
   res.status(404).send('Not found');
 });
 
-// Authentication routes were registered above. Every remaining API request
-// requires a current Google-backed session and uses that user's existing ID.
-app.use('/api', requireGoogleAuth);
+// Authentication routes were registered above. Remaining API requests use
+// either a verified Google user or a cookie-bound anonymous trial identity.
+app.use('/api', requireAccessIdentity);
+
+const ANONYMOUS_FREE_ACTIONS = 3;
+const AUTHENTICATED_FREE_ACTIONS = 10;
+const METERED_API_PATHS = new Set([
+  '/chat', '/chat/compare', '/idea-diary/list', '/idea-diary/analytics',
+  '/report/generate', '/summarize', '/tractator/generate', '/coherence',
+  '/coherence/revise', '/profile/generate', '/audit'
+]);
+
+function subscriptionIsPaid(status) {
+  return status === 'active' || status === 'trialing';
+}
+
+async function loadAccessState(req) {
+  var result = await pool.query(
+    `SELECT subscription_status, anonymous_actions_used, authenticated_actions_used,
+            stripe_customer_id, stripe_subscription_id
+       FROM users WHERE id = $1`,
+    [req.userId]
+  );
+  var row = result.rows[0] || {};
+  var authenticated = Boolean(req.isAuthenticatedUser);
+  var used = authenticated ? Number(row.authenticated_actions_used || 0) : Number(row.anonymous_actions_used || 0);
+  var limit = authenticated ? AUTHENTICATED_FREE_ACTIONS : ANONYMOUS_FREE_ACTIONS;
+  return {
+    authenticated: authenticated,
+    paid: Boolean(req.isDevelopmentPreview) || subscriptionIsPaid(row.subscription_status),
+    subscriptionStatus: row.subscription_status || 'none',
+    used: used,
+    limit: limit,
+    remaining: Math.max(0, limit - used),
+    stripeCustomerId: row.stripe_customer_id || null,
+    stripeSubscriptionId: row.stripe_subscription_id || null
+  };
+}
+
+app.use('/api', async function enforceUsageGate(req, res, next) {
+  var normalizedPath = req.path.toLowerCase().replace(/\/+$/, '') || '/';
+  if (req.method !== 'POST' || !METERED_API_PATHS.has(normalizedPath)) return next();
+  try {
+    var access = await loadAccessState(req);
+    if (access.paid) return next();
+    if (access.used >= access.limit) {
+      return res.status(access.authenticated ? 402 : 401).json({
+        error: access.authenticated ? 'Payment required' : 'Google sign-in required',
+        code: access.authenticated ? 'payment_required' : 'login_required',
+        access: access
+      });
+    }
+    var column = access.authenticated ? 'authenticated_actions_used' : 'anonymous_actions_used';
+    var reserved = await pool.query(
+      'UPDATE users SET ' + column + ' = ' + column + ' + 1 WHERE id = $1 AND ' + column + ' < $2 RETURNING id',
+      [req.userId, access.limit]
+    );
+    if (reserved.rows.length === 0) {
+      access = await loadAccessState(req);
+      return res.status(access.authenticated ? 402 : 401).json({
+        error: access.authenticated ? 'Payment required' : 'Google sign-in required',
+        code: access.authenticated ? 'payment_required' : 'login_required',
+        access: access
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('[Paywall]', error.message);
+    res.status(503).json({ error: 'Unable to verify free access' });
+  }
+});
+
+app.get('/api/billing/status', async function(req, res) {
+  try {
+    var access = await loadAccessState(req);
+    res.set('Cache-Control', 'no-store');
+    res.json({ ...access, price: { amount: 495, currency: 'usd', interval: 'month' } });
+  } catch (error) {
+    res.status(500).json({ error: 'Unable to load billing status' });
+  }
+});
+
+app.post('/api/billing/checkout', async function(req, res) {
+  if (!req.isAuthenticatedUser) return res.status(401).json({ error: 'Google sign-in required', code: 'login_required' });
+  if (!stripe || !process.env.STRIPE_PRICE_ID) return res.status(503).json({ error: 'Stripe is not configured' });
+  try {
+    var access = await loadAccessState(req);
+    if (access.paid) return res.status(409).json({ error: 'Subscription is already active' });
+    var customerId = access.stripeCustomerId;
+    if (!customerId) {
+      var customer = await stripe.customers.create({
+        email: req.user.email || undefined,
+        name: req.user.display_name || undefined,
+        metadata: { userId: String(req.userId) }
+      }, { idempotencyKey: 'llmplus-customer-' + req.userId });
+      customerId = customer.id;
+      await pool.query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, req.userId]);
+    }
+    var origin = req.protocol + '://' + req.get('host');
+    var checkout = await stripe.checkout.sessions.create({
+      customer: customerId,
+      client_reference_id: String(req.userId),
+      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      mode: 'subscription',
+      success_url: origin + '/?checkout=success',
+      cancel_url: origin + '/?checkout=cancelled',
+      subscription_data: { metadata: { userId: String(req.userId) } },
+      allow_promotion_codes: true
+    }, { idempotencyKey: 'llmplus-subscription-checkout-' + req.userId });
+    res.json({ url: checkout.url });
+  } catch (error) {
+    console.error('[Stripe checkout]', error.message);
+    res.status(500).json({ error: 'Unable to open secure checkout' });
+  }
+});
+
+app.post('/api/billing/portal', async function(req, res) {
+  if (!req.isAuthenticatedUser) return res.status(401).json({ error: 'Google sign-in required', code: 'login_required' });
+  try {
+    var access = await loadAccessState(req);
+    if (!stripe || !access.stripeCustomerId) return res.status(400).json({ error: 'No Stripe billing account exists yet' });
+    var origin = req.protocol + '://' + req.get('host');
+    var portal = await stripe.billingPortal.sessions.create({ customer: access.stripeCustomerId, return_url: origin + '/' });
+    res.json({ url: portal.url });
+  } catch (error) {
+    console.error('[Stripe portal]', error.message);
+    res.status(500).json({ error: 'Unable to open billing portal' });
+  }
+});
 
 async function verifyProjectOwnership(projectId, userId) {
   var r = await pool.query('SELECT id FROM projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
@@ -199,6 +379,11 @@ CREATE TABLE IF NOT EXISTS profile_snapshots (
   word_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS stripe_events (
+  event_id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  processed_at TIMESTAMPTZ DEFAULT NOW()
+);
 `;
 
 async function initDB() {
@@ -232,6 +417,14 @@ async function initDB() {
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS replit_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT");
       await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymous_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymous_actions_used INTEGER NOT NULL DEFAULT 0");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS authenticated_actions_used INTEGER NOT NULL DEFAULT 0");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT");
+      await client.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'none'");
+      await client.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_anonymous_id ON users (anonymous_id) WHERE anonymous_id IS NOT NULL");
+      await client.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users (google_id) WHERE google_id IS NOT NULL");
       // Identity data is never created or reassigned at startup. Owner
       // resolution later requires exactly one pre-existing email match.
     } catch (e) { /* columns may already exist */ }

@@ -11,7 +11,8 @@
     responseFormat: 'prose',
     stance: 'neutral',
     analysisMode: 'moderate',
-    model: 'claude'
+    model: 'claude',
+    access: null
   };
 
   function isIdeaDiary(project) {
@@ -551,6 +552,69 @@
     }, 3000);
   }
 
+  function showPaywall(code, access) {
+    if (access) state.access = access;
+    var authenticated = state.access && state.access.authenticated;
+    var modal = document.getElementById('paywall-modal');
+    var title = document.getElementById('paywall-title');
+    var message = document.getElementById('paywall-message');
+    var google = document.getElementById('paywall-google');
+    var upgrade = document.getElementById('paywall-upgrade');
+    if (code === 'login_required' || !authenticated) {
+      title.textContent = 'Sign in to keep using LLM Plus';
+      message.textContent = 'You have finished the anonymous preview. Google Login unlocks 10 more free AI actions and keeps your workspace tied to you.';
+      google.classList.remove('hidden');
+      upgrade.classList.add('hidden');
+    } else {
+      title.textContent = 'Unlock unlimited LLM Plus';
+      message.textContent = 'Your signed-in free actions are complete. Subscribe for $4.95 per month to continue using every AI feature.';
+      google.classList.remove('hidden');
+      upgrade.classList.remove('hidden');
+    }
+    modal.classList.remove('hidden');
+  }
+
+  async function refreshBillingStatus() {
+    try {
+      var response = await fetch('/api/billing/status', { cache: 'no-store' });
+      if (!response.ok) return;
+      state.access = await response.json();
+      var button = document.getElementById('btn-billing');
+      if (state.access.paid) {
+        button.textContent = 'Manage Billing';
+        button.classList.add('paid');
+      } else {
+        button.textContent = 'Upgrade · $4.95/mo';
+        button.classList.remove('paid');
+      }
+      button.title = state.access.paid ? 'Manage your Stripe subscription' :
+        state.access.remaining + ' free AI action' + (state.access.remaining === 1 ? '' : 's') + ' remaining';
+    } catch (e) {}
+  }
+
+  async function openBilling() {
+    if (!state.access || !state.access.authenticated) {
+      showPaywall('login_required', state.access);
+      return;
+    }
+    var endpoint = state.access.paid ? '/api/billing/portal' : '/api/billing/checkout';
+    var response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    var data = await response.json().catch(function() { return {}; });
+    if (!response.ok) {
+      if (data.code) showPaywall(data.code, data.access);
+      else notify(data.error || 'Unable to open secure billing', 'error');
+      return;
+    }
+    window.location.assign(data.url);
+  }
+
+  async function handleGateResponse(response) {
+    if (response.status !== 401 && response.status !== 402) return false;
+    var data = await response.json().catch(function() { return {}; });
+    showPaywall(data.code || (response.status === 401 ? 'login_required' : 'payment_required'), data.access);
+    return true;
+  }
+
   function updateDiaryToggleLabel() {
     if (!els.diaryResponseLabel || !els.diaryToggle) return;
     els.diaryResponseLabel.textContent = els.diaryToggle.checked ? 'ON · AI replies' : 'OFF · save silently';
@@ -798,6 +862,7 @@
 
   async function api(url, opts) {
     var r = await fetch(url, opts || {});
+    if (await handleGateResponse(r.clone())) throw new Error('Free access limit reached');
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   }
@@ -1751,6 +1816,15 @@
         }),
         signal: state.abortController.signal
       });
+      if (await handleGateResponse(res.clone())) {
+        if (textEl) textEl.textContent = 'Free access limit reached.';
+        state.streaming = false;
+        state.abortController = null;
+        els.btnSend.innerHTML = '&#9654;';
+        els.btnSend.classList.remove('stop-mode');
+        refreshBillingStatus();
+        return;
+      }
 
       if (silentDiary) {
         await streamSilentDiary(res, sendingSession, text);
@@ -1777,6 +1851,7 @@
         els.btnSend.innerHTML = '&#9654;';
         els.btnSend.classList.remove('stop-mode');
         els.btnSend.disabled = false;
+        refreshBillingStatus();
 
         if (needsAutoTitle && sendingSession) {
           api('/api/sessions/' + sendingSession.id + '/auto-title', {
@@ -5368,26 +5443,39 @@
     var signIn = document.getElementById('btn-google-login');
     var signOut = document.getElementById('btn-signout');
     var errorCode = new URLSearchParams(window.location.search).get('authError');
+    var checkoutState = new URLSearchParams(window.location.search).get('checkout');
 
     try {
       var response = await fetch('/api/auth/me', { cache: 'no-store' });
-      if (!response.ok) return;
-      var data = await response.json();
-      if (!data.authenticated || !data.user) return;
-
-      window.__authUser = data.user;
-      if (signIn) signIn.classList.add('hidden');
-      if (signOut) signOut.classList.toggle('hidden', Boolean(data.developmentPreview));
-      var chip = document.getElementById('user-chip');
-      if (chip) chip.textContent = data.user.email || data.user.username || '';
+      var data = response.ok ? await response.json() : { authenticated: false, user: null };
+      if (data.authenticated && data.user) {
+        window.__authUser = data.user;
+        if (signIn) signIn.textContent = 'Google Login';
+        if (signOut) signOut.classList.toggle('hidden', Boolean(data.developmentPreview));
+        var chip = document.getElementById('user-chip');
+        if (chip) chip.textContent = data.user.email || data.user.username || '';
+      }
       app.classList.remove('hidden');
       initializeApp();
-
-      if (errorCode) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } catch (error) {}
+      await refreshBillingStatus();
+      if (checkoutState === 'success') notify('Subscription received. Stripe is confirming access.', 'success');
+      if (checkoutState === 'cancelled') notify('Checkout cancelled. No charge was made.', 'info');
+      if (errorCode || checkoutState) window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error) {
+      app.classList.remove('hidden');
+      initializeApp();
+    }
   }
+
+  document.getElementById('btn-billing').addEventListener('click', openBilling);
+  document.getElementById('btn-billing-sidebar').addEventListener('click', openBilling);
+  document.getElementById('paywall-upgrade').addEventListener('click', openBilling);
+  document.getElementById('paywall-close').addEventListener('click', function() {
+    document.getElementById('paywall-modal').classList.add('hidden');
+  });
+  document.getElementById('paywall-modal').addEventListener('mousedown', function(event) {
+    if (event.target === this) this.classList.add('hidden');
+  });
 
   document.getElementById('btn-signout').addEventListener('click', async function() {
     try {

@@ -7,6 +7,7 @@ import { pool } from './db.js';
 const SESSION_COOKIE = 'llmplus.sid.v2';
 const CALLBACK_PATH = '/auth/google/callback';
 const PERSONAL_OWNER_EMAIL = 'johnmichaelkuczynski@gmail.com';
+const VISITOR_COOKIE = 'llmplus_vid';
 
 function cleanSecret(value) {
   return (value || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g, '').trim();
@@ -21,6 +22,16 @@ function publicUser(row) {
   };
 }
 
+async function ensureUserWorkspace(userId) {
+  const existing = await pool.query('SELECT id FROM projects WHERE user_id = $1 LIMIT 1', [userId]);
+  if (existing.rows.length === 0) {
+    await pool.query(
+      "INSERT INTO projects (name, tractatus_tree, user_id) VALUES ('My First Project', '{}'::jsonb, $1)",
+      [userId]
+    );
+  }
+}
+
 async function getUserById(id) {
   const result = await pool.query(
     `SELECT id, username, email, display_name, google_id
@@ -31,7 +42,13 @@ async function getUserById(id) {
   return result.rows.length === 1 ? result.rows[0] : null;
 }
 
-async function findExistingUserForGoogle(profile) {
+function visitorIdFromRequest(req) {
+  const raw = String(req.headers.cookie || '');
+  const match = raw.match(new RegExp('(?:^|;\\s*)' + VISITOR_COOKIE + '=([^;]+)'));
+  return match && /^[0-9a-f-]{36}$/.test(match[1]) ? match[1] : null;
+}
+
+async function findOrCreateUserForGoogle(req, profile) {
   const emailEntry = Array.isArray(profile.emails)
     ? profile.emails.find((entry) => entry && entry.value)
     : null;
@@ -42,20 +59,23 @@ async function findExistingUserForGoogle(profile) {
     throw new Error('Google did not provide a verified email address');
   }
 
-  if (email !== PERSONAL_OWNER_EMAIL) {
-    throw new Error('This Google account is not authorized for this personal workspace');
-  }
-
-  const matches = await pool.query(
+  let matches = await pool.query(
     `SELECT id, username, email, display_name, google_id
        FROM users
-      WHERE LOWER(email) = LOWER($1)
+      WHERE google_id = $1 OR LOWER(email) = LOWER($2)
       ORDER BY id`,
-    [PERSONAL_OWNER_EMAIL]
+    [profile.id, email]
   );
 
-  if (matches.rows.length !== 1) {
-    throw new Error(`No unique existing user is authorized for ${email}`);
+  if (matches.rows.length === 0) {
+    matches = await pool.query(
+      `INSERT INTO users (email, display_name, google_id)
+       VALUES ($1, $2, $3)
+       RETURNING id, username, email, display_name, google_id`,
+      [email, profile.displayName || email, profile.id]
+    );
+  } else if (matches.rows.length !== 1) {
+    throw new Error(`Multiple accounts match ${email}`);
   }
 
   const user = matches.rows[0];
@@ -78,6 +98,45 @@ async function findExistingUserForGoogle(profile) {
     );
     user.google_id = profile.id;
   }
+
+  const visitorId = req.session?.guestVisitorId || null;
+  if (visitorId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const guest = await client.query(
+        'SELECT id FROM users WHERE anonymous_id = $1 AND id <> $2 FOR UPDATE',
+        [visitorId, user.id]
+      );
+      if (guest.rows.length === 1) {
+        const guestId = guest.rows[0].id;
+        await client.query('UPDATE projects SET user_id = $1 WHERE user_id = $2', [user.id, guestId]);
+        await client.query('UPDATE global_documents SET user_id = $1 WHERE user_id = $2', [user.id, guestId]);
+        await client.query('UPDATE document_jobs SET user_id = $1 WHERE user_id = $2', [user.id, guestId]);
+        await client.query('UPDATE reminders SET user_id = $1 WHERE user_id = $2', [user.id, guestId]);
+        await client.query('UPDATE profile_snapshots SET user_id = $1 WHERE user_id = $2', [user.id, guestId]);
+        await client.query(
+          `INSERT INTO user_analytics (user_id, profile_tree, exchange_count, last_updated)
+           SELECT $1, profile_tree, exchange_count, last_updated FROM user_analytics WHERE user_id = $2
+           ON CONFLICT (user_id) DO UPDATE SET
+             profile_tree = user_analytics.profile_tree || EXCLUDED.profile_tree,
+             exchange_count = user_analytics.exchange_count + EXCLUDED.exchange_count,
+             last_updated = GREATEST(user_analytics.last_updated, EXCLUDED.last_updated)`,
+          [user.id, guestId]
+        );
+        await client.query('DELETE FROM user_analytics WHERE user_id = $1', [guestId]);
+        await client.query('DELETE FROM users WHERE id = $1', [guestId]);
+      }
+      await client.query('COMMIT');
+      delete req.session.guestVisitorId;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  await ensureUserWorkspace(user.id);
 
   return user;
 }
@@ -178,11 +237,12 @@ export function setupGoogleAuth(app) {
       clientID,
       clientSecret,
       callbackURL: `https://llmplus.ink${CALLBACK_PATH}`,
-      state: true
+      state: true,
+      passReqToCallback: true
     },
-    async (_accessToken, _refreshToken, profile, done) => {
+    async (req, _accessToken, _refreshToken, profile, done) => {
       try {
-        done(null, await findExistingUserForGoogle(profile));
+        done(null, await findOrCreateUserForGoogle(req, profile));
       } catch (error) {
         console.error('Google sign-in rejected:', error.message);
         done(null, false, { message: 'This Google account is not authorized' });
@@ -197,6 +257,7 @@ export function setupGoogleAuth(app) {
     } catch (error) {
       return res.status(400).json({ error: 'Invalid sign-in origin' });
     }
+    req.session.guestVisitorId = visitorIdFromRequest(req);
     return passport.authenticate('google', {
       scope: ['openid', 'email', 'profile'],
       prompt: 'select_account',
@@ -230,6 +291,7 @@ export function setupGoogleAuth(app) {
         console.error('Google session save failed:', error.message);
         return res.redirect('/?authError=session');
       }
+      res.append('Set-Cookie', VISITOR_COOKIE + '=' + globalThis.crypto.randomUUID() + '; Path=/; Max-Age=63072000; SameSite=Lax; HttpOnly; Secure');
       res.redirect('/');
     });
   });
@@ -272,25 +334,50 @@ export function setupGoogleAuth(app) {
   console.log('Fresh Google authentication configured');
 }
 
-export async function requireGoogleAuth(req, res, next) {
+async function getOrCreateGuest(req) {
+  const visitorId = visitorIdFromRequest(req);
+  if (!visitorId) return null;
+  const result = await pool.query(
+    `INSERT INTO users (anonymous_id)
+     VALUES ($1)
+     ON CONFLICT (anonymous_id) WHERE anonymous_id IS NOT NULL
+     DO UPDATE SET anonymous_id = EXCLUDED.anonymous_id
+     RETURNING id, username, email, display_name, google_id`,
+    [visitorId]
+  );
+  const guest = result.rows[0] || null;
+  if (guest) await ensureUserWorkspace(guest.id);
+  return guest;
+}
+
+export async function requireAccessIdentity(req, res, next) {
   if (isDevelopmentPreviewRequest(req)) {
     try {
       const owner = await getPersonalOwner();
       req.user = owner;
       req.userId = owner.id;
+      req.isAuthenticatedUser = true;
+      req.isDevelopmentPreview = true;
       return next();
     } catch (error) {
       console.error('Development preview owner lookup failed:', error.message);
       return res.status(503).json({ error: 'Personal workspace is unavailable' });
     }
   }
-  if (
-    !req.isAuthenticated?.() ||
-    !req.user ||
-    String(req.user.email || '').toLowerCase() !== PERSONAL_OWNER_EMAIL
-  ) {
-    return res.status(401).json({ error: 'Authentication required' });
+  if (req.isAuthenticated?.() && req.user) {
+    req.userId = req.user.id;
+    req.isAuthenticatedUser = true;
+    return next();
   }
-  req.userId = req.user.id;
-  next();
+  try {
+    const guest = await getOrCreateGuest(req);
+    if (!guest) return res.status(401).json({ error: 'Reload the page to begin your free trial' });
+    req.user = guest;
+    req.userId = guest.id;
+    req.isAuthenticatedUser = false;
+    next();
+  } catch (error) {
+    console.error('Guest identity failed:', error.message);
+    res.status(503).json({ error: 'Unable to start free access' });
+  }
 }

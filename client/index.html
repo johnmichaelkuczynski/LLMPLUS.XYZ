@@ -95,6 +95,10 @@
         </div>
       </div>
       <div class="sidebar-footer">
+        <div class="sidebar-access-links">
+          <a class="sidebar-access-btn" href="/api/auth/google">Google Login</a>
+          <button class="sidebar-access-btn billing" id="btn-billing-sidebar" type="button">$4.95/mo</button>
+        </div>
         <div id="cc-status" class="cc-status hidden">
           <div class="cc-label"><strong>Coherence Engine</strong> <span id="cc-status-text">Idle</span></div>
           <div class="cc-bar"><div class="cc-fill" id="cc-fill"></div></div>
@@ -118,9 +122,24 @@
         <button class="topbar-btn" id="btn-download-session" data-testid="btn-download-session" title="Download this chat session">&#11015; Download chat</button>
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
         <button class="topbar-btn topbar-btn-diagnostic" id="btn-diagnostic" data-testid="btn-diagnostic" title="Run a full system check">&#129514; Diagnostic</button>
-        <a class="topbar-btn" id="btn-google-login" data-testid="btn-google-login" href="/api/auth/google" title="Sign in to open your personal workspace">Sign in with Google</a>
+        <a class="topbar-btn" id="btn-google-login" data-testid="btn-google-login" href="/api/auth/google" title="Sign in or switch Google account">Google Login</a>
+        <button class="topbar-btn billing-btn" id="btn-billing" data-testid="btn-billing" type="button">Upgrade · $4.95/mo</button>
         <button class="topbar-btn hidden" id="btn-signout" data-testid="btn-signout" title="Sign out">Sign out</button>
       </header>
+
+      <div id="paywall-modal" class="modal hidden" data-testid="paywall-modal">
+        <div class="modal-content paywall-card">
+          <button class="paywall-close" id="paywall-close" type="button" aria-label="Close">&times;</button>
+          <div class="paywall-kicker">LLM Plus</div>
+          <h2 id="paywall-title">Keep going with LLM Plus</h2>
+          <p id="paywall-message">Sign in to continue your free access, then upgrade when you are ready.</p>
+          <div class="paywall-actions">
+            <a class="paywall-action secondary" id="paywall-google" href="/api/auth/google">Continue with Google</a>
+            <button class="paywall-action primary" id="paywall-upgrade" type="button">Subscribe · $4.95/month</button>
+          </div>
+          <p class="paywall-note">Secure checkout powered by Stripe. Cancel anytime.</p>
+        </div>
+      </div>
 
       <div id="diagnostic-modal" class="modal hidden" data-testid="diagnostic-modal">
         <div class="modal-content diagnostic-modal-content">

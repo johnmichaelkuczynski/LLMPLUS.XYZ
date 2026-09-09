@@ -466,6 +466,81 @@ html, body {
   border-color: #d1d5db;
 }
 
+.billing-btn {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+  font-weight: 700;
+}
+.billing-btn:hover { background: #000; border-color: #000; }
+.billing-btn.paid { background: #047857; border-color: #047857; }
+
+.sidebar-access-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 0 10px;
+}
+.sidebar-access-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 7px 5px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sidebar-access-btn.billing { border-color: #c9613f; background: #c9613f; color: #fff; }
+
+.paywall-card {
+  position: relative;
+  width: min(440px, calc(100vw - 32px));
+  padding: 34px;
+  text-align: center;
+  border-radius: 14px;
+}
+.paywall-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 26px;
+  cursor: pointer;
+}
+.paywall-kicker {
+  color: #c9613f;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.paywall-card h2 { margin: 8px 0 10px; font-size: 24px; color: #111827; }
+.paywall-card p { color: #4b5563; line-height: 1.55; }
+.paywall-actions { display: grid; gap: 10px; margin-top: 24px; }
+.paywall-action {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.paywall-action.primary { border: 1px solid #c9613f; background: #c9613f; color: #fff; }
+.paywall-action.secondary { border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
+.paywall-note { margin: 14px 0 0; font-size: 11px; }
+
 .user-chip {
   margin-left: auto;
   color: #6b7280;
@@ -3342,6 +3417,8 @@ html, body{
   body.idea-diary-active .user-chip,
   body.idea-diary-active .visitor-count-chip,
   body.idea-diary-active .topbar-btn{display:none}
+  body.idea-diary-active #btn-google-login,
+  body.idea-diary-active #btn-billing{display:inline-flex}
   body.idea-diary-active .topbar-project{flex:1 1 100%;font-size:12px}
   .diary-controls{align-items:flex-start}
   .diary-actions{width:100%;margin-left:0}
