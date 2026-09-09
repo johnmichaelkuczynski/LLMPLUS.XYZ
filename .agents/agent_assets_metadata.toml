@@ -6,51 +6,82 @@ id = "KiRX5OoVzLvPZU2goGmVp"
 uri = "file://LLM_Plus_Technical_Reference.md"
 type = "text"
 title = "LLM Plus — Complete Technical Reference"
+logical_id = "c96aa6e0-71b2-434e-8b0a-74684c04a10c"
 
 [[outputs]]
 id = "1lokL9FknBuWUmTAzgbai"
 uri = "file://LLM_PLUS_FILE_TREE.txt"
 type = "text"
 title = "LLM Plus — Complete File Tree & Tractatus Memory System"
+logical_id = "6ee7ea06-f106-40ef-a097-c8dbba81e697"
 
 [[outputs]]
 id = "HAy4s4MpM-FglaisNuLC2"
 uri = "file://README.md"
 type = "text"
 title = "LLM Plus — README"
+logical_id = "41f33dd9-095d-453e-b1f6-da17b253c539"
 
 [[outputs]]
 id = "aVtH_re5DMffX4spTBF_z"
 uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z.tar.gz"
 type = "unspecified"
 title = "R1 Full Evidence Pack — transcript, network, screenshots, tree snapshots, report.html, failures.md"
+logical_id = "18254cc9-ca2b-4259-ac75-56c1bb4d0560"
 
 [[outputs]]
 id = "UD_myUue4NRHzTrJ-5nCf"
 uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/failures.md"
 type = "text"
 title = "R1 Failures — Categorized Findings"
+logical_id = "dd1d1813-67ae-4481-b8bf-71a04dd9e170"
 
 [[outputs]]
 id = "wR4HMRzeF5zI0UrDIsZIJ"
 uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/run-summary.txt"
 type = "text"
 title = "R1 Run Summary"
+logical_id = "b4faed7e-545e-4c7d-a5a4-c4abc9b3cd75"
 
 [[outputs]]
 id = "6wx1VNkdUXE3iQjR5RIJ0"
 uri = "file://tools/r1/runs/2026-05-17T13-19-09-052Z/network.log"
 type = "unspecified"
 title = "R1 Raw Network Log (267 calls)"
+logical_id = "96451d72-0fe4-4413-ae5b-f27fc112266a"
 
 [[outputs]]
 id = "NtGzAithQ8ekDkL-zVGkX"
 uri = "file://tools/demo/out/demo.mp4"
 type = "video"
 title = "LLM Plus demo (81s, no narration)"
+logical_id = "f12b96d7-9677-4a82-8b33-9169a2e01309"
 
 [[outputs]]
 id = "-I_oEhPY0Ce8GDAepPIE8"
 uri = "file://client/apple-touch-icon.png"
 type = "image"
 title = "Pyramid + eye icon"
+logical_id = "b288b32f-d6d4-4b6a-8217-323f02966c0e"
+
+[[outputs]]
+id = "s_Ek2HV5taOnk6roZFFRN"
+uri = "file://attached_assets/generated_audio/llm-plus-promo-voiceover.mp3"
+type = "audio"
+title = "LLM Plus friendly male promo voiceover"
+description = "Text-to-speech audio: AI should remember your work, not make you start over. But most language models lose track of earlier chats, forget the beginning of long conversations, and struggle to produce …"
+logical_id = "93c31c8b-0bc7-4037-8f1d-999750c21268"
+
+[[outputs]]
+id = "pcxSMt6yx3G6PFbqD1ZTv"
+uri = "file://outputs/llm-plus-promo.mp4"
+type = "video"
+title = "LLM Plus Promotional Video"
+description = "64.5-second landscape promo using the supplied app demonstration, friendly male voice-over, timed captions, and no background music."
+logical_id = "1576e5f7-97a7-4b69-9055-d6aa0d89154c"
+content_hash = "sha256:adc89d81827c9542bfd971e91ff5fb209d1c7c068700acdce9558654a667e9a7"
+size = 5034729
+mtime_ms = 1788986723523
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/1576e5f7-97a7-4b69-9055-d6aa0d89154c/5b1a5626-f044-4ca0-a880-e9c44f1fef52"
+storage_version_token = "1788986741396914"
+content_type = "video/mp4"
