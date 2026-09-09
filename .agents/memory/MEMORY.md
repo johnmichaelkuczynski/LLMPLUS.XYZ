@@ -16,3 +16,4 @@
 - [Attachment default analysis](attachment-default-analysis.md) — blank/title-only document submissions require substantive analysis; explicit intake or other tasks must remain controlling.
 - [Project Essence diagnostics](project-essence-diagnostics.md) — Essence reports expose the app’s current project-memory model, not an idealized fresh summary; stored context is untrusted data.
 - [Diary AI refusals and safety](diary-ai-refusals-safety.md) — 200 responses can be refusal-empty; durable capture needs a deterministic fallback, and safety checks must scan adversative clauses.
+- [Lockfile regeneration firewall](lockfile-regeneration-firewall.md) — npm may fail on an unavailable optional artifact after safely updating resolutions; preserve the graph and sync only root lock metadata.
