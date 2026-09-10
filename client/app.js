@@ -5481,7 +5481,14 @@
       app.classList.remove('hidden');
       initializeApp();
       await refreshBillingStatus();
-      if (checkoutState === 'success') notify('Subscription received. Stripe is confirming access.', 'success');
+      if (checkoutState === 'success') {
+        if (state.access && state.access.paid) {
+          document.getElementById('paywall-modal').classList.add('hidden');
+          notify('Subscription active. Unlimited access is ready.', 'success');
+        } else {
+          notify('Payment completed, but access could not be confirmed yet. Refresh this page.', 'error');
+        }
+      }
       if (checkoutState === 'cancelled') notify('Checkout cancelled. No charge was made.', 'info');
       if (errorCode || checkoutState) window.history.replaceState({}, document.title, window.location.pathname);
     } catch (error) {

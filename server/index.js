@@ -141,7 +141,49 @@ function subscriptionIsPaid(status) {
   return status === 'active' || status === 'trialing';
 }
 
-async function loadAccessState(req) {
+var stripeAccessChecks = new Map();
+var STRIPE_ACCESS_CHECK_TTL_MS = 60 * 1000;
+
+async function reconcileStripeAccess(userId, row, force) {
+  if (!stripe || !row.stripe_customer_id) return row;
+  var lastChecked = stripeAccessChecks.get(String(userId)) || 0;
+  if (!force && Date.now() - lastChecked < STRIPE_ACCESS_CHECK_TTL_MS) return row;
+  try {
+    var subscriptions = await stripe.subscriptions.list({
+      customer: row.stripe_customer_id,
+      status: 'all',
+      limit: 100
+    });
+    var configured = subscriptions.data.filter(function(subscription) {
+      return subscription.items.data.some(function(item) {
+        return item.price && item.price.id === process.env.STRIPE_PRICE_ID;
+      });
+    });
+    configured.sort(function(a, b) {
+      var aPaid = subscriptionIsPaid(a.status) ? 1 : 0;
+      var bPaid = subscriptionIsPaid(b.status) ? 1 : 0;
+      return bPaid - aPaid || b.created - a.created;
+    });
+    var current = configured[0] || null;
+    var subscriptionId = current ? current.id : null;
+    var status = current ? current.status : 'none';
+    if (row.stripe_subscription_id !== subscriptionId || row.subscription_status !== status) {
+      await pool.query(
+        `UPDATE users
+            SET stripe_subscription_id = $1, subscription_status = $2
+          WHERE id = $3 AND stripe_customer_id = $4`,
+        [subscriptionId, status, userId, row.stripe_customer_id]
+      );
+      row = { ...row, stripe_subscription_id: subscriptionId, subscription_status: status };
+    }
+    stripeAccessChecks.set(String(userId), Date.now());
+  } catch (error) {
+    console.error('[Stripe access reconciliation]', error.message);
+  }
+  return row;
+}
+
+async function loadAccessState(req, options) {
   var result = await pool.query(
     `SELECT subscription_status, anonymous_actions_used, authenticated_actions_used,
             stripe_customer_id, stripe_subscription_id
@@ -150,6 +192,9 @@ async function loadAccessState(req) {
   );
   var row = result.rows[0] || {};
   var authenticated = Boolean(req.isAuthenticatedUser);
+  if (authenticated && row.stripe_customer_id) {
+    row = await reconcileStripeAccess(req.userId, row, Boolean(options && options.forceStripe));
+  }
   var used = authenticated ? Number(row.authenticated_actions_used || 0) : Number(row.anonymous_actions_used || 0);
   var limit = authenticated ? AUTHENTICATED_FREE_ACTIONS : ANONYMOUS_FREE_ACTIONS;
   return {
@@ -199,7 +244,7 @@ app.use('/api', async function enforceUsageGate(req, res, next) {
 
 app.get('/api/billing/status', async function(req, res) {
   try {
-    var access = await loadAccessState(req);
+    var access = await loadAccessState(req, { forceStripe: true });
     res.set('Cache-Control', 'no-store');
     res.json({ ...access, price: { amount: 495, currency: 'usd', interval: 'month' } });
   } catch (error) {
