@@ -473,7 +473,6 @@ html, body {
   font-weight: 700;
 }
 .billing-btn:hover { background: #000; border-color: #000; }
-.billing-btn.paid { background: #047857; border-color: #047857; }
 
 .sidebar-access-links {
   display: grid;
