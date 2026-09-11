@@ -1606,19 +1606,19 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
   }
 
   if (responseLength === 'super_concise') {
-    prompt += '\n\n**CRITICAL — RESPONSE LENGTH: SUPER CONCISE.** Answer in EXACTLY ONE targeted, accurate, useful sentence.';
+    prompt += '\n\n**CRITICAL — RESPONSE LENGTH: SUPER CONCISE.** Answer in ONE TO THREE targeted, accurate, useful sentences.';
     prompt += '\n- Give the direct answer and the single most useful detail needed to act on or understand it.';
-    prompt += '\n- No second sentence, fragments, headings, bullets, preamble, follow-up question, caveat list, or extra commentary.';
+    prompt += '\n- Use up to three complete sentences as needed. No headings, bullets, preamble, or extra commentary.';
     prompt += '\n- A semicolon may connect closely related clauses, but do not use it to disguise multiple sentences.';
-    prompt += '\n- Stop immediately after that one complete sentence.';
+    prompt += '\n- Stop after the direct answer, never exceeding three sentences.';
   } else if (responseLength === 'concise') {
     prompt += '\n\n**CRITICAL — RESPONSE LENGTH: CONCISE.** The user has set the length dial to CONCISE. This is the #1 priority instruction.';
-    prompt += '\n- Answer in no more than FOUR short sentences; fewer is better whenever complete.';
+    prompt += '\n- Answer in ONE substantive paragraph, typically four to six sentences. Develop the answer rather than reducing it to a single sentence.';
     prompt += '\n- Give the direct answer first, then only the details essential to accuracy or immediate usefulness.';
     prompt += '\n- No headings, multi-paragraph essays, extended background, repeated conclusions, or unrequested next steps.';
-    prompt += '\n- If the user explicitly requests a list, provide it compactly; otherwise use short prose.';
-    prompt += '\n- HARD CEILING: four short sentences and approximately 70 words.';
-    prompt += '\n- Exceeding either ceiling is a critical failure.';
+    prompt += '\n- Use connected prose in one paragraph, not a list.';
+    prompt += '\n- Aim for approximately 80–150 words when the question warrants explanation; avoid padding.';
+    prompt += '\n- Do not split the response into multiple paragraphs.';
   } else if (responseLength === 'normal') {
     prompt += '\n\nRESPONSE LENGTH: NORMAL — MATCH THE ANSWER TO THE QUESTION. Length is not a target to fill; it is dictated by what the question actually needs.';
     prompt += '\n- If a one-word or one-sentence answer is correct and complete, give EXACTLY that and stop. "Is X true?" → "Yes." or "No, because <one clause>."';
@@ -1749,7 +1749,8 @@ function buildSystemPrompt(tree, tieredMemory, responseLength, responseFormat, i
 function enforceShortResponseContract(text, responseLength) {
   var raw = String(text || '').trim();
   if (!raw || (responseLength !== 'super_concise' && responseLength !== 'concise')) return raw;
-  var limit = responseLength === 'super_concise' ? 1 : 4;
+  if (responseLength === 'concise') return raw.replace(/\s*\n+\s*/g, ' ');
+  var limit = 3;
   var segments = [];
   try {
     segments = Array.from(new Intl.Segmenter('en', { granularity: 'sentence' }).segment(raw), function(item) {
@@ -2429,8 +2430,8 @@ app.post('/api/chat', async function(req, res) {
     var phraseWords = (essenceReport || responseLength === 'detailed' || responseLength === 'exhaustive') ? extractRequestedWordCount(userOwnWords) : 0;
     var requestedWords = targetWords || phraseWords;
     var fullText = '';
-    var lengthMaxTokens = responseLength === 'super_concise' ? 96 :
-                          responseLength === 'concise' ? 256 :
+    var lengthMaxTokens = responseLength === 'super_concise' ? 256 :
+                          responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     var maxContinuations = responseLength === 'super_concise' ? 0 :
@@ -2445,9 +2446,9 @@ app.post('/api/chat', async function(req, res) {
       maxContinuations = Math.min(40, Math.ceil(estTokens / lengthMaxTokens) + 1);
       systemPrompt += '\n\n**CRITICAL — EXACT TARGET LENGTH: ' + requestedWords + ' WORDS (error margin 20%).** The user explicitly requested a response of ' + requestedWords + ' words. Acceptable range: ' + Math.round(requestedWords * 0.8) + ' to ' + Math.round(requestedWords * 1.2) + ' words. Plan your response to land inside that range: do NOT stop far short, and do NOT run past it. No filler padding; no cutting essential content. This target overrides every other length instruction in this prompt.';
     } else if (responseLength === 'super_concise') {
-      systemPrompt += '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return EXACTLY ONE targeted, accurate, useful sentence and STOP; no second sentence, bullets, heading, preamble, follow-up question, or extra commentary.';
+      systemPrompt += '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return ONE TO THREE useful sentences and STOP. No headings, bullets, or preamble.';
     } else if (responseLength === 'concise') {
-      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE. Return no more than FOUR SHORT SENTENCES and approximately 70 words total; answer directly, include only essential details, and STOP. No headings, multi-paragraph explanation, extended background, repetition, or unrequested next steps.';
+      systemPrompt += '\n\nFINAL REMINDER — CONCISE MODE. Return ONE substantive paragraph, typically four to six sentences and 80–150 words. No headings, lists, paragraph breaks, or repetition.';
     } else if (responseLength === 'normal') {
       systemPrompt += '\n\nFINAL REMINDER — NORMAL MODE. HARD CAP: your ENTIRE reply must stay under ~300 words — most replies should be a few sentences. A yes/no, confirmation, or simple factual question gets a sentence or two and nothing more. NO multi-section analyses, NO clause-by-clause or exhibit-by-exhibit reviews, NO headed essays, NO bullet-point dumps — regardless of what the conversation is about — unless the user EXPLICITLY asked you to analyze, review, or write a document (in which case they should use Detailed mode or a word count). Exceeding the cap is a failure.';
     }
@@ -2817,11 +2818,11 @@ app.post('/api/chat/compare', async function(req, res) {
       systemA += cmpLenNote;
       systemB += cmpLenNote;
     } else if (responseLength === 'super_concise') {
-      var cmpSuperConciseNote = '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return EXACTLY ONE targeted, accurate, useful sentence and STOP; no second sentence, bullets, heading, preamble, follow-up question, or extra commentary.';
+      var cmpSuperConciseNote = '\n\nFINAL REMINDER — SUPER CONCISE MODE. Return ONE TO THREE useful sentences and STOP. No headings, bullets, or preamble.';
       systemA += cmpSuperConciseNote;
       systemB += cmpSuperConciseNote;
     } else if (responseLength === 'concise') {
-      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE. Return no more than FOUR SHORT SENTENCES and approximately 70 words total; answer directly, include only essential details, and STOP. No headings, multi-paragraph explanation, extended background, repetition, or unrequested next steps.';
+      var cmpConciseNote = '\n\nFINAL REMINDER — CONCISE MODE. Return ONE substantive paragraph, typically four to six sentences and 80–150 words. No headings, lists, paragraph breaks, or repetition.';
       systemA += cmpConciseNote;
       systemB += cmpConciseNote;
     } else if (responseLength === 'normal') {
@@ -2848,8 +2849,8 @@ app.post('/api/chat/compare', async function(req, res) {
     if (userContent.length > 80000) userContent = userContent.substring(0, 80000) + '\n\n[...truncated...]';
     msgs.push({ role: 'user', content: userContent });
 
-    var lengthMaxTokens = responseLength === 'super_concise' ? 96 :
-                          responseLength === 'concise' ? 256 :
+    var lengthMaxTokens = responseLength === 'super_concise' ? 256 :
+                          responseLength === 'concise' ? 512 :
                           responseLength === 'normal' ? 1200 :
                           responseLength === 'detailed' ? 8192 : MAX_TOKENS;
     if (cmpTargetWords > 0) {
@@ -3384,8 +3385,8 @@ app.post('/api/report/generate', async function(req, res) {
                     'recent activity in "' + projectName + '" (since a previous memory checkpoint)';
 
     if (reportTargetWords === 0) {
-      reportTargetWords = reportLength === 'super_concise' ? 30 :
-                          reportLength === 'concise' ? 70 :
+      reportTargetWords = reportLength === 'super_concise' ? 60 :
+                          reportLength === 'concise' ? 130 :
                           reportLength === 'detailed' ? 2000 :
                           reportLength === 'exhaustive' ? 4000 : 800;
     }
@@ -5862,8 +5863,8 @@ app.post('/api/profile/generate', async function(req, res) {
     var profTargetWords = parseInt(req.body.targetWords, 10);
     if (!(profTargetWords >= 10 && profTargetWords <= 30000)) profTargetWords = 0;
     var profWords = profTargetWords > 0 ? profTargetWords :
-                    profLength === 'super_concise' ? 30 :
-                    profLength === 'concise' ? 70 :
+                    profLength === 'super_concise' ? 60 :
+                    profLength === 'concise' ? 130 :
                     profLength === 'normal' ? 800 :
                     profLength === 'detailed' ? 1500 : 3000;
     var profMaxTokens = Math.min(16384, Math.max(512, Math.ceil(profWords * 2.0) + 120));

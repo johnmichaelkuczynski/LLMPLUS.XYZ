@@ -11,10 +11,10 @@ const firebasePrompt = 'Explain which Firebase configuration and script setup I 
 assert.ok(firebasePrompt.includes('Firebase'), 'Firebase regression prompt fixture is missing');
 assert.match(client, /data-length="super_concise"[^>]*>Super Concise</);
 assert.match(client, /data-length="concise"[^>]*>Concise</);
-assert.match(server, /EXACTLY ONE targeted, accurate, useful sentence/);
-assert.match(server, /no more than FOUR short sentences/);
-assert.match(server, /responseLength === 'super_concise' \? 96/);
-assert.match(server, /responseLength === 'concise' \? 256/);
+assert.match(server, /ONE TO THREE targeted, accurate, useful sentences/);
+assert.match(server, /ONE substantive paragraph/);
+assert.match(server, /responseLength === 'super_concise' \? 256/);
+assert.match(server, /responseLength === 'concise' \? 512/);
 assert.match(server, /function enforceShortResponseContract/);
 assert.match(server, /bufferShortResponse/);
 assert.match(server, /bufferLane/);
@@ -31,7 +31,11 @@ const enforceShortResponseContract = Function(
 const overlongFirebaseAnswer = 'Use the Firebase web configuration for your project. Load the app and auth SDKs from the CDN. Initialize Firebase with that configuration. Create a reCAPTCHA verifier. Call signInWithPhoneNumber. Confirm the SMS code.';
 const superResult = enforceShortResponseContract(overlongFirebaseAnswer, 'super_concise');
 const conciseResult = enforceShortResponseContract(overlongFirebaseAnswer, 'concise');
-assert.equal([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(superResult)].length, 1);
-assert.equal([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(conciseResult)].length, 4);
+assert.equal([...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(superResult)].length, 3);
+assert.equal(conciseResult, overlongFirebaseAnswer);
+assert.equal(enforceShortResponseContract('First paragraph.\n\nSecond paragraph.', 'concise'), 'First paragraph. Second paragraph.');
+for (const text of ['One sentence.', 'One sentence. Two sentences.']) {
+  assert.equal(enforceShortResponseContract(text, 'super_concise'), text);
+}
 
 console.log('Response-length contract check passed for the Firebase-style explanatory prompt.');
