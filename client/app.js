@@ -2641,7 +2641,7 @@
       return;
     }
     var isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'].indexOf(ext) !== -1;
-    if (isImage) notify('Running OCR on image...', 'info');
+    if (isImage) notify('Extracting text and analyzing image...', 'info');
 
     var placeholderIdx = state.pendingAttachments.length;
     state.pendingAttachments.push({ name: file.name, uploading: true, wordCount: 0, content: '', docId: null });
@@ -2654,7 +2654,10 @@
     try {
       notify('Uploading ' + file.name + '...', 'info');
       var resp = await fetch('/api/documents/upload', { method: 'POST', body: fd });
-      if (!resp.ok) throw new Error(await resp.text());
+      if (!resp.ok) {
+        var uploadError = await resp.json().catch(function() { return {}; });
+        throw new Error(uploadError.error || 'Upload failed (' + resp.status + ')');
+      }
       var docData = await resp.json();
 
       var wordCount = docData.raw_content ? docData.raw_content.split(/\s+/).length : 0;
