@@ -249,7 +249,7 @@ app.get('/api/billing/status', async function(req, res) {
   try {
     var access = await loadAccessState(req, { forceStripe: true });
     res.set('Cache-Control', 'no-store');
-    res.json({ ...access, price: { amount: 495, currency: 'usd', interval: 'month' } });
+    res.json({ ...access, price: { amount: 10000, currency: 'usd', interval: 'month' } });
   } catch (error) {
     res.status(500).json({ error: 'Unable to load billing status' });
   }

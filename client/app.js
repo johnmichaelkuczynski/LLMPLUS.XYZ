@@ -591,7 +591,7 @@
       upgrade.classList.add('hidden');
     } else {
       title.textContent = 'Unlock unlimited LLM Plus';
-      message.textContent = 'Your signed-in free actions are complete. Subscribe for $4.95 per month to continue using every AI feature.';
+      message.textContent = 'Your signed-in free actions are complete. Subscribe for $100 per month to continue using every AI feature.';
       google.classList.remove('hidden');
       upgrade.classList.remove('hidden');
     }
@@ -615,7 +615,7 @@
         button.textContent = 'Manage Billing';
         button.classList.add('paid');
       } else {
-        button.textContent = 'Upgrade · $4.95/mo';
+        button.textContent = 'Upgrade · $100/mo';
         button.classList.remove('paid');
       }
       button.title = state.access.paid ? 'Manage your Stripe subscription' :
