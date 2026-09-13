@@ -1,0 +1,20 @@
+{
+  "1.0": "QUESTION: What is the ontological status of mathematical objects like numbers?",
+  "1.1": "ASSERTS: Platonism (mathematical realism) holds that mathematical objects are real abstract entities existing independently of human minds",
+  "1.2": "ASSERTS: Nominalism/Constructivism holds that mathematical objects are mental constructions and human inventions",
+  "1.3": "DOCUMENT: Core tension between views - Platonism struggles to explain epistemic access to abstract entities; Nominalism struggles to explain the discovery-feeling and applicability of mathematics",
+  "2.0": "QUESTION: Is the Earth closer to the Sun than Mars is?",
+  "2.1": "RESOLVED: Yes, Earth is closer to the Sun than Mars is",
+  "1.1.1": "ASSERTS: Mathematical truths exhibit objectivity and necessity difficult to explain if mathematics is merely human construction",
+  "1.1.2": "ASSERTS: The Pythagorean theorem was true before humans discovered it and would remain true if humanity vanished",
+  "1.1.3": "ASSERTS: Different cultures independently discovered identical mathematical truths, suggesting tracking of real entities rather than arbitrary invention",
+  "1.1.4": "ASSERTS: The unreasonable effectiveness of mathematics in physics (Wigner) suggests mathematical structures exist independently and physical world instantiates them",
+  "1.1.5": "OPEN: How do humans access or have knowledge of abstract entities that exist outside space and time?",
+  "1.2.1": "ASSERTS: Humans have no sensory or causal contact with abstract objects, making their postulation a violation of explanatory parsimony",
+  "1.2.2": "ASSERTS: Observable mathematical practice consists entirely of physical mathematicians writing symbols and following rules",
+  "1.2.3": "ASSERTS: Mathematical practice can be fully explained through human activity: creating formal systems, proving theorems within them, and selecting useful systems",
+  "1.2.4": "ASSERTS: Mathematical objectivity reflects consistent adherence to shared rules rather than description of independent entities",
+  "1.2.5": "ASSERTS: Cultural convergence on mathematics reflects convergence on useful symbol systems rather than discovery of platonic realm",
+  "1.2.6": "OPEN: Why does mathematics feel discovered rather than invented if it is merely human construction?",
+  "1.2.7": "OPEN: Why does mathematics work unreasonably well in describing physical reality if mathematical objects are mere constructions?"
+}
