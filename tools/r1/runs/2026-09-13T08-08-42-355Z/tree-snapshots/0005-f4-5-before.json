@@ -1,0 +1,19 @@
+{
+  "1.0": "DOCUMENT: Philosophical implications of Gödel's incompleteness theorems for mathematics",
+  "1.1": "ASSERTS: Gödel's incompleteness theorems shattered the hope that mathematics could be completely formalized as a finite set of axioms from which all truths could be mechanically derived",
+  "1.2": "ASSERTS: Mathematical truth appears to transcend formal proof",
+  "1.3": "ASSERTS: Gödel's theorems challenge the notion that mathematical truth is merely what we can construct or prove",
+  "1.4": "OPEN: For Platonists, theorems might vindicate the idea that mathematical objects exist independently of our formal systems, since truth outruns provability",
+  "1.5": "RESOLVED: We cannot achieve complete formalization of mathematical truth in any single consistent system",
+  "1.6": "ASSERTS: Mathematical truth appears to be an open-ended concept that resists capture by any fixed formal framework",
+  "1.1.1": "ASSERTS: First incompleteness theorem - any consistent formal system powerful enough to express basic arithmetic must contain true statements that cannot be proven within that system",
+  "1.1.2": "ASSERTS: Second incompleteness theorem - no such system can prove its own consistency without being inconsistent",
+  "1.2.1": "ASSERTS: There are truths we can recognize (like the Gödel sentence asserting its own unprovability) that our formal systems cannot capture",
+  "1.2.2": "REJECTS: Mathematical knowledge can be reduced to symbol manipulation following fixed rules",
+  "1.2.3": "REJECTS: Strict formalist positions in philosophy of mathematics",
+  "1.3.1": "ASSERTS: This creates difficulties for certain intuitionist views",
+  "1.4.1": "QUESTION: How do we access mathematical truths if not through formal proof?",
+  "1.5.1": "ASSERTS: We can always extend a system by adding its Gödel sentence as a new axiom, but this generates a new, stronger system with its own unprovable truths",
+  "1.5.2": "ASSERTS: The process is inexhaustible",
+  "1.6.1": "ASSERTS: Human mathematical insight involves something beyond mechanical computation"
+}
