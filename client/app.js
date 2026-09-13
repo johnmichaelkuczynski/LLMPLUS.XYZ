@@ -604,6 +604,13 @@
       if (!response.ok) return;
       state.access = await response.json();
       var button = document.getElementById('btn-billing');
+      if (state.access.owner) {
+        button.textContent = 'Owner · Unlimited';
+        button.title = 'Permanent owner access. No subscription required.';
+        document.getElementById('btn-billing-sidebar').textContent = 'Owner · Unlimited';
+        document.getElementById('paywall-modal').classList.add('hidden');
+        return;
+      }
       if (state.access.paid) {
         button.textContent = 'Manage Billing';
         button.classList.add('paid');
@@ -617,6 +624,10 @@
   }
 
   async function openBilling() {
+    if (state.access && state.access.owner) {
+      notify('Permanent owner access: all features, unlimited usage, no subscription required.', 'success');
+      return;
+    }
     if (!state.access || !state.access.authenticated) {
       showPaywall('login_required', state.access);
       return;

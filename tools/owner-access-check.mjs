@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { hasPermanentOwnerAccess, permanentOwnerState } from '../server/owner-access.js';
+const owner = { isAuthenticatedUser: true, userId: 'verified', user: { id: 'verified', email: 'johnmichaelkuczynski@gmail.com' } };
+assert.equal(hasPermanentOwnerAccess(owner), true);
+assert.equal(hasPermanentOwnerAccess({ ...owner, isAuthenticatedUser: false }), false);
+assert.equal(hasPermanentOwnerAccess({ ...owner, userId: 'other' }), false);
+assert.equal(hasPermanentOwnerAccess({ ...owner, user: { id: 'verified', email: 'other@example.com' } }), false);
+assert.equal(hasPermanentOwnerAccess({ body: { email: owner.user.email }, isAuthenticatedUser: true }), false);
+assert.equal(hasPermanentOwnerAccess({ ...owner, user: { ...owner.user, email: owner.user.email.toUpperCase() } }), true);
+assert.equal(permanentOwnerState().paid, true);
+assert.equal(permanentOwnerState().unlimitedCredits, true);
+assert.equal(permanentOwnerState().expiresAt, null);
+console.log('Owner access checks passed: authenticated owner only, no expiry or credit limit.');

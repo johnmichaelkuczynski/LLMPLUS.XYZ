@@ -7,6 +7,7 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import Stripe from 'stripe';
+import { hasPermanentOwnerAccess, permanentOwnerState } from './owner-access.js';
 import sharp from 'sharp';
 import { pool } from './db.js';
 import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
@@ -185,6 +186,7 @@ async function reconcileStripeAccess(userId, row, force) {
 }
 
 async function loadAccessState(req, options) {
+  if (hasPermanentOwnerAccess(req)) return permanentOwnerState();
   var result = await pool.query(
     `SELECT subscription_status, anonymous_actions_used, authenticated_actions_used,
             stripe_customer_id, stripe_subscription_id
@@ -254,6 +256,7 @@ app.get('/api/billing/status', async function(req, res) {
 });
 
 app.post('/api/billing/checkout', async function(req, res) {
+  if (hasPermanentOwnerAccess(req)) return res.json({ owner: true, url: '/' });
   if (!req.isAuthenticatedUser) return res.status(401).json({ error: 'Google sign-in required', code: 'login_required' });
   if (!stripe || !process.env.STRIPE_PRICE_ID) return res.status(503).json({ error: 'Stripe is not configured' });
   try {
@@ -288,6 +291,7 @@ app.post('/api/billing/checkout', async function(req, res) {
 });
 
 app.post('/api/billing/portal', async function(req, res) {
+  if (hasPermanentOwnerAccess(req)) return res.json({ owner: true, url: '/' });
   if (!req.isAuthenticatedUser) return res.status(401).json({ error: 'Google sign-in required', code: 'login_required' });
   try {
     var access = await loadAccessState(req);
