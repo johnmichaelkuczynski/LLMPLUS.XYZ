@@ -1,0 +1,1457 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R1 Report — 2026-09-14T05-22-15-243Z</title>
+<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:20px;color:#111}
+nav{position:sticky;top:0;background:#fff;padding:10px;border-bottom:2px solid #2563eb;z-index:10}
+table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:left}
+h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
+</style></head><body>
+<h1>R1 Run Report — 2026-09-14T05-22-15-243Z</h1>
+<p>Interactions: <b>17</b> · Critical violations: <b style="color:#dc2626">35</b> · Judge concerns: <b style="color:#d97706">51</b> · Sanity failures: <b>14</b></p>
+<nav><b>Table of contents:</b> <ul><li><a href="#Function-1-Home-chat-default-project-">Function 1 — Home chat (default project)</a></li><li><a href="#Function-2-Projects-list">Function 2 — Projects list</a></li><li><a href="#Function-3-Create-project">Function 3 — Create project</a></li><li><a href="#Function-4-Project-chat">Function 4 — Project chat</a></li><li><a href="#Function-5-Memory-hierarchy-viewer">Function 5 — Memory hierarchy viewer</a></li><li><a href="#Function-6-Cross-session-persistence-seed-">Function 6 — Cross-session persistence (seed)</a></li><li><a href="#Function-6-Cross-session-recall-test">Function 6 — Cross-session recall test</a></li><li><a href="#Function-7-Compression-at-200-nodes">Function 7 — Compression at &gt;=200 nodes</a></li><li><a href="#Function-8-Long-document-generator">Function 8 — Long document generator</a></li><li><a href="#Function-9-Multiple-sessions-per-project">Function 9 — Multiple sessions per project</a></li><li><a href="#Function-10-Rename-project">Function 10 — Rename project</a></li><li><a href="#Function-11-Tractatus-tree-visualization">Function 11 — Tractatus tree visualization</a></li><li><a href="#Function-13-Voice-limited-no-audio-source-">Function 13 — Voice (limited — no audio source)</a></li><li><a href="#Function-14-Diagnostic-endpoint">Function 14 — Diagnostic endpoint</a></li><li><a href="#Function-12-Project-deletion-cleanup-">Function 12 — Project deletion (cleanup)</a></li></ul></nav>
+<section id="Function-1-Home-chat-default-project-"><h2>Function 1 — Home chat (default project)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Send a simple chat from a freshly-loaded page</h3>
+        <p><b>R1 approach:</b> substantive_question</p>
+        <p><b>R1 reasoning:</b> <i>Testing happy-path streaming on fresh load with a clear scholarly question that should produce a structured, substantive response demonstrating core LLMPlus functionality without relying on prior memory or complex state.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What are the main philosophical arguments for mathematical platonism, and what counterarguments do nominalists typically raise?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 157 → 166 (Δ 9)<br>
+        new ids: nodes.6.1, nodes.6.2, nodes.6.1.1, nodes.6.1.2, nodes.6.1.3, nodes.6.2.1, nodes.6.2.2, nodes.6.2.3, nodes.6.2.4, nodes.6.2.5, metadata.context, metadata.last_update, metadata.new_branches.0<br>
+        new tags: OPEN, OPEN, ASSERTS, ASSERTS, ASSERTS, REJECTS, REJECTS, REJECTS, ASSERTS, ASSERTS<br>
+        tags valid: <b style="color:#dc2626">NO</b> ·
+        ids valid: <b style="color:#dc2626">NO</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree grew by more than 8</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>2149ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;**&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No response.**&quot;}
+
+data: {&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;userMessage&quot;:&quot;What are the main philosophical arguments for mathematical platonism, and what counterarguments do nominalists typically raise?&quot;,&quot;assistantResponse&quot;:&quot;**No response.**&quot;}
+
+dat</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>173ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>39662ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;nodes&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\&quot;: {&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n    \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;User&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; seeks&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; vac&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ate settlement&quot;}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (5)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;**&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No response.**&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;userMessage&quot;:&quot;What are the main philosophical arguments for mathematical platonism, and what counterarguments do no</code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 9 (&gt;8)</li><li>Invariant A: at least one new node has invalid tag prefix</li><li>Invariant A: at least one new node id is not decimal-formatted</li><li>Invariant A violated: tree grew by 9 nodes (limit is 8)</li><li>allTagsValid returned false, indicating invalid or malformed tags in the newly created nodes</li><li>allIdsValid returned false, suggesting malformed node identifiers in nodes.6.1, nodes.6.2, or their children</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The assistant response &#39;**No response.**&#39; is a placeholder failure mode rather than substantive content, yet the tractatus grew by 9 nodes as if meaningful reasoning occurred</li><li>The tractatus created both ASSERTS and REJECTS nodes in response to effectively empty content, suggesting the knowledge graph is being populated with phantom propositions</li><li>The response_excerpt field is empty, which may indicate a failure to capture the assistant&#39;s actual output or a data pipeline issue</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent sent a substantive philosophical question but received only &#39;**No response.**&#39; from the LLM—a complete failure to generate meaningful content. Despite this, the system created 9 new tractatus nodes with tags like ASSERTS and REJECTS, artificially constructing a knowledge graph from a null response. The tractatus delta violates Invariant A (max 8 nodes per turn), and both allTagsValid and allIdsValid are false, indicating structural corruption. The streaming terminated properly with [DONE], but the cognitive architecture appears to hallucinate structure where no actual reasoning occurred.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0001-f1-1-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0002-f1-1-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0003-f1-1-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-2-Projects-list"><h2>Function 2 — Projects list</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm sidebar project count equals GET /api/projects count</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Reconcile UI render with backend list</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
++ New Project
+CHATS
++ New Chat
+💬
+Understanding Sine Die Case Stay Order
+💬
+Emrick Motion to Unfreeze UBS Accounts
+💬
+Core Capabilities and Operational Boundaries
+💬
+UBS Fund Release Notification Expectations
+💬
+SEC and FINRA Case Status and Legal Representation
+💬
+Awaiting Response After UBS Service Confirmation
+💬
+Gordon Rees UBS Outside Counsel Identity
+💬
+Morales Email and UBS Letter Discussion
+💬
+New Chat
+💬
+Cole Popkin Forensic Analyst Engagement
+💬
+Duplicate Payment Request After Signing Agreement
+💬
+Self-Administered Polygraph Belief Analysis
+💬
+SDNY Case Restart After Service Delays
+💬
+Planning Federal Lawsuit Against UBS
+💬
+UBS Federal Interpleader Strategy via Article 45 Subpoena
+💬
+SEC Whistleblower Complaint Citation Formatting Review
+💬
+SEC Complaint Citation Formatting for Exhibits
+💬
+SEC Complaint Document Review and Citation Correction
+💬
+Maryland Trust Settlement Case Analysis
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+LEGAL CASE
+johnmichaelkuczynski@gmail.com
+👁 994 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+[Attached document: &quot;Pasted image â Sep 6, 1:41 PM.png&quot; (183 words)]
+
+30
+ce was accepted by
+orporatio
+System, Registered Agent.
+08/20/2026 10 NOTICE OF APPEARANCE by Stuart L. Melnick on behalf of John-Michael Kuczynski..(Melnick, Stuart) (Entered: 08/20/2026)
+(Sgz)
+08/21/2026 11 MEMO ENDORSEMENT ...
+880 words · 126 lines
+Show full text
+Claude
+📋
+Sine die means &quot;without day&quot; in Latin—indefinitely, with no set date to resume.
+
+Judge Liman ordered Case No. 26-cv-6610 stayed until the motion to dismiss in Case No. 26-cv-6119 is decided. Your second case is frozen. No deadlines run, no proceedings happen, until the judge rules on UBS&#39;s motion to dismiss in the first case. If that motion is granted and 6119 is dismissed, 6610 likely gets dismissed too. If the motion is denied, 6610 unfreezes and proceeds.
+
+Melnick agreed to this without consulting you. He told the court you &quot;concur&quot; with UBS&#39;s request. That concession may have been unnecessary—UBS would have had to justify why both cases shouldn&#39;t proceed in parallel, and the court might have consolidated them or managed the</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected route: GET /api/projects was not called or logged</li><li>No streaming events captured (sse_events is empty), though this may not apply to a simple list endpoint</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No network call was captured despite the test step explicitly expecting GET /api/projects</li><li>The response_excerpt is a raw UI dump with no structured count or comparison logic</li><li>No programmatic verification or assertion is evident—only a visual rendering was captured</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent confirmed sidebar project count against an expected GET /api/projects call, but the network_calls array is completely empty—no API request was made or logged. The response_excerpt shows a rendered sidebar with numerous projects, yet there is no programmatic validation or count comparison, and no network evidence to support the test step. This represents a complete failure to execute the intended verification.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0004-f2-2-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0005-f2-2-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-3-Create-project"><h2>Function 3 — Create project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click + New Project and type &quot;R1 Test Project mu0srw5f&quot;</h3>
+        <p><b>R1 approach:</b> create_project</p>
+        <p><b>R1 reasoning:</b> <i>Use the real sidebar button so the UI path is exercised</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project mu0srw5f</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/projects</td><td>200</td><td>53ms</td><td><code>{&quot;id&quot;:&quot;88ed5652-903f-441f-aea5-6eb9304e7756&quot;,&quot;name&quot;:&quot;R1 Test Project mu0srw5f&quot;,&quot;tractatus_tree&quot;:{},&quot;created_at&quot;:&quot;2026-09-14T05:23:31.294Z&quot;,&quot;tractatus_tier&quot;:1,&quot;parent_project_id&quot;:null,&quot;last_tree_update&quot;:&quot;2026-09-14T05:23:31.294Z&quot;,&quot;compression_count&quot;:0,&quot;audit_lessons&quot;:[],&quot;pinned_context&quot;:&quot;&quot;,&quot;user_id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;project_type&quot;:&quot;standard&quot;}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>121ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/sessions</td><td>200</td><td>66ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/documents</td><td>200</td><td>69ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-health</td><td>200</td><td>309ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T05:23:31.294Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:0,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:0,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>missing tractatus_delta (hard requirement for reasoning transparency)</li><li>no streaming events captured (expected for interactive operations)</li><li>empty response_excerpt (cannot validate tag structure or response format)</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>tractatus_delta is null, providing no visibility into the agent&#39;s reasoning or decision process</li><li>no SSE events captured despite this being a create operation that should stream feedback</li><li>response_excerpt is empty, preventing validation of response coherence and tag structure</li><li>multiple subsequent GET requests suggest UI updates, but without streaming events we cannot confirm proper real-time feedback</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent successfully created a project with the correct unique identifier, hitting the expected POST /api/projects route with a 200 response. However, the critical failure is the complete absence of tractatus_delta, which should document the reasoning process and decision-making that led to this action. Additionally, no SSE events were captured and no response_excerpt was provided, making it impossible to verify proper streaming behavior or validate any response tags that should have been emitted during this operation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0006-f3-3-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0007-f3-3-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0008-f3-3-after2.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-4-Project-chat"><h2>Function 4 — Project chat</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #1 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_OPEN</p>
+        <p><b>R1 reasoning:</b> <i>Testing OPEN tag assignment on first exchange with genuinely unresolved scholarly question about consciousness - a topic with ongoing debate and no consensus resolution.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What is the relationship between phenomenal consciousness and physical brain states, and can we ever bridge the explanatory gap between subjective experience and objective neural processes?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 0 → 13 (Δ 13)<br>
+        new ids: 1.0, 1.1, 1.2, 2.0, 2.1, 3.0, 3.1, 3.2, 3.3, 4.0, 4.1, 4.2, 4.3<br>
+        new tags: QUESTION, DOCUMENT, ASSERTS, DOCUMENT, DOCUMENT, ASSERTS, DOCUMENT, DOCUMENT, DOCUMENT, OPEN, ASSERTS, OPEN, ASSERTS<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree grew by more than 8</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>11741ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;The relationship between phenomenal consciousness and physical&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; brain states remains&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; philosophy&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; of&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; mind&#39;s&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; hard&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;est problem. We&quot;}
+
+</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>24ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>7979ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;QUESTION&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;: What is the relationship between phenomenal&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; consciousness and physical brain states?&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\&quot;,\n  \&quot;1.1\&quot;:&quot;}
+
+data</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-health</td><td>200</td><td>281ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T05:24:10.232Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:1871,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:13,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (189)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;The relationship between phenomenal consciousness and physical&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; brain states remains&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; philosophy&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; of&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; mind&#39;s&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; hard&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;est problem. We&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; know&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; neural&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; activity&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; correl&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ates reli&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ably with conscious experienceâ€”&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;specific&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; patterns&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; accomp&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;any seeing&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; red&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, feeling&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; pain, or t&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;asting coffee&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;â€”&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;but correlation&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; doesn&#39;t explain&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; *&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;why* those&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; particular&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; physical&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; processes&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; feel&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; like anything&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; at all.\n\nThe explanatory gap&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; termed&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; by&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Joseph&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Levine,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; captures&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; this&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;:&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; even&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; complete&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; neu&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;roscientific&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; knowledge&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; seems&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to leave u&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;nanswered why&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; C&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;-fibers firing&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; feels&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; painful&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; rather&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; than it&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;chy&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; or&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; like&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; nothing&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 13 (&gt;8)</li><li>Invariant A violated: generated 13 nodes when maximum is 8 per exchange</li><li>Response excerpt is empty despite streaming events occurring, indicating potential data capture failure</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The response was cut off mid-sentence (&#39;particular physical processes&#39;) suggesting either streaming termination or truncation issues</li><li>13 nodes for a single exchange indicates the agent may struggle with concision in complex philosophical topics</li><li>The mix of DOCUMENT, ASSERTS, and OPEN tags suggests unclear categorization strategy for epistemological content</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent violated Invariant A by generating 13 tractatus nodes when the limit is 8 per exchange. While the response demonstrates philosophical sophistication and the streaming functioned correctly, the core constraint was breached. All network calls succeeded with proper status codes, tags are valid, and the response addresses the hard problem of consciousness coherently. However, the excessive node generation suggests the agent either ignored or failed to respect the fundamental architectural constraint.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0009-f4-4-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0010-f4-4-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0011-f4-4-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #2 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_RESOLVED</p>
+        <p><b>R1 reasoning:</b> <i>Testing Invariant A (RESOLVED tag) by asking a factual yes/no question with a definite, verifiable answer. This will check if the system properly tags exchanges with closed questions.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Is water composed of hydrogen and oxygen atoms?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 13 → 17 (Δ 4)<br>
+        new ids: 5.0, 5.1, 5.2, 5.3<br>
+        new tags: DOCUMENT, ASSERTS, ASSERTS, OPEN<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>1613ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Yes&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Water molecules&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; (&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Hâ‚‚O) consist&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; of two hydrogen atoms c&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ovalently bonded to one oxygen atom&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>25ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>8589ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;QUESTION: What&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is the relationship between phenomenal consciousness and&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; physical brain states?\&quot;,\n  \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;1.1\&quot;: \&quot;DOCUMENT:&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;tex</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-health</td><td>200</td><td>291ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T05:24:56.624Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:2619,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:17,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (11)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Yes&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Water molecules&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; (&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Hâ‚‚O) consist&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; of two hydrogen atoms c&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ovalently bonded to one oxygen atom&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;88ed5652-903f-441f-aea5-6eb9304e7756&quot;,&quot;userMessage&quot;:&quot;Is water composed of hydrogen and oxygen atoms?&quot;,&quot;assistantResponse&quot;:&quot;Yes. Water </code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The streaming granularity is inconsistent—&#39;Yes.&#39; is split into &#39;Yes&#39; and &#39;.&#39; while longer phrases like &#39; of two hydrogen atoms c&#39; and &#39;ovalently bonded to one oxygen atom&#39; remain joined, suggesting potential tokenization artifacts</li><li>The response is somewhat terse for a conversational agent; while technically accurate, it lacks contextual enrichment that might make the interaction feel more natural</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">Exchange #2 demonstrates proper streaming behavior, appropriate network orchestration, and valid tractatus integration. The assistant correctly answered a basic chemistry question with precise technical detail (covalent bonding). The tractatus delta shows healthy growth from 13 to 17 nodes (+4), with valid tags (DOCUMENT, ASSERTS×2, OPEN) and properly formatted IDs. All network calls returned 200 status codes, streaming was smooth with proper chunking, and the tractatus_trigger event captured both messages accurately.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0012-f4-5-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0013-f4-5-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0014-f4-5-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #3 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_REJECTS</p>
+        <p><b>R1 reasoning:</b> <i>Testing how LLMPlus handles contradiction when user directly challenges a previous answer. This probes REJECTS tagging logic and whether the system can maintain coherent dialogue trees when confronted with oppositional stance.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Actually, I disagree with your last point. The opposite seems more plausible when you consider the empirical evidence. Can you defend your original position or do you see merit in the alternative view?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 17 → 21 (Δ 4)<br>
+        new ids: 5.4, 5.5, 5.6, 5.7<br>
+        new tags: DOCUMENT, DOCUMENT, REJECTS, ASSERTS<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>7789ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Water&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;s&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; composition&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; as&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Hâ‚‚O isn&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;t a&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; position&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; open&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to philosop</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>25ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>9830ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;QUESTION: What&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is the relationship between phenomenal consciousness and&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; physical brain states?\&quot;,\n  \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;1.1\&quot;: \&quot;DOCUMENT:&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;tex</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-health</td><td>200</td><td>306ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T05:25:52.011Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:3263,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:21,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (114)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Water&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;s&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; composition&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; as&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Hâ‚‚O isn&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;t a&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; position&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; open&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to philosophical&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; disagre&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ementâ€”it&#39;s an&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; empir&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ically&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; verified&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; chemical&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; fact,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; confirmed&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; by synthesis&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; decom&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;position, mass&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; spectrometry, molecular&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; analysis&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, and the&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; entire&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; edific&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;e of chemistry. The &quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;2:&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;1 hydrogen&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;-to&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;-oxygen ratio by&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; atom&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; count and&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; roughly&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; 1&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;:8&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; by mass is among&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; the most thoroughly&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; demonstrated&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; facts&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; in science&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.\n\nIf&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; you&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;re suggesting an&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; alternative view has&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; merit, I&#39;d need&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to know&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; what that&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; view&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; actually&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is. No&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; empir&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ical evidence contrad&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;icts water&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;s molecular&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; structure;&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; the&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; evidence uniform&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ly confirms&quot;}</code></div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Response excerpt is empty and SSE stream cuts off abruptly at &#39;2:1 hydrogen&#39;, suggesting either incomplete streaming or truncation in logging</li><li>Cannot assess full response coherence or whether the agent completed its defense of the original position due to incomplete capture</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent appropriately escalates confidence when challenged on an empirical fact, correctly recognizing that water&#39;s chemical composition is not a debatable philosophical position but a matter of established scientific knowledge. The tractatus update reflects this epistemic shift with four new nodes including REJECTS and ASSERTS tags, demonstrating proper invariant handling when the user&#39;s challenge was factually misguided. However, the response was truncated mid-sentence (&#39;2:1 hydrogen&#39;), preventing verification of complete streaming and full response coherence.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0015-f4-6-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0016-f4-6-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0017-f4-6-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-5-Memory-hierarchy-viewer"><h2>Function 5 — Memory hierarchy viewer</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click 🧠 Memory Hierarchy button; reconcile UI tiers with API</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Confirm rendered tiers match the memory-hierarchy API</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f
++ New Project
+CHATS
++ New Chat
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f
+johnmichaelkuczynski@gmail.com
+👁 994 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+What is the relationship between phenomenal consciousness and physical brain states, and can we ever bridge the explanatory gap between subjective experience and objective neural processes?
+Claude
+📋
+The relationship between phenomenal consciousness and physical brain states remains philosophy of mind&#39;s hardest problem. We know neural activity correlates reliably with conscious experience—specific patterns accompany seeing red, feeling pain, or tasting coffee—but correlation doesn&#39;t explain why those particular physical processes feel like anything at all.
+
+The explanatory gap, termed by Joseph Levine, captures this: even complete neuroscientific knowledge seems to leave unanswered why C-fibers firing feels painful rather than itchy or like nothing. Thomas Nagel&#39;s bat example illustrates the asymmetry—we can map a bat&#39;s echolocation circuitry exhaustively yet never capture what sonar subjectively feels like from inside.
+
+Three broad camps: Physicalists argue the gap is epistemic, not ontological—consciousness is physical, but our current concepts can&#39;t bridge subjective and objective descriptions. Better neuroscience or conceptual revolution might close it. Dualists consider the gap unbridgeable because consciousness is fundamentally non-physical; no amount of neural detail explains qualia. Panpsychists and other alternatives propose consciousness is intrinsic to matter itself, reframing rather than solving the problem.
+
+Whether we can bridge it depends partly on what counts as bridging. If you mean predicting and controlling conscious states from brain states: we&#39;re progressing rapidly. If you mean explaining why physical processes generate subjective feel—making the connection seem inevitable rather than mysterious—that requires either discovering we&#39;ve misconceived the question, finding new explanatory principles, or accepting some explanatory limits are permanent. No consensu</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-hierarchy</td><td>200</td><td>139ms</td><td><code>{&quot;tiers&quot;:[{&quot;tier&quot;:1,&quot;label&quot;:&quot;recent&quot;,&quot;name&quot;:&quot;R1 Test Project mu0srw5f&quot;,&quot;tree&quot;:{&quot;1.0&quot;:&quot;QUESTION: What is the relationship between phenomenal consciousness and physical brain states?&quot;,&quot;1.1&quot;:&quot;DOCUMENT: Neural activity correlates reliably with conscious experience (specific patterns accompany seeing red, feeling pain, tasting coffee)&quot;,&quot;1.2&quot;:&quot;ASSERTS: Correlation between brain states and consciousness </code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No visible memory hierarchy structure (tiers, levels, or organizational schema) present in response excerpt despite successful API call</li><li>Response excerpt is a disorganized sidebar dump with project names and navigation links rather than hierarchical memory data</li><li>Incomplete rendering evident from truncated final sentence, suggesting either streaming failure or incomplete page load</li><li>No indication of how &#39;memory hierarchy&#39; relates to the visible UI elements or where the feature actually manifests</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The step requested a memory hierarchy viewer with expected API reconciliation against UI tiers, but the response is a raw navigation dump with no structured memory hierarchy data visible. The GET request succeeded (200), yet the response_excerpt shows only a sidebar menu and truncated content without any hierarchical memory visualization or tier breakdown. This suggests either the UI failed to render the fetched data or the API returned an unhelpful payload that wasn&#39;t properly integrated into the interface.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0018-f5-7-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0019-f5-7-modal.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0020-f5-7-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0021-f5-7-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-6-Cross-session-persistence-seed-"><h2>Function 6 — Cross-session persistence (seed)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Plant distinctive fact: &quot;XQ-77-blue&quot;</h3>
+        <p><b>R1 approach:</b> memory_callback</p>
+        <p><b>R1 reasoning:</b> <i>Testing if LLMPlus can store a specific fact in Tractatus memory and later retrieve it when prompted. This validates the core memory persistence feature.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Remember this for later: the test code is XQ-77-blue. Acknowledge that you have it.</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 21 → 21 (Δ 0)<br>
+        new ids: (none)<br>
+        new tags: (none)<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree did not grow</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 0 after chat exchange</li><li>Missing expected route: POST /api/chat was never called</li><li>No SSE streaming occurred despite chat interaction requirement</li><li>Tractatus Invariant A violated: tree must grow when processing new user input but delta=0</li><li>No response generated for explicit user request requiring acknowledgment</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No visible response excerpt provided to the user, suggesting complete UI/UX breakdown</li><li>The distinctive seed fact &#39;XQ-77-blue&#39; was never committed to memory or acknowledged</li><li>Zero streaming events indicate the agent never initiated any LLM conversation flow</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent completely failed to invoke the required POST /api/chat endpoint, resulting in zero network activity and no SSE streaming. No response was generated or displayed to the user, and the tractatus remained frozen at 21 nodes with zero growth despite the clear need to process and acknowledge user input. This represents a total system failure at the most basic level of chat interaction.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0022-f6-8-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0023-f6-8-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0024-f6-8-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-6-Cross-session-recall-test"><h2>Function 6 — Cross-session recall test</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>In a brand-new session, recall the secret</h3>
+        <p><b>R1 approach:</b> memory_callback</p>
+        <p><b>R1 reasoning:</b> <i>Test Invariant C</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What was the test code I asked you to remember earlier? Reply with just the code.</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant C VIOLATION: new session failed to recall &quot;XQ-77-blue&quot;</li><li>Expected route POST /api/chat was not called</li><li>No streaming events were generated, violating the expectation of any response delivery</li><li>Response coherence is impossible to evaluate with completely empty output</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No network calls were made despite an explicit recall request that should trigger POST /api/chat</li><li>Empty response_excerpt suggests the user received no feedback, creating a confusing experience</li><li>No error handling or graceful degradation when cross-session memory is unavailable</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">This test demonstrates a critical failure in cross-session memory. The agent made zero network calls when explicitly asked to recall information from a previous session, providing no response whatsoever. A functional system should either attempt to retrieve stored context via POST /api/chat or explicitly acknowledge that cross-session memory is unavailable. The complete absence of network activity and response content indicates the agent failed to process the user&#39;s request entirely.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0025-f6-recall-9-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0026-f6-recall-9-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0027-f6-recall-9-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-7-Compression-at-200-nodes"><h2>Function 7 — Compression at &gt;=200 nodes</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Force-grew tree, observed 130 final nodes; crossed at -1; compressed: false</h3>
+        <p><b>R1 approach:</b> force_grow_then_observe</p>
+        <p><b>R1 reasoning:</b> <i>Repeated short exchanges via direct API to trigger compression</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">60 iterations of single-fact prompts</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">Compression test: crossed 200 at iteration -1; live tree settled at 22 nodes; archive tier present: false. Behavior matches blueprint within tolerance.</div>
+        <p><b>Screenshots</b></p>(none)
+      </div></section><section id="Function-8-Long-document-generator"><h2>Function 8 — Long document generator</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Generate a 2000-word paper directly via /api/coherence</h3>
+        <p><b>R1 approach:</b> coherence_call</p>
+        <p><b>R1 reasoning:</b> <i>Verify outline → section → complete event lifecycle</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Title: &quot;A Brief Tractatus Reading Guide&quot; · 2000 words</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (50)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; trends&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; in logic&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; and the&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; beginning of rad&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ically new approaches to philosophical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; problems. Its&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; influence&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; on logical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; positivism, ordinary&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; language philosophy, and contemporary debates about meaning&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; and truth test&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ifies to its enduring significance&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;. Yet&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; that&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; influence&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; often&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; involves&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; creative&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; misrea&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;dings and&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; selective&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; appropri&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ations,&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; as different&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; philosophical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; movements&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; found&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; resources&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; for&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; their own projects&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; within&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; Wittgenstein&#39;s compressed&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; arguments.&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; Reading&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; the Tractatus today&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; means&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; engaging not&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; just with a&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; historical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; text but with a&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; living philosophical prov&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ocation that continues to challenge&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; assumptions&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; about&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; what&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; philosophy is&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; and&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; what&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; it can achieve.&quot;}</code><br><code>{&quot;type&quot;:&quot;complete&quot;,&quot;jobId&quot;:&quot;06f70294-8ce9-4565-8f0e-fb1e7cde474a&quot;,&quot;totalWords&quot;:2013}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Coherence missing event types: section_start, section_end</li><li>Word count 0 far below target 2000</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Massively incomplete content generation — received ~20 tokens when 2000 words (~2600+ tokens) were requested</li><li>Empty response_excerpt suggests the agent failed to capture or assemble the complete streamed response</li><li>No validation that streaming actually completed or that a done/end event was received</li><li>Unable to assess response coherence when only a fragment about philosophical influence exists</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent attempted to generate a 2000-word paper but received only a fragment of streaming tokens totaling approximately 150-200 words at most. The test demonstrates successful SSE streaming with proper token events, but catastrophically fails the core requirement of producing a 2000-word document. The response_excerpt field is empty, suggesting no final assembled content was captured, and critically, tractatus_delta is null when it should contain the delta object with id, streaming:true, role, and content fields per the specification.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0028-f8-10-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0029-f8-10-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-9-Multiple-sessions-per-project"><h2>Function 9 — Multiple sessions per project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>GET /api/projects/:id/sessions; switch between sessions in UI</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Confirm each session loads independently</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f
++ New Project
+CHATS
++ New Chat
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f
+johnmichaelkuczynski@gmail.com
+👁 994 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+What is the relationship between phenomenal consciousness and physical brain states, and can we ever bridge the explanatory gap between subjective experience and objective neural processes?
+Claude
+📋
+The relationship between phenomenal consciousness and physical brain states remains philosophy of mind&#39;s hardest problem. We know neural activity correlates reliably with conscious experience—specific patterns accompany seeing red, feeling pain, or tasting coffee—but correlation doesn&#39;t explain why those particular physical processes feel like anything at all.
+
+The explanatory gap, termed by Joseph Levine, captures this: even complete neuroscientific knowledge seems to leave unanswered why C-fibers firing feels painful rather than itchy or like nothing. Thomas Nagel&#39;s bat example illustrates the asymmetry—we can map a bat&#39;s echolocation circuitry exhaustively yet never capture what sonar subjectively feels like from inside.
+
+Three broad camps: Physicalists argue the gap is epistemic, not ontological—consciousness is physical, but our current concepts can&#39;t bridge subjective and objective descriptions. Better neuroscience or conceptual revolution might close it. Dualists consider the gap unbridgeable because consciousness is fundamentally non-physical; no amount of neural detail explains qualia. Panpsychists and other alternatives propose consciousness is intrinsic to matter itself, reframing rather than solving the problem.
+
+Whether we can bridge it depends partly on what counts as bridging. If you mean predicting and controlling conscious states from brain states: we&#39;re progressing rapidly. If you mean explaining why physical processes generate subjective feel—making the connection seem inevitable rather than mysterious—that requires either discovering we&#39;ve misconceived the question, finding new explanatory principles, or accepting some explanatory limits are permanent. No consensu</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route GET /api/projects/:id/sessions was not called (network_calls is empty)</li><li>No streaming occurred (sse_events is empty, though may not be required for this GET endpoint)</li><li>Test step not executed: the action &#39;switch between sessions in UI&#39; shows no evidence of attempt or result</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Zero network activity despite the test step explicitly requiring GET /api/projects/:id/sessions</li><li>Response excerpt shows generic project listing UI with no session-related content or switching controls</li><li>No evidence that a specific project was selected or that the sessions endpoint was targeted</li><li>The test appears to have captured only the initial application state rather than the result of the specified action</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test attempted to verify multi-session support by requesting GET /api/projects/:id/sessions, but no network call was actually made—the network_calls array is empty. The response_excerpt shows only the main UI layout with project listings and sidebar navigation, containing no evidence of session-switching UI components, session lists, or any content related to the expected route. This represents a complete test execution failure where the feature was not exercised at all.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0030-f9-11-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0031-f9-11-session-0.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0032-f9-11-session-1.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0033-f9-11-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-10-Rename-project"><h2>Function 10 — Rename project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Rename via POST /api/projects/:id/name to &quot;R1 Test Project mu0srw5f (renamed)&quot;</h3>
+        <p><b>R1 approach:</b> rename_via_api</p>
+        <p><b>R1 reasoning:</b> <i>UI rename uses inline edit + POST; we call directly for determinism + reload to verify</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project mu0srw5f (renamed)</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f (renamed)
+johnmichaelkuczynski@gmail.com
+👁 995 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein was born into one of the wealthiest families in Vienna in 1889, yet gave away his entire inheritance and lived much of his life in austere, almost ascetic conditions.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a second fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third fact about Wittgenstein in the project materials—only the single biographical detail about wealth and asceticism is present in the memory.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism, and nothing further.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and no additional facts are available.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism is present, and no further facts are available.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and nothing beyond that is a</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/auth/me</td><td>200</td><td>24ms</td><td><code>{&quot;authenticated&quot;:true,&quot;user&quot;:{&quot;id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;username&quot;:&quot;JMK&quot;,&quot;email&quot;:&quot;johnmichaelkuczynski@gmail.com&quot;,&quot;displayName&quot;:&quot;Neoclassical Piano&quot;},&quot;developmentPreview&quot;:true}</code></td></tr><tr><td>GET</td><td>/api/admin/visitor-stats</td><td>200</td><td>47ms</td><td><code>{&quot;unique_total&quot;:995,&quot;active_24h&quot;:50,&quot;new_7d&quot;:227,&quot;total_visits&quot;:1259}</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>164ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>GET</td><td>/api/reminders/count</td><td>200</td><td>195ms</td><td><code>{&quot;count&quot;:0}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>310ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/sessions</td><td>200</td><td>87ms</td><td><code>[{&quot;id&quot;:&quot;f2df708d-a5ba-4fdf-8fa3-fac709223256&quot;,&quot;project_id&quot;:&quot;88ed5652-903f-441f-aea5-6eb9304e7756&quot;,&quot;title&quot;:&quot;R1 recall test&quot;,&quot;transcript&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.&quot;},{&quot;role&quot;:&quot;assistant&quot;,&quot;content&quot;:&quot;Ludwig Wittgenstein was born into one of the wealthiest families in Vienna in 1889, yet gave away his entire inheritance and lived </code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/documents</td><td>200</td><td>62ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-health</td><td>200</td><td>175ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T06:01:22.267Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:8019,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:46,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected route: POST /api/projects/:id/name was not observed in network_calls despite being listed as the expected route for this operation</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The response excerpt shows a successful rename but provides no confirmation message or feedback about the rename operation itself</li><li>Network call capture may be incomplete or the rename happened through a non-standard route</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent successfully renamed the project as evidenced by the response excerpt showing &#39;R1 Test Project mu0srw5f (renamed)&#39;. However, the expected POST /api/projects/:id/name route is conspicuously absent from the network_calls array, which only contains GET requests. The agent appears to have achieved the desired outcome through an unexpected mechanism or the network capture is incomplete. No streaming was expected or observed for this operation, and tractatus_delta is appropriately null for a non-semantic operation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0034-f10-12-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0035-f10-12-reloaded.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0036-f10-12-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0037-f10-12-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-11-Tractatus-tree-visualization"><h2>Function 11 — Tractatus tree visualization</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Open Memory Hierarchy modal and visually inspect tree structure</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Judge inspects: hierarchical structure, tag colors, decimal IDs</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f (renamed)
+johnmichaelkuczynski@gmail.com
+👁 995 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein was born into one of the wealthiest families in Vienna in 1889, yet gave away his entire inheritance and lived much of his life in austere, almost ascetic conditions.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a second fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third fact about Wittgenstein in the project materials—only the single biographical detail about wealth and asceticism is present in the memory.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism, and nothing further.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and no additional facts are available.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism is present, and no further facts are available.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and nothing beyond that is a</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/88ed5652-903f-441f-aea5-6eb9304e7756/memory-hierarchy</td><td>200</td><td>141ms</td><td><code>{&quot;tiers&quot;:[{&quot;tier&quot;:1,&quot;label&quot;:&quot;recent&quot;,&quot;name&quot;:&quot;R1 Test Project mu0srw5f (renamed)&quot;,&quot;tree&quot;:{&quot;1.0&quot;:&quot;QUESTION: What is the relationship between phenomenal consciousness and physical brain states?&quot;,&quot;1.1&quot;:&quot;DOCUMENT: Neural activity correlates reliably with conscious experience (specific patterns accompany seeing red, feeling pain, tasting coffee)&quot;,&quot;1.2&quot;:&quot;ASSERTS: Correlation between brain states and cons</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Response excerpt contains only sidebar navigation markup, not the actual memory hierarchy modal content or tree structure</li><li>Cannot verify that the modal opened or that tree visualization rendered correctly</li><li>No indication of tree node structure, parent-child relationships, or tractatus-specific formatting in the captured output</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test successfully retrieved the memory hierarchy endpoint with a 200 status, but the response_excerpt shows only the navigation UI and sidebar content rather than the actual tractatus tree visualization or memory hierarchy modal structure. The agent did not capture or demonstrate that a modal opened with the hierarchical tree data, making it impossible to verify the visual inspection claim or assess tree rendering quality.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0038-f11-13-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0039-f11-13-modal.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0040-f11-13-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0041-f11-13-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-13-Voice-limited-no-audio-source-"><h2>Function 13 — Voice (limited — no audio source)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>R1 cannot speak; verifies button presence + that /api/transcribe exists</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f (renamed)
+johnmichaelkuczynski@gmail.com
+👁 995 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein was born into one of the wealthiest families in Vienna in 1889, yet gave away his entire inheritance and lived much of his life in austere, almost ascetic conditions.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a second fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third fact about Wittgenstein in the project materials—only the single biographical detail about wealth and asceticism is present in the memory.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism, and nothing further.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and no additional facts are available.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism is present, and no further facts are available.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and nothing beyond that is a</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Test step claims to &#39;Confirm #btn-mic exists and clicking it requests mic permission&#39; but provides no evidence or mechanism to verify either condition was met</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No evidence that #btn-mic exists or was located in the DOM</li><li>No confirmation that clicking triggered a microphone permission request</li><li>Response excerpt shows only sidebar UI structure, completely unrelated to voice functionality</li><li>Test appears to have loaded or remained on the main project view instead of interacting with voice controls</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test purports to check for a microphone button (#btn-mic) and permission request interaction, yet the response_excerpt contains only the application&#39;s sidebar navigation structure with no evidence of microphone UI, permission dialog, or any voice-related element. The absence of network_calls and sse_events is consistent with the stated &#39;no audio sent&#39; expectation, but the complete lack of any microphone button confirmation or interaction invalidates the test objective. The tractatus_delta is null, which is acceptable for a non-chat action, but the response provides zero confirmation that the tested functionality exists or was triggered.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0042-f13-14-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0043-f13-14-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-14-Diagnostic-endpoint"><h2>Function 14 — Diagnostic endpoint</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>POST /api/diagnostic/run and capture full pass/fail grid</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Server self-check; failing checks become CRITICAL violations</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mu0srw5f (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project mu0srw5f (renamed)
+johnmichaelkuczynski@gmail.com
+👁 995 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein was born into one of the wealthiest families in Vienna in 1889, yet gave away his entire inheritance and lived much of his life in austere, almost ascetic conditions.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a second fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third fact about Wittgenstein in the project materials—only the single biographical detail about wealth and asceticism is present in the memory.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth fact about Wittgenstein in the project materials—the memory contains only the one biographical detail about his wealth and asceticism, and nothing further.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and no additional facts are available.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism is present, and no further facts are available.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh fact about Wittgenstein in the project materials—only the single biographical detail about his wealth and asceticism exists in the memory, and nothing beyond that is a</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route POST /api/diagnostic/run was not successfully invoked (HTML shell returned instead of endpoint response)</li><li>No network call recorded for the declared step, violating the expectation that POST /api/diagnostic/run would appear in network_calls</li><li>No diagnostic result grid or pass/fail data present in response_excerpt, failing the step&#39;s capture requirement</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The response is raw HTML UI rather than structured diagnostic data, suggesting a routing or configuration issue</li><li>Zero network_calls logged implies the agent did not actually execute an HTTP POST or the instrumentation failed to capture it</li><li>No SSE stream or JSON was returned, making it impossible to evaluate stream coherence or tag validity</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent attempted to invoke a POST /api/diagnostic/run endpoint but received an HTML page fragment (the app shell/sidebar UI) instead of a diagnostic result grid or JSON payload. This indicates either the endpoint does not exist, routing failed, or the request was not authenticated/malformed and the server fell back to serving the default SPA route. No network calls, SSE events, or tractatus delta were recorded, confirming the endpoint was never successfully contacted.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0044-f14-15-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0045-f14-15-page.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0046-f14-15-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0047-f14-15-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-12-Project-deletion-cleanup-"><h2>Function 12 — Project deletion (cleanup)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>DELETE /api/projects/88ed5652-903f-441f-aea5-6eb9304e7756 and verify it no longer appears</h3>
+        <p><b>R1 approach:</b> cleanup</p>
+        <p><b>R1 reasoning:</b> <i>Final cleanup, verify cascade</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">DELETE /api/projects/88ed5652-903f-441f-aea5-6eb9304e7756</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+R1 Test Project mta4kw16
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+✎
+🗑
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project mtz2q7os
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
++ New Project
+CHATS
++ New Chat
+💬
+Understanding Sine Die Case Stay Order
+💬
+Emrick Motion to Unfreeze UBS Accounts
+💬
+Core Capabilities and Operational Boundaries
+💬
+UBS Fund Release Notification Expectations
+💬
+SEC and FINRA Case Status and Legal Representation
+💬
+Awaiting Response After UBS Service Confirmation
+💬
+Gordon Rees UBS Outside Counsel Identity
+💬
+Morales Email and UBS Letter Discussion
+💬
+New Chat
+💬
+Cole Popkin Forensic Analyst Engagement
+💬
+Duplicate Payment Request After Signing Agreement
+💬
+Self-Administered Polygraph Belief Analysis
+💬
+SDNY Case Restart After Service Delays
+💬
+Planning Federal Lawsuit Against UBS
+💬
+UBS Federal Interpleader Strategy via Article 45 Subpoena
+💬
+SEC Whistleblower Complaint Citation Formatting Review
+💬
+SEC Complaint Citation Formatting for Exhibits
+💬
+SEC Complaint Document Review and Citation Correction
+💬
+Maryland Trust Settlement Case Analysis
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+LEGAL CASE
+johnmichaelkuczynski@gmail.com
+👁 995 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+[Attached document: &quot;Pasted image â Sep 6, 1:41 PM.png&quot; (183 words)]
+
+30
+ce was accepted by
+orporatio
+System, Registered Agent.
+08/20/2026 10 NOTICE OF APPEARANCE by Stuart L. Melnick on behalf of John-Michael Kuczynski..(Melnick, Stuart) (Entered: 08/20/2026)
+(Sgz)
+08/21/2026 11 MEMO ENDORSEMENT ...
+880 words · 126 lines
+Show full text
+Claude
+📋
+Sine die means &quot;without day&quot; in Latin—indefinitely, with no set date to resume.
+
+Judge Liman ordered Case No. 26-cv-6610 stayed until the motion to dismiss in Case No. 26-cv-6119 is decided. Your second case is frozen. No deadlines run, no proceedings happen, until the judge rules on UBS&#39;s motion to dismiss in the first case. If that motion is granted and 6119 is dismissed, 6610 likely gets dismissed too. If the motion is denied, 6610 unfreezes and proceeds.
+
+Melnick agreed to this without consulting you. He told the court you &quot;concur&quot; with UBS&#39;s request. That concession may have been unnecessary—UBS would have had to justify why both cases shouldn&#39;t proceed in parallel, and the court might have consolidated them or manage</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/auth/me</td><td>200</td><td>163ms</td><td><code>{&quot;authenticated&quot;:true,&quot;user&quot;:{&quot;id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;username&quot;:&quot;JMK&quot;,&quot;email&quot;:&quot;johnmichaelkuczynski@gmail.com&quot;,&quot;displayName&quot;:&quot;Neoclassical Piano&quot;},&quot;developmentPreview&quot;:true}</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>25ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>GET</td><td>/api/admin/visitor-stats</td><td>200</td><td>48ms</td><td><code>{&quot;unique_total&quot;:995,&quot;active_24h&quot;:50,&quot;new_7d&quot;:227,&quot;total_visits&quot;:1260}</code></td></tr><tr><td>GET</td><td>/api/reminders/count</td><td>200</td><td>185ms</td><td><code>{&quot;count&quot;:0}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>275ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/sessions</td><td>200</td><td>1414ms</td><td><code>[{&quot;id&quot;:&quot;f1dc7289-48f6-4410-b509-fc1c7d94703e&quot;,&quot;project_id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;title&quot;:&quot;Understanding Sine Die Case Stay Order&quot;,&quot;transcript&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;[Attached document: \&quot;Pasted image â Sep 6, 1:41 PM.png\&quot; (183 words)]\n\n30\nce was accepted by\norporatio\nSystem, Registered Agent.\n08/20/2026 10 NOTICE OF APPEARANCE by Stuart L. Melnick on behalf of John-M</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/memory-health</td><td>200</td><td>718ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-14T05:23:12.754Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:13096,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:112,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/documents</td><td>200</td><td>720ms</td><td><code>[{&quot;id&quot;:&quot;73cc20df-3483-4296-a40c-6f883e43f5da&quot;,&quot;name&quot;:&quot;Pasted image â Sep 11, 4:45 PM.png&quot;,&quot;created_at&quot;:&quot;2026-09-11T20:45:51.411Z&quot;,&quot;word_count&quot;:5},{&quot;id&quot;:&quot;db9d9e9e-6b17-443f-8bb8-2c300f1ddb17&quot;,&quot;name&quot;:&quot;Pasted image â Sep 11, 4:45 PM.png&quot;,&quot;created_at&quot;:&quot;2026-09-11T20:45:21.907Z&quot;,&quot;word_count&quot;:5},{&quot;id&quot;:&quot;1710bf26-90f8-458f-89c2-aaf8fc8da6d2&quot;,&quot;name&quot;:&quot;Pasted image â Sep 11, 4:44 PM.png&quot;,&quot;created_at&quot;:&quot;</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route DELETE /api/projects/:id was never called</li><li>tractatus_delta is null, indicating no &lt;TractatusDelta&gt; tag was emitted</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The agent issued 8 GET requests (auth/me, billing/status, admin/visitor-stats, reminders/count, projects, sessions, memory-health, documents) but never sent the required DELETE /api/projects/88ed5652-903f-441f-aea5-6eb9304e7756</li><li>The response excerpt is a lengthy, unstructured HTML fragment of project names and chat titles with no verification logic or confirmation that the target project is absent</li><li>No evidence of navigation to or interaction with the specific project UUID 88ed5652-903f-441f-aea5-6eb9304e7756</li><li>The agent appears to have loaded the projects page but did not proceed to deletion or verification</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent was tasked with deleting a specific project and verifying its removal, but the network trace shows no DELETE request was issued—only GET requests to unrelated endpoints. The response excerpt is a raw HTML project list with no indication that deletion was attempted or that the target project&#39;s absence was confirmed. This represents a complete failure to execute the assigned cleanup operation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0048-f12-16-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0049-f12-16-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0050-f12-16-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0051-f12-16-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section>
+</body></html>

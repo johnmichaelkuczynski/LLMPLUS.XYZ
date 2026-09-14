@@ -1,0 +1,23 @@
+{
+  "1.0": "QUESTION: What is the relationship between phenomenal consciousness and physical brain states?",
+  "1.1": "DOCUMENT: Neural activity correlates reliably with conscious experience (specific patterns accompany seeing red, feeling pain, tasting coffee)",
+  "1.2": "ASSERTS: Correlation between brain states and consciousness does not explain why particular physical processes feel like anything at all",
+  "2.0": "DOCUMENT: The explanatory gap (Joseph Levine): Complete neuroscientific knowledge seems to leave unanswered why C-fibers firing feels painful rather than itchy or like nothing",
+  "2.1": "DOCUMENT: Nagel's bat example illustrates asymmetry - exhaustive mapping of bat's echolocation circuitry never captures what sonar subjectively feels like from inside",
+  "3.0": "ASSERTS: Three broad philosophical positions exist regarding the mind-body problem",
+  "3.1": "DOCUMENT: Physicalism - consciousness is physical; gap is epistemic not ontological; current concepts cannot bridge subjective and objective descriptions; better neuroscience or conceptual revolution might close it",
+  "3.2": "DOCUMENT: Dualism - gap is unbridgeable because consciousness is fundamentally non-physical; no amount of neural detail can explain qualia",
+  "3.3": "DOCUMENT: Panpsychism and alternatives - consciousness is intrinsic to matter itself; reframes rather than solves the problem",
+  "4.0": "OPEN: Whether the explanatory gap can be bridged depends on what counts as bridging",
+  "4.1": "ASSERTS: Predicting and controlling conscious states from brain states - rapid progress being made",
+  "4.2": "OPEN: Explaining why physical processes generate subjective feel (making connection seem inevitable rather than mysterious) - requires discovering misconceived question, finding new explanatory principles, or accepting permanent explanatory limits",
+  "4.3": "ASSERTS: No consensus exists on which approach will succeed or whether the gap can be bridged",
+  "5.0": "DOCUMENT: Water molecules (H₂O) consist of two hydrogen atoms covalently bonded to one oxygen atom",
+  "5.1": "ASSERTS: Chemical composition explanation provides successful model of reductive explanation - macro property (being water) fully explained by micro constituents (hydrogen and oxygen atoms) and their relations",
+  "5.2": "ASSERTS: Water-H₂O case contrasts with consciousness-brain case - no explanatory gap exists between water and H₂O; knowing molecular structure makes wetness, transparency, boiling point seem inevitable consequences",
+  "5.3": "OPEN: Whether consciousness-brain relationship could ever achieve same explanatory completeness as water-H₂O relationship, or whether consciousness is categorically different from other natural phenomena",
+  "5.4": "DOCUMENT: Water's H₂O composition is empirically verified chemical fact confirmed by synthesis, decomposition, mass spectrometry, molecular analysis, and entire edifice of chemistry",
+  "5.5": "DOCUMENT: 2:1 hydrogen-to-oxygen ratio by atom count and roughly 1:8 by mass is among the most thoroughly demonstrated facts in science",
+  "5.6": "REJECTS: Alternative views regarding water's molecular structure have no empirical standing; evidence uniformly confirms H₂O composition",
+  "5.7": "ASSERTS: Water's chemical composition is not a matter of philosophical disagreement or alternative interpretations; it is established scientific fact not open to debate"
+}
