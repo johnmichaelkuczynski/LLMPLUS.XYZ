@@ -1753,6 +1753,7 @@ html, body {
   display: flex;
   width: 100%;
   min-width: 0;
+  position: relative;
   align-items: center;
   gap: 8px;
   padding: 10px 10px;
@@ -1795,14 +1796,22 @@ html, body {
 
 .dp-item .dp-actions {
   display: flex;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  z-index: 1;
   gap: 4px;
   opacity: 0;
+  padding-left: 8px;
+  background: linear-gradient(90deg, rgba(232, 240, 254, 0), #e8f0fe 10px);
+  pointer-events: none;
+  transform: translateY(-50%);
   transition: opacity 0.15s;
 }
 
 .dp-item:hover .dp-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .dp-action-btn {
