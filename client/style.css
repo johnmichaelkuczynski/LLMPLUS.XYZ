@@ -1567,12 +1567,61 @@ html, body {
 }
 
 .doc-panel {
-  width: 260px;
-  min-width: 260px;
+  --doc-panel-width: 260px;
+  width: var(--doc-panel-width);
+  min-width: var(--doc-panel-width);
+  max-width: 520px;
+  position: relative;
   background: #fafbfc;
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
+}
+
+.doc-panel-resize-handle {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.doc-panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 2px;
+  height: 34px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.doc-panel:hover .doc-panel-resize-handle::after,
+.doc-panel-resize-handle:focus-visible::after,
+.doc-panel-resizing .doc-panel-resize-handle::after {
+  opacity: 1;
+}
+
+.doc-panel-resize-handle:hover::after,
+.doc-panel-resize-handle:focus-visible::after,
+.doc-panel-resizing .doc-panel-resize-handle::after {
+  background: #64748b;
+}
+
+.doc-panel-resizing,
+.doc-panel-resizing * {
+  cursor: ew-resize !important;
+  user-select: none !important;
 }
 
 .doc-panel-header {
@@ -1687,6 +1736,7 @@ html, body {
 
 .doc-panel-list {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 8px;
 }
@@ -1701,6 +1751,8 @@ html, body {
 
 .dp-item {
   display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 8px;
   padding: 10px 10px;
@@ -1722,6 +1774,7 @@ html, body {
 .dp-item .dp-info {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .dp-item .dp-name {
@@ -1742,6 +1795,7 @@ html, body {
 
 .dp-item .dp-actions {
   display: flex;
+  flex: 0 0 auto;
   gap: 4px;
   opacity: 0;
   transition: opacity 0.15s;

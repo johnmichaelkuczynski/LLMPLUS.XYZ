@@ -54,6 +54,7 @@
     docPanelList: document.getElementById('doc-panel-list'),
     docPanel: document.getElementById('doc-panel'),
     docPanelToggle: document.getElementById('doc-panel-toggle'),
+    docPanelResizeHandle: document.getElementById('doc-panel-resize-handle'),
     ccStatus: document.getElementById('cc-status'),
     ccStatusText: document.getElementById('cc-status-text'),
     ccFill: document.getElementById('cc-fill'),
@@ -2275,6 +2276,80 @@
     els.docPanelToggle.innerHTML = collapsed ? '&#9650;' : '&#9660;';
     els.docPanelToggle.title = collapsed ? 'Expand' : 'Minimize';
   });
+
+  (function setupDocPanelResize() {
+    var handle = els.docPanelResizeHandle;
+    if (!handle || !els.docPanel) return;
+    var storageKey = 'llmplus-doc-panel-width';
+    var minWidth = 220;
+    var maxWidth = 520;
+    var resizeState = null;
+
+    function clampWidth(width) {
+      var viewportLimit = Math.max(minWidth, Math.floor(window.innerWidth * 0.45));
+      return Math.max(minWidth, Math.min(maxWidth, viewportLimit, Math.round(width)));
+    }
+
+    function setPanelWidth(width, persist) {
+      var nextWidth = clampWidth(width);
+      els.docPanel.style.setProperty('--doc-panel-width', nextWidth + 'px');
+      if (persist) {
+        try { window.localStorage.setItem(storageKey, String(nextWidth)); } catch (error) {}
+      }
+    }
+
+    try {
+      var savedWidth = Number(window.localStorage.getItem(storageKey));
+      if (Number.isFinite(savedWidth) && savedWidth > 0) setPanelWidth(savedWidth, false);
+    } catch (error) {}
+
+    handle.addEventListener('pointerdown', function(event) {
+      if (event.button !== 0) return;
+      var rect = els.docPanel.getBoundingClientRect();
+      resizeState = { pointerId: event.pointerId, startX: event.clientX, startWidth: rect.width };
+      els.docPanel.classList.add('doc-panel-resizing');
+      handle.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', function(event) {
+      if (!resizeState || event.pointerId !== resizeState.pointerId) return;
+      // The panel is on the right, so moving left makes it wider.
+      setPanelWidth(resizeState.startWidth + resizeState.startX - event.clientX, false);
+    });
+
+    function finishResize(event) {
+      if (!resizeState || (event && event.pointerId !== resizeState.pointerId)) return;
+      setPanelWidth(els.docPanel.getBoundingClientRect().width, true);
+      els.docPanel.classList.remove('doc-panel-resizing');
+      resizeState = null;
+    }
+
+    handle.addEventListener('pointerup', finishResize);
+    handle.addEventListener('pointercancel', finishResize);
+    handle.addEventListener('dblclick', function() {
+      setPanelWidth(260, true);
+    });
+    handle.addEventListener('keydown', function(event) {
+      var currentWidth = els.docPanel.getBoundingClientRect().width;
+      if (event.key === 'ArrowLeft') {
+        setPanelWidth(currentWidth + 20, true);
+        event.preventDefault();
+      } else if (event.key === 'ArrowRight') {
+        setPanelWidth(currentWidth - 20, true);
+        event.preventDefault();
+      } else if (event.key === 'Home') {
+        setPanelWidth(minWidth, true);
+        event.preventDefault();
+      } else if (event.key === 'End') {
+        setPanelWidth(maxWidth, true);
+        event.preventDefault();
+      }
+    });
+    window.addEventListener('resize', function() {
+      setPanelWidth(els.docPanel.getBoundingClientRect().width, false);
+    });
+  })();
 
   var docPanelSearchTerm = '';
   var docPanelSort = 'newest';
