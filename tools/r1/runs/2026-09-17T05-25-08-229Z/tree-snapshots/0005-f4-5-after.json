@@ -1,0 +1,21 @@
+{
+  "1.0": "QUESTION: What are the fundamental epistemological tensions between empiricism and rationalism that remain unresolved in contemporary philosophy of science?",
+  "1.1": "ASSERTS: Three core problems resist synthesis despite centuries of attempts",
+  "1.2": "ASSERTS: Contemporary philosophy of science largely works around these tensions rather than resolving them",
+  "1.3": "OPEN: How can beings with rational faculties learn about a world disclosed through experience when reason and experience seem to operate by incompatible logics?",
+  "2.0": "QUESTION: Is water composed of hydrogen and oxygen atoms?",
+  "2.1": "RESOLVED: Water is composed of hydrogen and oxygen atoms",
+  "1.1.1": "ASSERTS: The justification asymmetry - rationalists cannot explain how pure reason generates substantive knowledge about the world rather than mere logical relations",
+  "1.1.2": "ASSERTS: The justification asymmetry - empiricists cannot ground induction without circularity (Hume's problem persists)",
+  "1.1.3": "ASSERTS: The theory-ladenness paradox - observation requires conceptual frameworks (supporting rationalism), yet frameworks must answer to experience (supporting empiricism)",
+  "1.1.4": "ASSERTS: Mathematics and necessity - mathematical knowledge appears both indispensable to empirical science and unreasonably effective in describing nature",
+  "1.2.1": "DOCUMENT: Approaches include pragmatism, naturalized epistemology, and structural realism",
+  "1.1.2.1": "ASSERTS: We observe regularities, but experience alone cannot justify belief that unobserved cases will resemble observed ones",
+  "1.1.2.2": "ASSERTS: Every attempt to justify induction empirically assumes what it tries to prove",
+  "1.1.3.1": "OPEN: If all observation is theory-laden, how does experience genuinely constrain theory rather than simply confirm what our concepts predispose us to see?",
+  "1.1.3.2": "DOCUMENT: Kuhn and Feyerabend radicalized theory-ladenness into incommensurability",
+  "1.1.3.3": "ASSERTS: Even modest versions of theory-ladenness create trouble for empiricist foundationalism",
+  "1.1.4.1": "ASSERTS: Mathematical necessity seems incompatible with empirical contingency",
+  "1.1.4.2": "DOCUMENT: Quine's holism attempted to dissolve the analytic-synthetic distinction",
+  "1.1.4.3": "OPEN: Whether mathematical structures are discovered (rationalist realism) or imposed (empiricist instrumentalism) remains debated in philosophy of mathematics and physics"
+}

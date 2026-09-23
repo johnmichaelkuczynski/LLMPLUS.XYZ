@@ -85,3 +85,25 @@ mtime_ms = 1788986723523
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/1576e5f7-97a7-4b69-9055-d6aa0d89154c/5b1a5626-f044-4ca0-a880-e9c44f1fef52"
 storage_version_token = "1788986741396914"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "tWZQy2Lulrl7mbGzzjvVz"
+uri = "file://attached_assets/generated_audio/llm_plus_promo_narration.mp3"
+type = "audio"
+title = "llm_plus_promo_narration"
+description = "Text-to-speech audio: Every new chat shouldn't mean starting over. For researchers, lawyers, and authors, work builds over time. But with ordinary AI chats, returning to an earlier idea can mean spen…"
+logical_id = "77faefac-053f-44df-9d71-971aa04a9dcf"
+
+[[outputs]]
+id = "xK8ZP-oGQH01uxMQPicou"
+uri = "file://deliverables/LLM_Plus_Promo_Fullscreen.mp4"
+type = "video"
+title = "LLM Plus promotional video"
+description = "55-second full-screen original footage with relaxed British male narration. Original audio removed; no music or overlays."
+logical_id = "7fdc6d43-4e15-474f-ba95-8308493584eb"
+content_hash = "sha256:6ebf848ef7d043ca205b818fbc3c6c7af03236e1fe7419d2f3ce822a2ab8c538"
+size = 5210150
+mtime_ms = 1790196803183
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/7fdc6d43-4e15-474f-ba95-8308493584eb/3b7a7c94-fcdd-440e-bd83-00b8a6cee144"
+storage_version_token = "1790196818495596"
+content_type = "video/mp4"
