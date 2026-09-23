@@ -107,3 +107,25 @@ mtime_ms = 1790196803183
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/7fdc6d43-4e15-474f-ba95-8308493584eb/3b7a7c94-fcdd-440e-bd83-00b8a6cee144"
 storage_version_token = "1790196818495596"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "gvaeL9xn_7FZz61fbXd6O"
+uri = "file://attached_assets/generated_audio/llm_plus_sequel_narration.mp3"
+type = "audio"
+title = "llm_plus_sequel_narration"
+description = "Text-to-speech audio: Watch this closely. One conversation ends. The user opens a fresh chat. No copying, no recap, no re-explaining the backstory. They simply ask LLM Plus about an idea from the pre…"
+logical_id = "841bfe83-f96d-4db1-b105-63678f725fb2"
+
+[[outputs]]
+id = "SN0wlN-fD9v4_pm7k-_11"
+uri = "file://deliverables/LLM_Plus_Promo_Sequel_Fullscreen.mp4"
+type = "video"
+title = "LLM Plus promotional video — fresh chat, remembered context"
+description = "51-second full-screen original recording with relaxed British male voiceover; source audio removed, no music or overlays."
+logical_id = "06ce412b-5836-4333-a275-bdfb37117068"
+content_hash = "sha256:a70cb4380957ffb20ca54b6b817d92934b2046670825086fb7629d9f511e267c"
+size = 6925878
+mtime_ms = 1790204060896
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/06ce412b-5836-4333-a275-bdfb37117068/8f6432f4-a1dc-475c-b799-8225bb9df6ea"
+storage_version_token = "1790204068389624"
+content_type = "video/mp4"
