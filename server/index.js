@@ -11,6 +11,7 @@ import { hasPermanentOwnerAccess, permanentOwnerState } from './owner-access.js'
 import sharp from 'sharp';
 import { pool } from './db.js';
 import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
+import { registerVeniceVideoRoutes } from './venice-video.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,7 +137,7 @@ const AUTHENTICATED_FREE_ACTIONS = 10;
 const METERED_API_PATHS = new Set([
   '/chat', '/chat/compare', '/idea-diary/list', '/idea-diary/analytics',
   '/report/generate', '/summarize', '/tractator/generate', '/coherence',
-  '/coherence/revise', '/profile/generate', '/audit'
+  '/coherence/revise', '/profile/generate', '/audit', '/video/queue'
 ]);
 
 function subscriptionIsPaid(status) {
@@ -215,6 +216,9 @@ async function loadAccessState(req, options) {
 app.use('/api', async function enforceUsageGate(req, res, next) {
   var normalizedPath = req.path.toLowerCase().replace(/\/+$/, '') || '/';
   if (req.method !== 'POST' || !METERED_API_PATHS.has(normalizedPath)) return next();
+  if (normalizedPath === '/video/queue' && !process.env.VENICE_API_KEY) {
+    return res.status(503).json({ error: 'Venice video generation is not configured yet' });
+  }
   try {
     var access = await loadAccessState(req);
     if (access.paid) return next();
@@ -238,12 +242,15 @@ app.use('/api', async function enforceUsageGate(req, res, next) {
         access: access
       });
     }
+    if (normalizedPath === '/video/queue') req.videoUsageReservationColumn = column;
     next();
   } catch (error) {
     console.error('[Paywall]', error.message);
     res.status(503).json({ error: 'Unable to verify free access' });
   }
 });
+
+registerVeniceVideoRoutes(app, pool);
 
 app.get('/api/billing/status', async function(req, res) {
   try {
@@ -434,6 +441,21 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   event_type TEXT NOT NULL,
   processed_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS venice_video_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  queue_id TEXT,
+  model TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  duration TEXT NOT NULL,
+  resolution TEXT NOT NULL,
+  aspect_ratio TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'submitting',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS venice_video_one_active_per_user
+ON venice_video_jobs (user_id)
+WHERE status IN ('submitting', 'queued', 'processing');
 `;
 
 async function initDB() {
