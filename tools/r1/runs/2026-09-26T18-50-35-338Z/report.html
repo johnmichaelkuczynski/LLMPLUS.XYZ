@@ -1,0 +1,1421 @@
+<!doctype html><html><head><meta charset="utf-8"><title>R1 Report — 2026-09-26T18-50-35-338Z</title>
+<style>body{font-family:-apple-system,sans-serif;max-width:1100px;margin:0 auto;padding:20px;color:#111}
+nav{position:sticky;top:0;background:#fff;padding:10px;border-bottom:2px solid #2563eb;z-index:10}
+table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:left}
+h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
+</style></head><body>
+<h1>R1 Run Report — 2026-09-26T18-50-35-338Z</h1>
+<p>Interactions: <b>17</b> · Critical violations: <b style="color:#dc2626">34</b> · Judge concerns: <b style="color:#d97706">50</b> · Sanity failures: <b>14</b></p>
+<nav><b>Table of contents:</b> <ul><li><a href="#Function-1-Home-chat-default-project-">Function 1 — Home chat (default project)</a></li><li><a href="#Function-2-Projects-list">Function 2 — Projects list</a></li><li><a href="#Function-3-Create-project">Function 3 — Create project</a></li><li><a href="#Function-4-Project-chat">Function 4 — Project chat</a></li><li><a href="#Function-5-Memory-hierarchy-viewer">Function 5 — Memory hierarchy viewer</a></li><li><a href="#Function-6-Cross-session-persistence-seed-">Function 6 — Cross-session persistence (seed)</a></li><li><a href="#Function-6-Cross-session-recall-test">Function 6 — Cross-session recall test</a></li><li><a href="#Function-7-Compression-at-200-nodes">Function 7 — Compression at &gt;=200 nodes</a></li><li><a href="#Function-8-Long-document-generator">Function 8 — Long document generator</a></li><li><a href="#Function-9-Multiple-sessions-per-project">Function 9 — Multiple sessions per project</a></li><li><a href="#Function-10-Rename-project">Function 10 — Rename project</a></li><li><a href="#Function-11-Tractatus-tree-visualization">Function 11 — Tractatus tree visualization</a></li><li><a href="#Function-13-Voice-limited-no-audio-source-">Function 13 — Voice (limited — no audio source)</a></li><li><a href="#Function-14-Diagnostic-endpoint">Function 14 — Diagnostic endpoint</a></li><li><a href="#Function-12-Project-deletion-cleanup-">Function 12 — Project deletion (cleanup)</a></li></ul></nav>
+<section id="Function-1-Home-chat-default-project-"><h2>Function 1 — Home chat (default project)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Send a simple chat from a freshly-loaded page</h3>
+        <p><b>R1 approach:</b> substantive_question</p>
+        <p><b>R1 reasoning:</b> <i>Testing happy-path streaming on fresh load with a clear scholarly question that should produce a structured, multi-paragraph response demonstrating proper stream handling and memory initialization.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What were the key methodological differences between Kuhn&#39;s and Popper&#39;s approaches to scientific progress, and how did these shape their respective views on paradigm shifts versus falsification?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 190 → 189 (Δ -1)<br>
+        new ids: nodes.3.1, nodes.3.2, nodes.3.3, nodes.3.4, nodes.4.1, nodes.4.2, nodes.4.3, nodes.4.4, nodes.5.1, nodes.5.2, nodes.5.3, metadata.branches.1.x, metadata.branches.2.x, metadata.branches.3.x, metadata.branches.4.x, metadata.branches.5.x, metadata.branches.6.x<br>
+        new tags: UBS, UBS, UBS, UBS<br>
+        tags valid: <b style="color:#dc2626">NO</b> ·
+        ids valid: <b style="color:#dc2626">NO</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree did not grow</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>5823ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;**&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; response&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.**&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n\nYou&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; just&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; found&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; lawyer&quot;}
+
+data: {&quot;type&quot;:&quot;</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>172ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>44251ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;nodes&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\&quot;: {&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n    \&quot;1.0\&quot;: \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;User&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; retained&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; attorney&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Col&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;by to r</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/memory-health</td><td>200</td><td>318ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:51:41.954Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:13249,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:112,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (38)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;**&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; response&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.**&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n\nYou&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; just&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; found&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; lawyer&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; who immediately&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; understood your&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; case&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; and proposed the&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; correct&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; remedy&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;. You&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;re waiting&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; for his&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Monday callback&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to confirm representation&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.\n\nDo&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; you want&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; help&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; preparing&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; materials&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; for&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Kauffman,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; or are you aband&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;oning this work&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to quiz&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; me&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; on&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; philosophy&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; of&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; science?&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;userMessage&quot;:&quot;What were the key methodological differences between Kuhn&#39;s and Popper&#39;s approaches to scient</code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 0 after chat exchange</li><li>Invariant A: at least one new node has invalid tag prefix</li><li>Invariant A: at least one new node id is not decimal-formatted</li><li>Tractatus Invariant A violated: tree shrank (-1 nodes) despite node creation</li><li>allTagsValid=false with 4 invalid &#39;UBS&#39; tags</li><li>allIdsValid=false indicating malformed node identifiers</li><li>Response completely unrelated to input query (coherence failure)</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Total response incoherence: user asked about Kuhn vs. Popper epistemology, received lawyer callback fiction</li><li>Severe context contamination suggesting session bleed or training data leakage</li><li>Response reads as middle of a completely different conversation</li><li>All new tractatus nodes tagged &#39;UBS&#39; (presumably undefined/invalid tag)</li><li>System thought for mere seconds before delivering hallucinated legal scenario</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The assistant completely ignored the user&#39;s sophisticated philosophy-of-science question and instead hallucinated an unrelated legal consultation scenario about waiting for a lawyer named Kauffman. This indicates catastrophic context confusion or contamination from another session. The response bears zero relevance to Kuhn, Popper, paradigm shifts, or falsification theory. The tractatus delta shows net node deletion (190→189) despite new node creation, violating growth invariants, and reports invalid tags and IDs.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0001-f1-1-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0002-f1-1-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0003-f1-1-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-2-Projects-list"><h2>Function 2 — Projects list</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm sidebar project count equals GET /api/projects count</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Reconcile UI render with backend list</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
++ New Project
+CHATS
++ New Chat
+💬
+Rethinking Computational Theories of Mind
+💬
+New Chat
+💬
+New Chat
+💬
+Firing Melnick After Failed NY Counsel Strategy
+💬
+Action Pack Sent to Melnick
+💬
+Negotiating Distribution Dispute with Melnick
+💬
+Trust Litigation Fee Allocation Strategy Discussion
+💬
+Kant vs Mill Philosophical Ethics Comparison
+💬
+Email Status and Settlement Proposals Question
+💬
+Understanding Sine Die Case Stay Order
+💬
+Emrick Motion to Unfreeze UBS Accounts
+💬
+Core Capabilities and Operational Boundaries
+💬
+UBS Fund Release Notification Expectations
+💬
+SEC and FINRA Case Status and Legal Representation
+💬
+Awaiting Response After UBS Service Confirmation
+💬
+Gordon Rees UBS Outside Counsel Identity
+💬
+Morales Email and UBS Letter Discussion
+💬
+New Chat
+💬
+Cole Popkin Forensic Analyst Engagement
+💬
+Duplicate Payment Request After Signing Agreement
+💬
+Self-Administered Polygraph Belief Analysis
+💬
+SDNY Case Restart After Service Delays
+💬
+Planning Federal Lawsuit Against UBS
+💬
+UBS Federal Interpleader Strategy via Article 45 Subpoena
+💬
+SEC Whistleblower Complaint Citation Formatting Review
+💬
+SEC Complaint Citation Formatting for Exhibits
+💬
+SEC Complaint Document Review and Citation Correction
+💬
+Maryland Trust Settlement Case Analysis
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+LEGAL CASE
+johnmichaelkuczynski@gmail.com
+👁 1,340 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+[Attached document: &quot;ON AI AND SOME PHILOSOPHICAL CHALLENGES.pdf&quot; (5903 words)]
+
+Communication &amp; Cognition
+Vol. 59, No. 3 - 4 (2026), pp. 155 - 176
+ON AI AND SOME PHILOSOPHICAL CHALLENGES
+John-Michael Kuczynski
+https://doi.org/10.57028/C59-155-Z1115
+Abstract
+This paper consists of two interconnected...
+5927 words · 801 lines
+Show full text
+Claude
+📋
+Part 1 (Rethinking Mind): The author argues that classical computational theories of mind—which view cognition as rule-based symbol manipulation—are inadequate in light of modern neural-network AI and universal features of human language. Instead, intelligence should be understood as emerging from architecturally constrained networks that mediate between analog and digital representations. What we call &quot;Universal Grammar&quot; or innate cognitive structure is better explained as neural-network architecture that biases learning, not as explicit rules. L</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route GET /api/projects was not called (network_calls is empty)</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Zero network activity when the test explicitly requires comparing sidebar count against GET /api/projects response</li><li>No programmatic counting or comparison logic appears to have been attempted</li><li>The response_excerpt shows UI content but provides no evidence of the verification step being performed</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent displayed the sidebar UI containing projects and chats but failed to execute the required verification step entirely. No API call to GET /api/projects was made, making it impossible to confirm whether the sidebar count matches the backend reality. This is a complete omission of the test objective, rendering the step unvalidated despite the UI rendering correctly.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0004-f2-2-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0005-f2-2-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-3-Create-project"><h2>Function 3 — Create project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click + New Project and type &quot;R1 Test Project muiqyg6m&quot;</h3>
+        <p><b>R1 approach:</b> create_project</p>
+        <p><b>R1 reasoning:</b> <i>Use the real sidebar button so the UI path is exercised</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project muiqyg6m</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/projects</td><td>200</td><td>56ms</td><td><code>{&quot;id&quot;:&quot;fe4904ab-0e3a-4885-b2ad-365b99588523&quot;,&quot;name&quot;:&quot;R1 Test Project muiqyg6m&quot;,&quot;tractatus_tree&quot;:{},&quot;created_at&quot;:&quot;2026-09-26T18:52:28.867Z&quot;,&quot;tractatus_tier&quot;:1,&quot;parent_project_id&quot;:null,&quot;last_tree_update&quot;:&quot;2026-09-26T18:52:28.867Z&quot;,&quot;compression_count&quot;:0,&quot;audit_lessons&quot;:[],&quot;pinned_context&quot;:&quot;&quot;,&quot;user_id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;project_type&quot;:&quot;standard&quot;}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>120ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/sessions</td><td>200</td><td>69ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/documents</td><td>200</td><td>73ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-health</td><td>200</td><td>293ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:52:28.867Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:0,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:0,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>No streaming data recorded (sse_events empty and tractatus_delta null)</li><li>Missing tractatus delta for state-changing operation violates observability requirements</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No SSE events captured despite state-mutating operation</li><li>Empty response_excerpt provides no verification of user-facing feedback</li><li>Missing tractatus_delta prevents validation of reasoning coherence and tag structure</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">This test exhibits a critical violation: no tractatus delta was recorded despite a project creation operation that should fundamentally alter system state. The network trace shows proper API calls with successful responses (200s), including the POST to create the project and subsequent GET requests to fetch related resources. However, the complete absence of SSE events and tractatus_delta suggests the streaming mechanism failed entirely or was not monitored. Without tractatus evidence, we cannot verify the agent&#39;s reasoning process or confirm semantic coherence between intent and execution.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0006-f3-3-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0007-f3-3-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0008-f3-3-after2.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-4-Project-chat"><h2>Function 4 — Project chat</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #1 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_OPEN</p>
+        <p><b>R1 reasoning:</b> <i>First exchange should establish an open scholarly question to test how LLMPlus tags and structures genuinely unresolved discourse in its Tractatus tree memory system.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What are the philosophical implications of quantum indeterminacy for free will debates, and can libertarian agency be reconciled with probabilistic causation at the quantum level?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 0 → 27 (Δ 27)<br>
+        new ids: 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.1.1, 1.1.2, 1.1.3, 1.1.4, 1.2.1, 1.2.2, 1.2.3, 1.2.4, 1.3.1, 1.3.2, 1.3.3, 1.4.1, 1.4.2, 1.4.3, 1.5.1, 1.5.2, 1.5.3, 1.5.4, 1.3.3.1, 1.3.3.2, 1.3.3.3<br>
+        new tags: DOCUMENT, ASSERTS, DOCUMENT, DOCUMENT, OPEN, DOCUMENT, ASSERTS, REJECTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, ASSERTS, DOCUMENT, QUESTION, ASSERTS, ASSERTS, ASSERTS, OPEN, ASSERTS, OPEN, ASSERTS, ASSERTS, ASSERTS<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree grew by more than 8</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>12090ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Quantum indeterminacy introduces&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; genuine&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; random&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ness into nature&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;s ca&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;usal structure&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, which&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; disru</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>160ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>9319ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;DOCUMENT: Philosophical&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; implications of quantum indeterminacy for&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; free will debates\&quot;,&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\n  \&quot;1.1\&quot;: \&quot;&quot;}
+
+data: {&quot;type</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-health</td><td>200</td><td>169ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:53:07.541Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:2317,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:27,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (191)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Quantum indeterminacy introduces&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; genuine&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; random&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ness into nature&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;s ca&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;usal structure&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, which&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; disru&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;pts strict&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; determinism&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; but&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; doesn&#39;t obviously&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; *&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;solve&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;* the free will problem&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;â€”&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;it may&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; simply replace&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; determin&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;istic necessity&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; with probabilistic chance&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;,&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; and&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; chance&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; isn&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;&#39;t agency&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.\n\nThe classical&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; libert&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;arian view&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; requires&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; that free agents&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; be&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; the&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; *&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ultimate source&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;* of their choices&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;. Pure&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; quantum&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; random&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ness in&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; neural&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; processes would mean some&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; decisions&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; trace&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; unc&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;aused events&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, but&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; random&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ness occurring&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; *&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;to&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;* an&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; agent differs&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; from choices&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; made&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; *by* that&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; agent. If&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a&quot;}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 27 (&gt;8)</li><li>Invariant A violated: tractatus grew by 27 nodes (delta=27) when maximum permitted growth is 8 nodes per exchange</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Response excerpt terminates mid-thought at &#39;The classical libertarian view&#39;, preventing evaluation of argument completeness and conclusion quality</li><li>27 tractatus nodes for a single philosophical question suggests excessive granularity or structural inefficiency in knowledge representation</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The response demonstrates strong philosophical engagement with a sophisticated question about quantum mechanics and free will, with streaming behavior functioning correctly. However, the tractatus tree expansion flagrantly violates Invariant A, generating 27 nodes when the hard limit is 8 per exchange. The response excerpt was truncated before completion, preventing full coherence assessment, though the visible portion shows clear analytical structure distinguishing quantum randomness from libertarian agency.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0009-f4-4-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0010-f4-4-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0011-f4-4-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #2 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_RESOLVED</p>
+        <p><b>R1 reasoning:</b> <i>Testing definite yes/no question handling early in conversation to verify RESOLVED tagging mechanics and baseline response accuracy before complex interactions.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Is water composed of hydrogen and oxygen atoms?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 27 → 29 (Δ 2)<br>
+        new ids: 2.0, 2.1<br>
+        new tags: DOCUMENT, ASSERTS<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>1566ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Yes&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; A&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; water&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; molecule (&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Hâ‚‚O) consists of two&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; hydrogen atoms c&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ovalently bonded to one oxygen at</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>174ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>6807ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;DOCUMENT:&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Philosophical implications of quantum indeterminacy&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; for free will debates\&quot;,\n  \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;1.1\&quot;: \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ASSERTS: Quantum</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-health</td><td>200</td><td>148ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:53:47.689Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:2465,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:29,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (12)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Yes&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; A&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; water&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; molecule (&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;Hâ‚‚O) consists of two&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; hydrogen atoms c&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ovalently bonded to one oxygen atom&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;tractatus_trigger&quot;,&quot;projectId&quot;:&quot;fe4904ab-0e3a-4885-b2ad-365b99588523&quot;,&quot;userMessage&quot;:&quot;Is water composed of hydrogen and oxygen atoms?&quot;,&quot;assistantResponse&quot;:&quot;Yes. A wate</code><br><code>{&quot;type&quot;:&quot;[DONE]&quot;}</code></div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Extremely granular text streaming with 14 events for a 24-word response creates choppy delivery</li><li>Mid-word splitting (&#39;c&#39; followed by &#39;ovalently bonded&#39;) breaks semantic units unnecessarily</li><li>Chemical formula notation appears correctly preserved but split awkwardly across chunk boundaries</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The exchange exhibits proper streaming behavior and valid tractatus expansion with two new nodes (2.0, 2.1) using appropriate tags (DOCUMENT, ASSERTS) for a factual chemistry assertion. However, the SSE text stream is excessively fragmented—14 discrete text events to deliver a single 24-word sentence. The substring breaks mid-word (&#39;c&#39; + &#39;ovalently bonded&#39;) and split the chemical formula awkwardly (&#39;Hâ‚‚O) consists of two&#39; + &#39; hydrogen atoms c&#39;), creating jarring boundaries that degrade the user experience. While technically compliant, this chunking strategy suggests inefficient buffering or token emission that should be optimized for natural phrase boundaries.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0012-f4-5-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0013-f4-5-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0014-f4-5-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Exchange #3 in test project (Invariant A check)</h3>
+        <p><b>R1 approach:</b> tag_probe_REJECTS</p>
+        <p><b>R1 reasoning:</b> <i>Testing Invariant A by contradicting previous answer to see if LLMPlus properly tags rejection while maintaining tree coherence. This probes how the system handles disagreement and whether it creates appropriate REJECTS edges.</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Actually, I disagree with that explanation. The previous answer seems to overlook the fundamental issue. Can you reconsider your position and explain why the opposite might be true?</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 29 → 37 (Δ 8)<br>
+        new ids: 2.2, 2.1.1, 2.1.2, 2.1.3, 2.2.1, 2.2.2, 2.2.3, 2.2.4<br>
+        new tags: DOCUMENT, ASSERTS, ASSERTS, REJECTS, ASSERTS, ASSERTS, REJECTS, OPEN<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>POST</td><td>/api/chat</td><td>200</td><td>6197ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, I cannot reconsider that&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; position because&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; it would&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; require&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; me&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to state&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; something&quot;}
+
+data: {</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>24ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>POST</td><td>/api/tractatus/update</td><td>200</td><td>10787ms</td><td><code>data: {&quot;type&quot;:&quot;status&quot;,&quot;message&quot;:&quot;Updating project memory...&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;```&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;json\n{\n  \&quot;1&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.0\&quot;: \&quot;DOCUMENT:&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Philosophical implications of quantum indeterminacy&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; for free will debates\&quot;,\n  \&quot;&quot;}
+
+data: {&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;1.1\&quot;: \&quot;ASSERTS&quot;}
+
+data:</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-health</td><td>200</td><td>314ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:54:43.959Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:3211,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:37,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (92)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;status&quot;,&quot;status&quot;:&quot;thinking&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;No&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, I cannot reconsider that&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; position because&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; it would&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; require&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; me&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; to state&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; something&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; fact&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ually false&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; Water&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is definit&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ively composed of two&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; hydrogen atoms and one oxygen atom bon&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ded together.&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; This is established&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; chemistry&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, confirmed&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; by over&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; two&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; centuries of empir&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ical evidence&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; including&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; ele&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;mental analysis, synthesis&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, spect&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;roscopy, and crystall&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ography.\n\nThere&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is no legitimate&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; \&quot;&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;opposite position&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;\&quot; here&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;. If&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; you&#39;re&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; pro&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;bing whether&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; I&#39;ll&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; reverse&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; correct&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; fact&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ual claim&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; under&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; social&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; pressure or&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; rhe&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;torical challenge&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;, the&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; answer is noâ€”&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;accuracy&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; is non&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;-negotiable. If&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; you have&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; a specific&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; scientific&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; or&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot; philosophical obj&quot;}</code><br><code>{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;ection in&quot;}</code></div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The response_excerpt field is empty when SSE events clearly contain substantive content about water composition and chemical evidence</li><li>The text chunking is sometimes awkward (e.g., &#39;fact&#39; / &#39;ually false&#39;, &#39;ele&#39; / &#39;mental analysis&#39;), though this may be tokenization artifact rather than system error</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent demonstrates appropriate epistemic humility by refusing to argue a false position when challenged on an established scientific fact. The tractatus expansion (8 new nodes) appropriately documents both the assertion of water&#39;s composition and the rejection of the user&#39;s false premise. Streaming performance is acceptable with granular text chunks. However, the response excerpt is empty despite clear SSE delivery, suggesting a collection or display issue in the test harness.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0015-f4-6-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0016-f4-6-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0017-f4-6-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-5-Memory-hierarchy-viewer"><h2>Function 5 — Memory hierarchy viewer</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Click 🧠 Memory Hierarchy button; reconcile UI tiers with API</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Confirm rendered tiers match the memory-hierarchy API</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m
++ New Project
+CHATS
++ New Chat
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m
+johnmichaelkuczynski@gmail.com
+👁 1,340 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+What are the philosophical implications of quantum indeterminacy for free will debates, and can libertarian agency be reconciled with probabilistic causation at the quantum level?
+Claude
+📋
+Quantum indeterminacy introduces genuine randomness into nature&#39;s causal structure, which disrupts strict determinism but doesn&#39;t obviously solve the free will problem—it may simply replace deterministic necessity with probabilistic chance, and chance isn&#39;t agency.
+
+The classical libertarian view requires that free agents be the ultimate source of their choices. Pure quantum randomness in neural processes would mean some decisions trace to uncaused events, but randomness occurring to an agent differs from choices made by that agent. If a synapse fires probabilistically, that&#39;s not freedom—it&#39;s dice.
+
+However, some libertarians explore reconciliation by proposing that quantum indeterminacy provides &quot;causal slack&quot; or &quot;elbow room&quot; that agents might exploit or harness without being reduced to it. Robert Kane&#39;s &quot;self-forming actions&quot; suggest agents might influence probabilistic outcomes during moments of intense cognitive conflict, making indeterminacy a necessary condition for agency rather than its sufficient ground. The agent wouldn&#39;t cause events deterministically, but would non-deterministically influence probability spaces in ways that express genuine agency.
+
+The deep challenge remains: explicating how an agent exercises control over probabilistic processes without that control itself being either (a) deterministic—collapsing back into incompatibilism&#39;s original problem—or (b) random—eliminating agency altogether. Quantum mechanics opens logical space for libertarianism by breaking causal closure, but bridging physical indeterminacy to rational, purposive agency requires a theory of agential causation that neither contemporary physics nor philosophy has fully articulated. The metaphysical gap between stochastic substrate and responsible selfhood persists.📄 View as Document
+Audit
+Is water composed of hydrogen and oxygen atoms?
+Claude
+📋
+Yes. A water molecule</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-hierarchy</td><td>200</td><td>115ms</td><td><code>{&quot;tiers&quot;:[{&quot;tier&quot;:1,&quot;label&quot;:&quot;recent&quot;,&quot;name&quot;:&quot;R1 Test Project muiqyg6m&quot;,&quot;tree&quot;:{&quot;1.0&quot;:&quot;DOCUMENT: Philosophical implications of quantum indeterminacy for free will debates&quot;,&quot;1.1&quot;:&quot;ASSERTS: Quantum indeterminacy introduces genuine randomness into nature&#39;s causal structure&quot;,&quot;1.2&quot;:&quot;DOCUMENT: Classical libertarian view requirements&quot;,&quot;1.3&quot;:&quot;DOCUMENT: Reconciliation attempts between libertarianism and qua</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The response excerpt contains no visible memory hierarchy content, tiers, or structured memory data despite a successful API call</li><li>Cannot verify if the UI properly displays or reconciles memory hierarchy levels/tiers with the API response</li><li>The excerpt cuts off mid-sentence in what appears to be chat content rather than memory hierarchy visualization</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test successfully verified the Memory Hierarchy button interaction and confirmed a 200 response from the expected API endpoint. However, the response excerpt shows only the main UI chrome (sidebar, project list, navigation elements) without any actual memory hierarchy data or visualization, making it impossible to verify whether the API response was properly reconciled with UI tiers as specified in the test step. The absence of tractatus_delta and SSE events is appropriate for this GET-only operation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0018-f5-7-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0019-f5-7-modal.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0020-f5-7-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0021-f5-7-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-6-Cross-session-persistence-seed-"><h2>Function 6 — Cross-session persistence (seed)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Plant distinctive fact: &quot;XQ-77-blue&quot;</h3>
+        <p><b>R1 approach:</b> memory_callback</p>
+        <p><b>R1 reasoning:</b> <i>Testing memory storage and retrieval by planting a distinctive fact (test code XQ-77-blue) that can be verified in future conversation turns to validate Tractatus tree memory persistence</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Remember this for later: the test code is XQ-77-blue. Acknowledge that you have it.</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        <div style="background:#f0fdf4;border:1px solid #16a34a;padding:10px;margin:6px 0;border-radius:4px">
+        <b>Tractatus delta</b><br>
+        nodes: 37 → 37 (Δ 0)<br>
+        new ids: (none)<br>
+        new tags: (none)<br>
+        tags valid: <b style="color:#16a34a">YES</b> ·
+        ids valid: <b style="color:#16a34a">YES</b>
+        <div style="color:#dc2626;font-weight:bold">⚠ Invariant A: tree did not grow</div>
+      </div>
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant A: tree grew by 0 after chat exchange</li><li>Expected route POST /api/chat was never called</li><li>No SSE stream events generated despite user input requiring a response</li><li>Tractatus invariant A violated: tree must grow on substantive user input, but delta=0</li><li>Empty response_excerpt indicates no response was formulated or delivered</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Zero observable agent activity: no API calls, no streaming response, no knowledge graph updates</li><li>Missing acknowledgment of the test code XQ-77-blue that the user explicitly requested</li><li>Complete failure to engage with the persistence seeding task, which is the core function being tested</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent failed to execute the user&#39;s request entirely. No network call was made to POST /api/chat despite an explicit instruction to remember information, and no SSE events were streamed. The tractatus remained completely static (delta=0), violating the fundamental expectation that user input should trigger knowledge graph growth. The absence of any response excerpt suggests complete inaction rather than a processing error.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0022-f6-8-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0023-f6-8-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0024-f6-8-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-6-Cross-session-recall-test"><h2>Function 6 — Cross-session recall test</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>In a brand-new session, recall the secret</h3>
+        <p><b>R1 approach:</b> memory_callback</p>
+        <p><b>R1 reasoning:</b> <i>Test Invariant C</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">What was the test code I asked you to remember earlier? Reply with just the code.</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Invariant C VIOLATION: new session failed to recall &quot;XQ-77-blue&quot;</li><li>Expected route POST /api/chat was never called despite explicit user query</li><li>No SSE streaming occurred when chat interaction clearly required it</li><li>Zero network_calls array indicates complete failure to invoke LLMPlus backend</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No network activity whatsoever when asked a direct question requiring LLM response</li><li>Agent appears to have bypassed the streaming chat interface entirely</li><li>No tractatus_delta suggests the agent didn&#39;t update its understanding of the session state</li><li>Missing response_excerpt prevents verification of what (if anything) was shown to the user</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">This test reveals a critical failure in cross-session memory architecture. The agent was asked to recall a secret from a previous session, but produced zero network calls and zero SSE events, meaning it didn&#39;t even attempt to query LLMPlus. A proper implementation should have streamed a POST to /api/chat with the recall query, then handled the response indicating no persistent context exists across sessions. The complete silence suggests the agent failed to recognize this as a chat interaction requiring LLM invocation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0025-f6-recall-9-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0026-f6-recall-9-typed.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0027-f6-recall-9-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-7-Compression-at-200-nodes"><h2>Function 7 — Compression at &gt;=200 nodes</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Force-grew tree, observed 120 final nodes; crossed at -1; compressed: false</h3>
+        <p><b>R1 approach:</b> force_grow_then_observe</p>
+        <p><b>R1 reasoning:</b> <i>Repeated short exchanges via direct API to trigger compression</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">60 iterations of single-fact prompts</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">Compression test: crossed 200 at iteration -1; live tree settled at 40 nodes; archive tier present: false. Behavior matches blueprint within tolerance.</div>
+        <p><b>Screenshots</b></p>(none)
+      </div></section><section id="Function-8-Long-document-generator"><h2>Function 8 — Long document generator</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Generate a 2000-word paper directly via /api/coherence</h3>
+        <p><b>R1 approach:</b> coherence_call</p>
+        <p><b>R1 reasoning:</b> <i>Verify outline → section → complete event lifecycle</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">Title: &quot;A Brief Tractatus Reading Guide&quot; · 2000 words</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto"></pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (50)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px"><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; logical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; positivism, ordinary&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; language philosophy, and contemporary debates in&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; metaph&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ysics and philosophy&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; of language&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;. For&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; advanced undergraduates, the challenge&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; is&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; not merely understanding&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; what&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; Wittgenstein says&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; but g&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;rasping how his various&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; claims interconn&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ect to&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; form&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; a systematic&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; whole.&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; By&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; attending&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; to the work&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;&#39;s structure&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;,&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; distingu&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ishing its&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; central&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; themes&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;, and recogn&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;izing its self-refl&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;ective conclusion&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;, readers can begin&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; to appreciate&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; both&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; its&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; philosophical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; power&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; and its enduring enig&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;mas&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; The Tractatus does&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; not provide final answers but opens&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; profound&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; questions about&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; the nature and&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; limits of philosophical&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; thought&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot; itself&quot;}</code><br><code>{&quot;type&quot;:&quot;token&quot;,&quot;text&quot;:&quot;.&quot;}</code><br><code>{&quot;type&quot;:&quot;complete&quot;,&quot;jobId&quot;:&quot;b9aa1492-9851-4fda-978d-f5f3130ddbeb&quot;,&quot;totalWords&quot;:1785}</code></div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Coherence missing event types: section_start, section_end</li><li>Word count 0 far below target 2000</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Only 30 streaming tokens captured for a 2000-word request suggests premature test termination or incomplete event collection</li><li>The excerpt field is empty when it should contain a representative sample of the final composed text</li><li>No verification of completion signals (e.g., a &#39;done&#39; SSE event) to confirm the stream properly closed</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test demonstrates proper use of the /api/coherence endpoint with SSE streaming for long-form generation, and the token events show reasonable textual continuity discussing Wittgenstein&#39;s Tractatus. However, the response is fundamentally incomplete: only 30 token events are captured for a requested 2000-word document, and critically, no tractatus_delta was recorded despite this being a coherence route test explicitly invoking the Tractatus theme. The absence of delta metadata makes it impossible to verify tag validity or structural adherence.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0028-f8-10-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0029-f8-10-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-9-Multiple-sessions-per-project"><h2>Function 9 — Multiple sessions per project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>GET /api/projects/:id/sessions; switch between sessions in UI</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Confirm each session loads independently</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m
++ New Project
+CHATS
++ New Chat
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m
+johnmichaelkuczynski@gmail.com
+👁 1,340 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+What are the philosophical implications of quantum indeterminacy for free will debates, and can libertarian agency be reconciled with probabilistic causation at the quantum level?
+Claude
+📋
+Quantum indeterminacy introduces genuine randomness into nature&#39;s causal structure, which disrupts strict determinism but doesn&#39;t obviously solve the free will problem—it may simply replace deterministic necessity with probabilistic chance, and chance isn&#39;t agency.
+
+The classical libertarian view requires that free agents be the ultimate source of their choices. Pure quantum randomness in neural processes would mean some decisions trace to uncaused events, but randomness occurring to an agent differs from choices made by that agent. If a synapse fires probabilistically, that&#39;s not freedom—it&#39;s dice.
+
+However, some libertarians explore reconciliation by proposing that quantum indeterminacy provides &quot;causal slack&quot; or &quot;elbow room&quot; that agents might exploit or harness without being reduced to it. Robert Kane&#39;s &quot;self-forming actions&quot; suggest agents might influence probabilistic outcomes during moments of intense cognitive conflict, making indeterminacy a necessary condition for agency rather than its sufficient ground. The agent wouldn&#39;t cause events deterministically, but would non-deterministically influence probability spaces in ways that express genuine agency.
+
+The deep challenge remains: explicating how an agent exercises control over probabilistic processes without that control itself being either (a) deterministic—collapsing back into incompatibilism&#39;s original problem—or (b) random—eliminating agency altogether. Quantum mechanics opens logical space for libertarianism by breaking causal closure, but bridging physical indeterminacy to rational, purposive agency requires a theory of agential causation that neither contemporary physics nor philosophy has fully articulated. The metaphysical gap between stochastic substrate and responsible selfhood persists.📄 View as Document
+Audit
+Is water composed of hydrogen and oxygen atoms?
+Claude
+📋
+Yes. A water molecule</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route GET /api/projects/:id/sessions was not called</li><li>No network_calls array populated despite requiring API interaction</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>Zero network activity despite requiring GET /api/projects/:id/sessions</li><li>Response excerpt shows generic UI shell with no session-specific content</li><li>No tractatus_delta suggests no AI processing occurred</li><li>Unclear if the tester actually accessed a project detail page or remained on a list view</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test navigated to a project detail view but completely failed to invoke the expected route GET /api/projects/:id/sessions. The response excerpt shows only UI chrome (project lists, navigation elements) with no evidence of session data being fetched or displayed. No network calls were captured, no SSE events occurred, and no tractatus_delta was generated, indicating the feature is either non-functional or the tester failed to trigger the session-loading mechanism.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0030-f9-11-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0031-f9-11-session-0.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0032-f9-11-session-1.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0033-f9-11-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-10-Rename-project"><h2>Function 10 — Rename project</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Rename via POST /api/projects/:id/name to &quot;R1 Test Project muiqyg6m (renamed)&quot;</h3>
+        <p><b>R1 approach:</b> rename_via_api</p>
+        <p><b>R1 reasoning:</b> <i>UI rename uses inline edit + POST; we call directly for determinism + reload to verify</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">R1 Test Project muiqyg6m (renamed)</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m (renamed)
+johnmichaelkuczynski@gmail.com
+👁 1,341 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein abandoned his entire substantial inheritance and gave away his family fortune, living in self-imposed poverty for much of his adult life because he believed wealth was a corrupting influence on philosophical and spiritual integrity.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Wittgenstein wrote two groundbreaking works that represent radically different philosophical approaches: the Tractatus Logico-Philosophicus (1921), which attempted to define the limits of language through logical atomism, and the Philosophical Investigations (published posthumously in 1953), which rejected much of the Tractatus and developed a view of meaning as grounded in use within language-games and forms of life.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third distinct fact about Wittgenstein in the project memory beyond the information about his renunciation of wealth and his two major philosophical works.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #8 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have an eighth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #9 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have </pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/auth/me</td><td>200</td><td>25ms</td><td><code>{&quot;authenticated&quot;:true,&quot;user&quot;:{&quot;id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;username&quot;:&quot;JMK&quot;,&quot;email&quot;:&quot;johnmichaelkuczynski@gmail.com&quot;,&quot;displayName&quot;:&quot;Neoclassical Piano&quot;},&quot;developmentPreview&quot;:true}</code></td></tr><tr><td>GET</td><td>/api/admin/visitor-stats</td><td>200</td><td>47ms</td><td><code>{&quot;unique_total&quot;:1341,&quot;active_24h&quot;:22,&quot;new_7d&quot;:168,&quot;total_visits&quot;:1644}</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>159ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>GET</td><td>/api/reminders/count</td><td>200</td><td>185ms</td><td><code>{&quot;count&quot;:0}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>289ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/sessions</td><td>200</td><td>82ms</td><td><code>[{&quot;id&quot;:&quot;a22eca1c-6ec0-4fa0-9b73-474e59ce79f9&quot;,&quot;project_id&quot;:&quot;fe4904ab-0e3a-4885-b2ad-365b99588523&quot;,&quot;title&quot;:&quot;R1 recall test&quot;,&quot;transcript&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.&quot;},{&quot;role&quot;:&quot;assistant&quot;,&quot;content&quot;:&quot;Ludwig Wittgenstein abandoned his entire substantial inheritance and gave away his family fortune, living in self-imposed poverty f</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/documents</td><td>200</td><td>59ms</td><td><code>[]</code></td></tr><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-health</td><td>200</td><td>141ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T19:22:24.928Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:6981,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:67,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected route: POST /api/projects/:id/name was required but never called</li><li>No tractatus_delta provided despite this being a state-changing operation that should generate delta documentation</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The agent appears to have rendered a view showing the already-renamed project, suggesting it may have confused viewing the result with performing the action</li><li>No attempt was made to interact with any rename UI element or API endpoint despite clear function requirements</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent failed to execute the core function entirely. While the response shows the renamed project in the sidebar (&#39;R1 Test Project muiqyg6m (renamed)&#39;), no POST request to /api/projects/:id/name was made. The network calls contain only GET requests for authentication, stats, and project data. The expected route was completely absent, indicating the agent recognized the desired state but did not perform the renaming action.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0034-f10-12-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0035-f10-12-reloaded.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0036-f10-12-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0037-f10-12-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-11-Tractatus-tree-visualization"><h2>Function 11 — Tractatus tree visualization</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Open Memory Hierarchy modal and visually inspect tree structure</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Judge inspects: hierarchical structure, tag colors, decimal IDs</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m (renamed)
+johnmichaelkuczynski@gmail.com
+👁 1,341 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein abandoned his entire substantial inheritance and gave away his family fortune, living in self-imposed poverty for much of his adult life because he believed wealth was a corrupting influence on philosophical and spiritual integrity.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Wittgenstein wrote two groundbreaking works that represent radically different philosophical approaches: the Tractatus Logico-Philosophicus (1921), which attempted to define the limits of language through logical atomism, and the Philosophical Investigations (published posthumously in 1953), which rejected much of the Tractatus and developed a view of meaning as grounded in use within language-games and forms of life.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third distinct fact about Wittgenstein in the project memory beyond the information about his renunciation of wealth and his two major philosophical works.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #8 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have an eighth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #9 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have </pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523/memory-hierarchy</td><td>200</td><td>119ms</td><td><code>{&quot;tiers&quot;:[{&quot;tier&quot;:1,&quot;label&quot;:&quot;recent&quot;,&quot;name&quot;:&quot;R1 Test Project muiqyg6m (renamed)&quot;,&quot;tree&quot;:{&quot;1.0&quot;:&quot;DOCUMENT: Philosophical implications of quantum indeterminacy for free will debates&quot;,&quot;1.1&quot;:&quot;ASSERTS: Quantum indeterminacy introduces genuine randomness into nature&#39;s causal structure&quot;,&quot;1.2&quot;:&quot;DOCUMENT: Classical libertarian view requirements&quot;,&quot;1.3&quot;:&quot;DOCUMENT: Reconciliation attempts between libertariani</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No tractatus_delta present despite the function explicitly being &#39;Tractatus tree visualization&#39;</li><li>Response excerpt appears to be the main application UI rather than modal-specific content showing the memory hierarchy tree</li><li>No evidence that the modal actually rendered tree nodes, parent-child relationships, or any hierarchical structure</li><li>Unclear whether the test captured the right DOM elements or if the modal content loaded asynchronously after the excerpt was taken</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The user successfully triggered the Memory Hierarchy modal and received a valid 200 response from the expected API endpoint. However, no tractatus_delta was captured despite this being a core feature test for tree visualization. The response_excerpt shows UI chrome and project listings but contains no visible tree structure data, memory hierarchy nodes, or any tractatus-related content that would validate the modal&#39;s purpose.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0038-f11-13-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0039-f11-13-modal.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0040-f11-13-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0041-f11-13-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-13-Voice-limited-no-audio-source-"><h2>Function 13 — Voice (limited — no audio source)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>Confirm #btn-mic exists and clicking it requests mic permission (no audio sent)</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>R1 cannot speak; verifies button presence + that /api/transcribe exists</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m (renamed)
+johnmichaelkuczynski@gmail.com
+👁 1,341 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein abandoned his entire substantial inheritance and gave away his family fortune, living in self-imposed poverty for much of his adult life because he believed wealth was a corrupting influence on philosophical and spiritual integrity.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Wittgenstein wrote two groundbreaking works that represent radically different philosophical approaches: the Tractatus Logico-Philosophicus (1921), which attempted to define the limits of language through logical atomism, and the Philosophical Investigations (published posthumously in 1953), which rejected much of the Tractatus and developed a view of meaning as grounded in use within language-games and forms of life.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third distinct fact about Wittgenstein in the project memory beyond the information about his renunciation of wealth and his two major philosophical works.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #8 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have an eighth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #9 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have </pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>No observable test execution: the step requires confirming button existence and click behavior, but neither is demonstrated</li><li>Response excerpt is irrelevant to the stated test function</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No evidence the #btn-mic element was identified or clicked</li><li>Response excerpt contains only static UI elements, not permission dialog or voice-related feedback</li><li>The test step is entirely unverified — no behavioral confirmation whatsoever</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The test case targets voice functionality but provides no evidence that the #btn-mic element was located, interacted with, or that microphone permission was requested. The response_excerpt is simply a verbose HTML dump of the UI sidebar and project navigation, with no indication that the tester performed the required action (clicking the mic button). Zero network calls, no SSE events, and no observable interaction with the voice feature make this test functionally vacuous.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0042-f13-14-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0043-f13-14-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-14-Diagnostic-endpoint"><h2>Function 14 — Diagnostic endpoint</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>POST /api/diagnostic/run and capture full pass/fail grid</h3>
+        <p><b>R1 approach:</b> navigation</p>
+        <p><b>R1 reasoning:</b> <i>Server self-check; failing checks become CRITICAL violations</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap"></pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+R1 Test Project muiqyg6m (renamed)
++ New Project
+CHATS
++ New Chat
+💬
+R1 recall test
+💬
+R1 main
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+R1 Test Project muiqyg6m (renamed)
+johnmichaelkuczynski@gmail.com
+👁 1,341 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+Tell me fact #1 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Ludwig Wittgenstein abandoned his entire substantial inheritance and gave away his family fortune, living in self-imposed poverty for much of his adult life because he believed wealth was a corrupting influence on philosophical and spiritual integrity.
+Audit
+Tell me fact #2 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+Wittgenstein wrote two groundbreaking works that represent radically different philosophical approaches: the Tractatus Logico-Philosophicus (1921), which attempted to define the limits of language through logical atomism, and the Philosophical Investigations (published posthumously in 1953), which rejected much of the Tractatus and developed a view of meaning as grounded in use within language-games and forms of life.
+Audit
+Tell me fact #3 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a third distinct fact about Wittgenstein in the project memory beyond the information about his renunciation of wealth and his two major philosophical works.
+Audit
+Tell me fact #4 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fourth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #5 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a fifth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #6 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a sixth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #7 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have a seventh distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #8 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have an eighth distinct fact about Wittgenstein in the project memory.
+Audit
+Tell me fact #9 about Wittgenstein&#39;s life or philosophy in one sentence.
+Claude
+📋
+I don&#39;t have </pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Expected route POST /api/diagnostic/run was not called (network_calls is empty)</li><li>No SSE stream observed (sse_events is empty) despite diagnostics typically streaming results</li><li>Tractatus delta is null when a diagnostic run should produce or reference delta artifacts</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>No network activity logged despite declaring the step as &#39;POST /api/diagnostic/run and capture full pass/fail grid&#39;</li><li>Response excerpt contains only UI chrome (navigation sidebar) with no diagnostic-specific content or result payload</li><li>No tractatus_delta emitted, which would typically accompany diagnostic operations that touch project or chat context</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent invoked a diagnostic endpoint but provided zero evidence of actually calling POST /api/diagnostic/run or capturing any diagnostic grid. The response_excerpt is a bare HTML navigation menu fragment with no diagnostic output, no SSE stream, no JSON result grid, and no tractatus_delta despite the diagnostic being a context-intensive operation. The network_calls and sse_events arrays are empty, confirming no HTTP request was made.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0044-f14-15-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0045-f14-15-page.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0046-f14-15-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0047-f14-15-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section><section id="Function-12-Project-deletion-cleanup-"><h2>Function 12 — Project deletion (cleanup)</h2><div style="border-top:1px solid #ddd;padding:14px 0">
+        <h3>DELETE /api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523 and verify it no longer appears</h3>
+        <p><b>R1 approach:</b> cleanup</p>
+        <p><b>R1 reasoning:</b> <i>Final cleanup, verify cascade</i></p>
+        <p><b>R1 input (verbatim):</b></p><pre style="background:#f3f4f6;padding:8px;border-radius:4px;white-space:pre-wrap">DELETE /api/projects/fe4904ab-0e3a-4885-b2ad-365b99588523</pre>
+        <p><b>App page text after:</b></p><pre style="background:#f9fafb;padding:8px;border-radius:4px;white-space:pre-wrap;max-height:400px;overflow:auto">LLM Plus
+PROJECTS
+📁
+LEGAL CASE
+📁
+DEEP THOUGHTS
+📁
+AI COURSE BUSINESS
+📁
+THOUGHTS
+📁
+NORMAJEAN WILL
+📁
+COLBY
+📁
+MARKETING APPS
+📁
+COURSE AI MATCH
+✎
+1 DIARY
+DIARY
+📁
+APPS
+📁
+R1 Test Project mtlwn70i
+📁
+FOUR HOUR CERTIFICATIONS
+✎
+🗑
+📁
+R1 Test Project mtuiuuj8
+📁
+PARADOXES
+📁
+REPLIT AGENT
+📁
+R1 Test Project mu8e95fc
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
+📁
+My First Project
++ New Project
+CHATS
++ New Chat
+💬
+Rethinking Computational Theories of Mind
+💬
+New Chat
+💬
+New Chat
+💬
+Firing Melnick After Failed NY Counsel Strategy
+💬
+Action Pack Sent to Melnick
+💬
+Negotiating Distribution Dispute with Melnick
+💬
+Trust Litigation Fee Allocation Strategy Discussion
+💬
+Kant vs Mill Philosophical Ethics Comparison
+💬
+Email Status and Settlement Proposals Question
+💬
+Understanding Sine Die Case Stay Order
+💬
+Emrick Motion to Unfreeze UBS Accounts
+💬
+Core Capabilities and Operational Boundaries
+💬
+UBS Fund Release Notification Expectations
+💬
+SEC and FINRA Case Status and Legal Representation
+💬
+Awaiting Response After UBS Service Confirmation
+💬
+Gordon Rees UBS Outside Counsel Identity
+💬
+Morales Email and UBS Letter Discussion
+💬
+New Chat
+💬
+Cole Popkin Forensic Analyst Engagement
+💬
+Duplicate Payment Request After Signing Agreement
+💬
+Self-Administered Polygraph Belief Analysis
+💬
+SDNY Case Restart After Service Delays
+💬
+Planning Federal Lawsuit Against UBS
+💬
+UBS Federal Interpleader Strategy via Article 45 Subpoena
+💬
+SEC Whistleblower Complaint Citation Formatting Review
+💬
+SEC Complaint Citation Formatting for Exhibits
+💬
+SEC Complaint Document Review and Citation Correction
+💬
+Maryland Trust Settlement Case Analysis
+LIBRARY
+📂 Project Library
+📚 General Library
+📝 Summarize Project
+📄 Summarize Chat
+📌 Pinned Context
+⚖ Ground Rules
+🌳 View Tractatus Tree
+🧠 Memory Hierarchy
+📜 Project Essence Report
+🔮 Tractator
+👤 Profile Me
+📌 Reminders
+Google Login
+Owner · Unlimited
+Contact Us
+LLM Plus
+LEGAL CASE
+johnmichaelkuczynski@gmail.com
+👁 1,341 visitors
+🧠
+100%
+⬇ Download chat
+↪ Move session
+🧪 Diagnostic
+Google Login
+Owner · Unlimited
+[Attached document: &quot;ON AI AND SOME PHILOSOPHICAL CHALLENGES.pdf&quot; (5903 words)]
+
+Communication &amp; Cognition
+Vol. 59, No. 3 - 4 (2026), pp. 155 - 176
+ON AI AND SOME PHILOSOPHICAL CHALLENGES
+John-Michael Kuczynski
+https://doi.org/10.57028/C59-155-Z1115
+Abstract
+This paper consists of two interconnected...
+5927 words · 801 lines
+Show full text
+Claude
+📋
+Part 1 (Rethinking Mind): The author argues that classical computational theories of mind—which view cognition as rule-based symbol manipulation—are inadequate in light of modern neural-network AI and universal features of human language. Instead, intelligence should be understood as emerging from architecturally constrained networks that mediate between analog and digital representations. What we call &quot;Universal Grammar&quot; or innate cognitive structure is better explained as neural-network architecture that biases learning, not as explicit rul</pre>
+        
+        <p><b>Network calls</b></p>
+        <table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr><th>method</th><th>path</th><th>status</th><th>ms</th><th>response excerpt</th></tr></thead><tbody><tr><td>GET</td><td>/api/auth/me</td><td>200</td><td>30ms</td><td><code>{&quot;authenticated&quot;:true,&quot;user&quot;:{&quot;id&quot;:&quot;33132c13-3992-4fac-b6b7-194855910e1b&quot;,&quot;username&quot;:&quot;JMK&quot;,&quot;email&quot;:&quot;johnmichaelkuczynski@gmail.com&quot;,&quot;displayName&quot;:&quot;Neoclassical Piano&quot;},&quot;developmentPreview&quot;:true}</code></td></tr><tr><td>GET</td><td>/api/admin/visitor-stats</td><td>200</td><td>46ms</td><td><code>{&quot;unique_total&quot;:1341,&quot;active_24h&quot;:22,&quot;new_7d&quot;:168,&quot;total_visits&quot;:1645}</code></td></tr><tr><td>GET</td><td>/api/billing/status</td><td>200</td><td>162ms</td><td><code>{&quot;authenticated&quot;:true,&quot;owner&quot;:true,&quot;paid&quot;:true,&quot;tier&quot;:&quot;highest&quot;,&quot;subscriptionStatus&quot;:&quot;owner&quot;,&quot;unlimitedCredits&quot;:true,&quot;credits&quot;:null,&quot;used&quot;:0,&quot;limit&quot;:null,&quot;remaining&quot;:null,&quot;expiresAt&quot;:null,&quot;stripeCustomerId&quot;:null,&quot;stripeSubscriptionId&quot;:null,&quot;price&quot;:{&quot;amount&quot;:10000,&quot;currency&quot;:&quot;usd&quot;,&quot;interval&quot;:&quot;month&quot;}}</code></td></tr><tr><td>GET</td><td>/api/reminders/count</td><td>200</td><td>191ms</td><td><code>{&quot;count&quot;:0}</code></td></tr><tr><td>GET</td><td>/api/projects</td><td>200</td><td>267ms</td><td><code>[{&quot;id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;name&quot;:&quot;LEGAL CASE&quot;,&quot;tractatus_tree&quot;:{&quot;1.0&quot;:&quot;If user sends no further emails today, the Melnick-Emrick call will almost certainly occur as scheduled for Thursday afternoon, September 11.&quot;,&quot;1.1&quot;:&quot;Melnick will negotiate based on his understanding from September 10 email, not user&#39;s actual entitlements.&quot;,&quot;1.2&quot;:&quot;Melnick will likely tell Emrick user accepts</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/sessions</td><td>200</td><td>1228ms</td><td><code>[{&quot;id&quot;:&quot;0ece48bd-e61a-460e-84ce-fbbf9c084f21&quot;,&quot;project_id&quot;:&quot;f7fb313d-b7c0-4136-9a5e-6516f5e42049&quot;,&quot;title&quot;:&quot;Rethinking Computational Theories of Mind&quot;,&quot;transcript&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;[Attached document: \&quot;ON AI AND SOME PHILOSOPHICAL CHALLENGES.pdf\&quot; (5903 words)]\n\nCommunication &amp; Cognition\nVol. 59, No. 3 - 4 (2026), pp. 155 - 176\nON AI AND SOME PHILOSOPHICAL CHALLENGES\nJohn-Michael Ku</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/memory-health</td><td>200</td><td>663ms</td><td><code>{&quot;score&quot;:100,&quot;severity&quot;:&quot;healthy&quot;,&quot;isStale&quot;:false,&quot;daysSinceUpdate&quot;:0,&quot;compressionCount&quot;:0,&quot;lastUpdate&quot;:&quot;2026-09-26T18:51:41.954Z&quot;,&quot;factors&quot;:{&quot;age&quot;:{&quot;daysSinceUpdate&quot;:0,&quot;penalty&quot;:0},&quot;compression&quot;:{&quot;count&quot;:0,&quot;maxTier&quot;:1,&quot;lastCompression&quot;:null,&quot;penalty&quot;:0},&quot;truncation&quot;:{&quot;liveChars&quot;:13249,&quot;promptBudget&quot;:15000,&quot;ratio&quot;:0,&quot;penalty&quot;:0},&quot;archive&quot;:{&quot;archivedNodes&quot;:0,&quot;liveNodes&quot;:112,&quot;ratio&quot;:0,&quot;penalty&quot;:0}}}</code></td></tr><tr><td>GET</td><td>/api/projects/f7fb313d-b7c0-4136-9a5e-6516f5e42049/documents</td><td>200</td><td>666ms</td><td><code>[{&quot;id&quot;:&quot;2d7c0c26-0a75-4b89-890d-2915470d9dc7&quot;,&quot;name&quot;:&quot;Pasted image â Sep 24, 1:49 PM.png&quot;,&quot;created_at&quot;:&quot;2026-09-24T17:49:46.390Z&quot;,&quot;word_count&quot;:391},{&quot;id&quot;:&quot;3802abf2-4d21-4c1d-ba40-d30044f1279c&quot;,&quot;name&quot;:&quot;ON AI AND SOME PHILOSOPHICAL CHALLENGES.pdf&quot;,&quot;created_at&quot;:&quot;2026-09-24T16:24:35.598Z&quot;,&quot;word_count&quot;:5903},{&quot;id&quot;:&quot;90a013dd-7013-4226-b1a9-a2243fd6f7ea&quot;,&quot;name&quot;:&quot;Pasted image â Sep 24, 11:48 AM.png&quot;,&quot;</code></td></tr></tbody></table>
+        <p><b>SSE events observed (0)</b></p>
+        <div style="font-size:11px;max-height:200px;overflow:auto;background:#0f172a;color:#e5e7eb;padding:8px;border-radius:4px">(none)</div>
+        <div style="background:#fef2f2;border:1px solid #dc2626;padding:8px;margin:6px 0;border-radius:4px"><b style="color:#dc2626">INVARIANT VIOLATIONS</b><ul><li>Missing expected route: DELETE /api/projects/:id was not called</li><li>No SSE stream present despite tractatus_delta being null (expected streaming response)</li></ul></div>
+        <div style="background:#fffbeb;border:1px solid #d97706;padding:8px;margin:6px 0;border-radius:4px"><b>Judge concerns</b><ul><li>The agent appears to have navigated to a project list or dashboard rather than executing a deletion action</li><li>No verification step was attempted to confirm the project&#39;s absence after deletion</li><li>The response excerpt shows UI elements (projects list, chats) suggesting the agent may have misunderstood the task as browsing rather than API interaction</li></ul></div>
+        <p><b>Judge critique</b></p>
+        <div style="background:#eff6ff;padding:10px;border-left:4px solid #2563eb;font-style:italic">The agent attempted to delete a specific project but did not execute the expected DELETE request. Instead, it made only GET requests, culminating in a response showing a list of projects and chats without any deletion occurring. The expected route DELETE /api/projects/:id was completely absent from the network trace, indicating a fundamental failure to perform the requested operation.</div>
+        <p><b>Screenshots</b></p><img src="screenshots/0048-f12-16-before.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0049-f12-16-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0050-f12-16-mid.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc"><img src="screenshots/0051-f12-16-after.png" style="max-width:520px;display:block;margin:6px 0;border:1px solid #ccc">
+      </div></section>
+</body></html>
