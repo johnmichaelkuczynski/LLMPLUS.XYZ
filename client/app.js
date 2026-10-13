@@ -14,6 +14,14 @@
     model: 'claude',
     access: null
   };
+  var contextHealthRequestToken = 0;
+  var contextHealthSnapshot = null;
+  var contextFreshStarting = false;
+  var contextDiagnosticsData = null;
+  var contextDiagnosticsRequestToken = 0;
+  var contextDiagnosticsTraces = [];
+  var contextComparisonPending = false;
+  var contextComparisonRequestToken = 0;
 
   function isIdeaDiary(project) {
     return !!project && (project.project_type === 'idea_diary' || project.projectType === 'idea_diary');
@@ -75,6 +83,12 @@
   els.diaryStatus = document.getElementById('diary-status');
   els.diaryList = document.getElementById('btn-diary-list');
   els.diaryAnalytics = document.getElementById('btn-diary-analytics');
+  els.contextHealth = document.getElementById('context-health');
+  els.contextHealthTitle = document.getElementById('context-health-title');
+  els.contextHealthDetail = document.getElementById('context-health-detail');
+  els.contextHealthEvidence = document.getElementById('context-health-evidence');
+  els.contextHealthEvidencePanel = document.getElementById('context-health-evidence-panel');
+  els.contextHealthFresh = document.getElementById('context-health-fresh');
 
   var currentArtifact = null;
 
@@ -604,6 +618,9 @@
       var response = await fetch('/api/billing/status', { cache: 'no-store' });
       if (!response.ok) return;
       state.access = await response.json();
+      var contextDiagnosticsButton = document.getElementById('btn-context-diagnostics');
+      if (contextDiagnosticsButton) contextDiagnosticsButton.classList.toggle('hidden', !state.access.owner);
+      if (!state.access.owner && contextDiagnosticsModal && !contextDiagnosticsModal.classList.contains('hidden')) closeContextDiagnostics();
       var button = document.getElementById('btn-billing');
       if (state.access.owner) {
         button.textContent = 'Owner · Unlimited';
@@ -713,7 +730,7 @@
     }
   }
 
-  async function streamSilentDiary(response, sendingSession, text) {
+  async function streamSilentDiary(response, sendingSession, sendingProject, text) {
     if (!response.ok) {
       var errorBody = await response.text();
       throw new Error(errorBody || 'Diary save failed');
@@ -732,6 +749,18 @@
         if (event.type === 'saved') saved = true;
         if (event.type === 'status') els.diaryStatus.textContent = event.message || 'Saving…';
         if (event.type === 'tractatus_trigger') startTractatusUpdate(event.projectId, event.userMessage || text, event.assistantResponse || '');
+        if (event.type === 'context_health' && sendingProject &&
+            String(event.sessionId) === String(sendingSession.id) &&
+            String(event.projectId) === String(sendingProject.id) &&
+            isCurrentContext(sendingSession.id, sendingProject.id)) renderContextHealth(event);
+        if (event.type === 'context_trace' && sendingProject &&
+            String(event.sessionId) === String(sendingSession.id) &&
+            String(event.projectId) === String(sendingProject.id) &&
+            isCurrentContext(sendingSession.id, sendingProject.id) && contextHealthSnapshot) {
+          renderContextHealth(Object.assign({}, contextHealthSnapshot, {
+            traceIds: Array.isArray(event.traceIds) ? event.traceIds : []
+          }));
+        }
         if (event.type === 'complete') memoryUpdated = true;
         if (event.type === 'error') streamError = event.error || event.message || 'Diary save failed';
       } catch (e) {
@@ -1017,8 +1046,130 @@
   }
 
   var projectSwitchToken = 0;
+  function clearContextHealth() {
+    contextHealthRequestToken++;
+    contextHealthSnapshot = null;
+    if (els.contextHealth) els.contextHealth.classList.add('hidden');
+    if (els.contextHealthEvidencePanel) {
+      els.contextHealthEvidencePanel.classList.add('hidden');
+      els.contextHealthEvidencePanel.textContent = '';
+    }
+    if (els.contextHealthEvidence) els.contextHealthEvidence.setAttribute('aria-expanded', 'false');
+    if (els.contextHealthFresh) {
+      els.contextHealthFresh.classList.add('hidden');
+      els.contextHealthFresh.disabled = false;
+    }
+  }
+
+  function isCurrentContext(sessionId, projectId) {
+    return !!(state.currentSession && state.currentProject &&
+      String(state.currentSession.id) === String(sessionId) &&
+      String(state.currentProject.id) === String(projectId));
+  }
+
+  function renderContextHealth(health) {
+    if (!health || !isCurrentContext(health.sessionId, health.projectId)) return;
+    contextHealthRequestToken++;
+    contextHealthSnapshot = health;
+    var title;
+    if (health.status==='provider_error' || health.status==='request_error') title = 'Request failed · original message preserved';
+    else if (health.status==='awaiting_provider') title = 'Context prepared · awaiting provider';
+    else if (health.mode === 'full') title = 'Last reply used · full history';
+    else if (health.mode === 'retrieved') title = 'Last reply used · retrieved context';
+    else title = 'Last reply · context not yet measured';
+    var detail = '';
+    if (health.mode !== 'not_yet_measured') {
+      detail = (Number(health.historyMessagesIncluded) || 0) + ' of ' +
+        (Number(health.totalMessages) || 0) + ' history messages ' +
+        (health.status==='awaiting_provider'?'selected for this request':
+          health.status==='request_error'?'prepared for the failed request':'used in the last reply');
+      if (Number(health.omittedMessages) > 0) detail += ' · ' + Number(health.omittedMessages) + ' omitted';
+      if (['provider_count_tokens','provider_response_usage'].indexOf(health.countMethod)>=0 &&
+          health.inputTokens !== null && health.inputTokens !== undefined &&
+          Number.isFinite(Number(health.inputTokens))) {
+        detail += ' · ' + Number(health.inputTokens).toLocaleString() + ' actual provider input tokens';
+        if (health.contextLimitTokens) detail += ' · configured context budget: ' + Number(health.contextLimitTokens).toLocaleString();
+      } else if (health.estimatedInputTokenBudget !== null && health.estimatedInputTokenBudget !== undefined) {
+        detail += ' · input budget estimate: '+Number(health.estimatedInputTokenBudget).toLocaleString()+' (not actual usage)';
+      } else if (health.conservativeTokenUpperBound !== null &&
+          health.conservativeTokenUpperBound !== undefined &&
+          Number.isFinite(Number(health.conservativeTokenUpperBound))) {
+        detail += ' · conservative token upper bound: ' +
+          Number(health.conservativeTokenUpperBound).toLocaleString() + ' (not provider-counted)';
+      }
+      if (Number(health.sourceCount) > 0) detail += ' · ' + Number(health.sourceCount) + ' sources';
+    } else {
+      detail = 'Coverage for the last reply has not yet been measured.';
+    }
+    els.contextHealthTitle.textContent = title;
+    els.contextHealthDetail.textContent = (health.warning ? String(health.warning) + ' · ' : '') + detail;
+    if(health.providerModelNotice) els.contextHealthDetail.textContent+=' · '+health.providerModelNotice;
+    else if(health.returnedModel) els.contextHealthDetail.textContent+=' · served model: '+health.returnedModel;
+    if (Array.isArray(health.consistencyIssues) && health.consistencyIssues.length) {
+      els.contextHealthDetail.textContent += ' · Possible factual inconsistency detected; inspect the evidence before relying on this answer.';
+      health.consistencyIssues.forEach(function(issue) {
+        if (issue.kind==='identity_conflict') els.contextHealthDetail.textContent+=' '+issue.entity+': answer says '+issue.claimedRole+'; user source says '+issue.userEstablishedRole+'.';
+        if (issue.kind==='unverified_year') els.contextHealthDetail.textContent+=' Years not found in supplied user/document excerpts: '+issue.years.join(', ')+'.';
+      });
+    }
+    els.contextHealth.classList.remove('hidden');
+
+    var roleConflict=Array.isArray(health.consistencyIssues) && health.consistencyIssues.some(function(i){return i.kind==='identity_conflict';});
+    var shouldFresh = health.status!=='provider_error' && health.status!=='request_error' &&
+      (!!health.warning || Number(health.omittedMessages) > 0 || roleConflict);
+    els.contextHealthFresh.classList.toggle('hidden', !shouldFresh);
+    els.contextHealthFresh.disabled = !!state.streaming || contextFreshStarting;
+    var identities = Array.isArray(health.identityStatements) ? health.identityStatements : [];
+    identities=identities.concat(Array.isArray(health.timelineStatements)?health.timelineStatements:[]);
+    els.contextHealthEvidencePanel.textContent = '';
+    var evidenceHeading = document.createElement('div');
+    evidenceHeading.textContent = 'Factual evidence used for context only; this is not an assessment of answer accuracy.';
+    els.contextHealthEvidencePanel.appendChild(evidenceHeading);
+    var evidenceList = document.createElement('ul');
+    identities.forEach(function(item) {
+      var li = document.createElement('li');
+      var sourceText = item.source && typeof item.source==='object' ?
+        'chat '+String(item.source.sessionId||'').slice(0,8)+', message '+item.source.ordinal : item.source;
+      li.textContent = [item.entity, item.role, sourceText].filter(Boolean).join(' — ');
+      if (item.quote) li.textContent += ' · User statement: '+item.quote;
+      evidenceList.appendChild(li);
+    });
+    if (identities.length) els.contextHealthEvidencePanel.appendChild(evidenceList);
+    else {
+      var noEvidence = document.createElement('div');
+      noEvidence.textContent = 'No identity statements were reported for this context.';
+      els.contextHealthEvidencePanel.appendChild(noEvidence);
+    }
+    if (Array.isArray(health.traceIds) && health.traceIds.length) {
+      var traceLine = document.createElement('div');
+      traceLine.textContent = 'Trace IDs: ' + health.traceIds.join(', ');
+      els.contextHealthEvidencePanel.appendChild(traceLine);
+    }
+  }
+
+  function updateContextFreshAvailability() {
+    if (els.contextHealthFresh) els.contextHealthFresh.disabled = !!state.streaming || contextFreshStarting;
+  }
+
+  async function refreshContextHealth(session, project) {
+    if (!session || !project) return;
+    var requestToken = ++contextHealthRequestToken;
+    var sessionId = session.id;
+    var projectId = project.id;
+    try {
+      var health = await api('/api/sessions/' + encodeURIComponent(sessionId) + '/context-health?scope=last_reply');
+      if (requestToken !== contextHealthRequestToken || !isCurrentContext(sessionId, projectId)) return;
+      if (health && String(health.sessionId) === String(sessionId) && String(health.projectId) === String(projectId)) {
+        renderContextHealth(health);
+      }
+    } catch (e) {
+      if (requestToken === contextHealthRequestToken && isCurrentContext(sessionId, projectId)) clearContextHealth();
+    }
+  }
+
   async function selectProject(p) {
     var token = ++projectSwitchToken;
+    clearContextHealth();
     state.currentProject = p;
     document.body.classList.toggle('idea-diary-active', isIdeaDiary(p));
     try { localStorage.setItem('llmplus_last_project', p.id); } catch (e) {}
@@ -1189,9 +1340,11 @@
     // Never activate a session that belongs to a different project than the
     // one currently selected (guards against stale/racing state).
     if (s && s.project_id && state.currentProject && s.project_id !== state.currentProject.id) return;
+    clearContextHealth();
     state.currentSession = s;
     renderSessions();
     renderTranscript(s.transcript || []);
+    if (state.currentProject) refreshContextHealth(s, state.currentProject);
   }
 
   function setGreeting() {
@@ -1205,6 +1358,7 @@
   }
 
   function showWelcome() {
+    clearContextHealth();
     els.messages.innerHTML = '';
     els.messages.appendChild(els.welcome);
     els.welcome.style.display = '';
@@ -1439,7 +1593,7 @@
     return div.querySelector('.msg-text');
   }
 
-  function streamSSE(response, textEl, onDone) {
+  function streamSSE(response, textEl, onDone, originSessionId, originProjectId) {
     var reader = response.body.getReader();
     var decoder = new TextDecoder();
     var buffer = '';
@@ -1559,6 +1713,19 @@
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {
                 startTractatusUpdate(parsed.projectId, parsed.userMessage, parsed.assistantResponse);
+              } else if (parsed.type === 'context_health') {
+                if (String(parsed.sessionId) === String(originSessionId) &&
+                    String(parsed.projectId) === String(originProjectId) &&
+                    isCurrentContext(originSessionId, originProjectId)) renderContextHealth(parsed);
+              } else if (parsed.type === 'context_trace') {
+                if (String(parsed.sessionId) === String(originSessionId) &&
+                    String(parsed.projectId) === String(originProjectId) &&
+                    isCurrentContext(originSessionId, originProjectId) && contextHealthSnapshot) {
+                  var traceHealth = Object.assign({}, contextHealthSnapshot, {
+                    traceIds: Array.isArray(parsed.traceIds) ? parsed.traceIds : []
+                  });
+                  renderContextHealth(traceHealth);
+                }
               }
             } catch (e) {}
           }
@@ -1827,6 +1994,7 @@
     state.currentSession.transcript.push({ role: 'user', content: displayText });
 
     state.streaming = true;
+    updateContextFreshAvailability();
     state.abortController = new AbortController();
     els.btnSend.innerHTML = '&#9724;';
     els.btnSend.classList.add('stop-mode');
@@ -1863,7 +2031,8 @@
       }
 
       if (silentDiary) {
-        await streamSilentDiary(res, sendingSession, text);
+        await streamSilentDiary(res, sendingSession, sendingProject, text);
+        refreshContextHealth(sendingSession, sendingProject);
         if (needsAutoTitle && sendingSession) {
           api('/api/sessions/' + sendingSession.id + '/auto-title', {
             method: 'POST',
@@ -1888,6 +2057,7 @@
         els.btnSend.classList.remove('stop-mode');
         els.btnSend.disabled = false;
         refreshBillingStatus();
+        refreshContextHealth(sendingSession, sendingProject);
 
         if (needsAutoTitle && sendingSession) {
           api('/api/sessions/' + sendingSession.id + '/auto-title', {
@@ -1901,7 +2071,7 @@
             }
           }).catch(function() {});
         }
-      });
+      }, sendingSession.id, sendingProject.id);
     } catch (err) {
       if (err.name === 'AbortError') {
         var c = textEl && textEl.querySelector('.cursor-blink');
@@ -1921,6 +2091,8 @@
       els.btnSend.innerHTML = '&#9654;';
       els.btnSend.classList.remove('stop-mode');
       els.btnSend.disabled = false;
+    } finally {
+      updateContextFreshAvailability();
     }
   }
 
@@ -2666,7 +2838,10 @@
       addDocUploadCard(result.name, wordCount, previewText, docId);
 
       state.streaming = true;
+      updateContextFreshAvailability();
       els.btnSend.disabled = true;
+      var contextSession = state.currentSession;
+      var contextProject = state.currentProject;
 
       var claudeMsg = 'The user wants to discuss the document "' + result.name + '" (' + wordCount + ' words). Here is its full content:\n\n' + result.raw_content + '\n\nPlease acknowledge you have loaded this document, briefly summarize it, and let the user know you are ready for questions or instructions about it.';
 
@@ -2685,11 +2860,14 @@
       streamSSE(chatResp, textEl, function() {
         state.streaming = false;
         els.btnSend.disabled = false;
-      });
+        updateContextFreshAvailability();
+        refreshContextHealth(contextSession, contextProject);
+      }, contextSession.id, contextProject.id);
     } catch (err) {
       notify('Failed to load document', 'error');
       state.streaming = false;
       els.btnSend.disabled = false;
+      updateContextFreshAvailability();
     }
   }
 
@@ -2801,7 +2979,10 @@
       loadProjectDocs();
 
       state.streaming = true;
+      updateContextFreshAvailability();
       els.btnSend.disabled = true;
+      var contextSession = state.currentSession;
+      var contextProject = state.currentProject;
 
       var claudeMsg = 'The user just uploaded a document called "' + docData.name + '" (' + wordCount + ' words). Here is its full content:\n\n' + docData.raw_content + '\n\nPlease analyze this document. Summarize its key points, structure, and purpose. Then let the user know you are ready for any questions or instructions about it.';
 
@@ -2820,13 +3001,16 @@
       streamSSE(chatResp, textEl, function() {
         state.streaming = false;
         els.btnSend.disabled = false;
+        updateContextFreshAvailability();
+        refreshContextHealth(contextSession, contextProject);
         var statusEl = cardDiv.querySelector('.duc-status');
         if (statusEl) statusEl.textContent = '\u2705 Claude has analyzed this document. Use the buttons below or ask questions in the chat.';
-      });
+      }, contextSession.id, contextProject.id);
     } catch (err) {
       notify('Upload failed: ' + err.message, 'error');
       state.streaming = false;
       els.btnSend.disabled = false;
+      updateContextFreshAvailability();
     }
   }
 
@@ -3675,6 +3859,279 @@
     // No popup barrier: start the chat immediately. Ground rules are optional and
     // can be set any time from inside the chat via the standing "Ground Rules" button.
     createChatWithRules('');
+  });
+
+  if (els.contextHealthEvidence) {
+    els.contextHealthEvidence.addEventListener('click', function() {
+      var open = els.contextHealthEvidence.getAttribute('aria-expanded') !== 'true';
+      els.contextHealthEvidence.setAttribute('aria-expanded', String(open));
+      els.contextHealthEvidencePanel.classList.toggle('hidden', !open);
+    });
+  }
+  if (els.contextHealthFresh) {
+    els.contextHealthFresh.addEventListener('click', async function() {
+      if (state.streaming || contextFreshStarting || !contextHealthSnapshot ||
+          !state.currentSession || !state.currentProject) return;
+      var sourceSessionId = state.currentSession.id;
+      var sourceProjectId = state.currentProject.id;
+      var sourceSession = state.currentSession;
+      var sourceProject = state.currentProject;
+      contextFreshStarting = true;
+      updateContextFreshAvailability();
+      try {
+        var rules = typeof sourceSession.ground_rules === 'string' ? sourceSession.ground_rules : '';
+        if (typeof sourceSession.ground_rules !== 'string') {
+          var rulesResponse = await api('/api/sessions/' + encodeURIComponent(sourceSessionId) + '/ground-rules');
+          rules = rulesResponse.groundRules || '';
+        }
+        if (!isCurrentContext(sourceSessionId, sourceProjectId) ||
+            String(sourceProject.id) !== String(state.currentProject.id)) return;
+        await createChatWithRules(rules);
+      } catch (err) {
+        notify('Could not start a fresh chat: ' + (err.message || 'request failed'), 'error');
+      } finally {
+        contextFreshStarting = false;
+        updateContextFreshAvailability();
+      }
+    });
+  }
+
+  var contextDiagnosticsButton = document.getElementById('btn-context-diagnostics');
+  var contextDiagnosticsModal = document.getElementById('context-diagnostics-modal');
+  var contextDiagnosticsSelect = document.getElementById('context-diagnostics-trace');
+  var contextDiagnosticsBody = document.getElementById('context-diagnostics-body');
+  var contextDiagnosticsNote = document.getElementById('context-diagnostics-note');
+  var contextDiagnosticsCopy = document.getElementById('context-diagnostics-copy');
+  var contextDiagnosticsDownload = document.getElementById('context-diagnostics-download');
+  var contextCompareButton = document.getElementById('context-compare-full-history');
+  var contextComparisonResult = document.getElementById('context-comparison-result');
+  var contextComparisonStatus = document.getElementById('context-comparison-status');
+  var contextComparisonDirectMeta = document.getElementById('context-comparison-direct-meta');
+  var contextComparisonAppMeta = document.getElementById('context-comparison-app-meta');
+  var contextComparisonDirectText = document.getElementById('context-comparison-direct-text');
+  var contextComparisonAppText = document.getElementById('context-comparison-app-text');
+  function selectedContextDiagnosticTrace() {
+    var selectedId = contextDiagnosticsSelect.value;
+    return contextDiagnosticsTraces.find(function(trace) { return String(trace.id) === selectedId; }) || null;
+  }
+  function updateContextCompareAvailability() {
+    var selected = selectedContextDiagnosticTrace();
+    contextCompareButton.disabled = !!contextComparisonPending || !state.access || !state.access.owner ||
+      !selected || !selected.session_id || !selected.project_id;
+  }
+  function clearContextComparison() {
+    contextComparisonRequestToken++;
+    contextComparisonResult.classList.add('hidden');
+    contextComparisonStatus.classList.remove('is-error');
+    contextComparisonStatus.textContent = 'Select an ordinary trace to compare.';
+    contextComparisonDirectMeta.textContent = '';
+    contextComparisonAppMeta.textContent = '';
+    contextComparisonDirectText.textContent = '';
+    contextComparisonAppText.textContent = '';
+  }
+  function comparisonUsage(usage) {
+    return usage === null || usage === undefined ? 'Usage not reported' : JSON.stringify(usage);
+  }
+  function renderContextComparison(result) {
+    var direct = result.direct || {};
+    var application = result.application || {};
+    contextComparisonResult.classList.remove('hidden');
+    contextComparisonStatus.classList.remove('is-error');
+    var summary = [];
+    if (result.selectedModel) summary.push('Selected model: ' + result.selectedModel);
+    if (result.sameReturnedModel !== undefined) summary.push('Same returned model: ' + String(result.sameReturnedModel));
+    if (result.sameParameters !== undefined) summary.push('Same parameters: ' + String(result.sameParameters));
+    if (result.sameSystemPrompt !== undefined) summary.push('Same system prompt: ' + String(result.sameSystemPrompt));
+    if (result.fullHistoryMessages !== undefined) summary.push('Full-history messages: ' + result.fullHistoryMessages);
+    if (result.applicationHistoryMessages !== undefined) summary.push('Application history messages: ' + result.applicationHistoryMessages);
+    if (Array.isArray(result.traceIds) && result.traceIds.length) summary.push('Comparison traces: ' + result.traceIds.join(', '));
+    if (result.note) summary.push(String(result.note));
+    contextComparisonStatus.textContent = summary.join(' · ') || 'Comparison complete.';
+    contextComparisonDirectMeta.textContent = 'Model: ' + (direct.model || 'not reported') + ' · Usage: ' + comparisonUsage(direct.usage);
+    contextComparisonAppMeta.textContent = 'Model: ' + (application.model || 'not reported') + ' · Usage: ' + comparisonUsage(application.usage);
+    contextComparisonDirectText.textContent = direct.text === null || direct.text === undefined ? 'No direct response text was returned.' : String(direct.text);
+    contextComparisonAppText.textContent = application.text === null || application.text === undefined ? 'No application response text was returned.' : String(application.text);
+  }
+  function scrubContextDiagnostic(value) {
+    if (Array.isArray(value)) return value.map(scrubContextDiagnostic);
+    if (!value || typeof value !== 'object') return value;
+    var clean = {};
+    Object.keys(value).forEach(function(key) {
+      if (/^(?:key|keys|headers?|api[_-]?key|authorization|password|secret|credential|access[_-]?token)$/i.test(key)) {
+        clean[key] = '[redacted]';
+      } else {
+        clean[key] = scrubContextDiagnostic(value[key]);
+      }
+    });
+    return clean;
+  }
+  function closeContextDiagnostics() {
+    contextDiagnosticsRequestToken++;
+    contextDiagnosticsTraces = [];
+    clearContextComparison();
+    updateContextCompareAvailability();
+    contextDiagnosticsModal.classList.add('hidden');
+    contextDiagnosticsModal.classList.remove('active');
+    contextDiagnosticsData = null;
+    contextDiagnosticsSelect.innerHTML = '';
+    contextDiagnosticsBody.textContent = 'Select a trace to inspect its provider request and response.';
+    contextDiagnosticsCopy.disabled = true;
+    contextDiagnosticsDownload.disabled = true;
+  }
+  async function loadContextDiagnosticDetail(traceId) {
+    if (!state.access || !state.access.owner || !traceId) return;
+    var detailToken = ++contextDiagnosticsRequestToken;
+    contextDiagnosticsData = null;
+    contextDiagnosticsBody.textContent = 'Loading trace…';
+    contextDiagnosticsCopy.disabled = true;
+    contextDiagnosticsDownload.disabled = true;
+    contextDiagnosticsNote.textContent = 'Trace data is sensitive and is held only in this page while open.';
+    try {
+      var response = await fetch('/api/admin/context-diagnostics/' + encodeURIComponent(traceId), {
+        cache: 'no-store',
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Trace request failed (' + response.status + ')');
+      var detail = scrubContextDiagnostic(await response.json());
+      if (detailToken !== contextDiagnosticsRequestToken || contextDiagnosticsModal.classList.contains('hidden') ||
+          !state.access || !state.access.owner || contextDiagnosticsSelect.value !== String(traceId)) return;
+      contextDiagnosticsData = detail;
+      contextDiagnosticsBody.textContent = JSON.stringify(detail, null, 2);
+      contextDiagnosticsCopy.disabled = false;
+      contextDiagnosticsDownload.disabled = false;
+    } catch (error) {
+      contextDiagnosticsBody.textContent = 'Could not load this trace.';
+      contextDiagnosticsNote.textContent = error.message || 'Trace request failed.';
+    }
+  }
+  if (contextDiagnosticsButton) contextDiagnosticsButton.addEventListener('click', async function() {
+    if (!state.access || !state.access.owner) return;
+    var indexToken = ++contextDiagnosticsRequestToken;
+    contextDiagnosticsTraces = [];
+    clearContextComparison();
+    updateContextCompareAvailability();
+    contextDiagnosticsModal.classList.remove('hidden');
+    contextDiagnosticsModal.classList.add('active');
+    contextDiagnosticsData = null;
+    contextDiagnosticsSelect.innerHTML = '';
+    var loading = document.createElement('option');
+    loading.value = '';
+    loading.textContent = 'Loading traces…';
+    contextDiagnosticsSelect.appendChild(loading);
+    contextDiagnosticsBody.textContent = 'Loading trace index…';
+    contextDiagnosticsCopy.disabled = true;
+    contextDiagnosticsDownload.disabled = true;
+    contextDiagnosticsNote.textContent = 'Trace data is sensitive and is held only in this page while open.';
+    try {
+      var response = await fetch('/api/admin/context-diagnostics', { cache: 'no-store', credentials: 'include' });
+      if (!response.ok) throw new Error('Trace index request failed (' + response.status + ')');
+      var traces = await response.json();
+      if (indexToken !== contextDiagnosticsRequestToken || !state.access || !state.access.owner ||
+          contextDiagnosticsModal.classList.contains('hidden')) return;
+      contextDiagnosticsSelect.innerHTML = '';
+      if (!Array.isArray(traces) || traces.length === 0) {
+        var empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = 'No traces available';
+        contextDiagnosticsSelect.appendChild(empty);
+        contextDiagnosticsBody.textContent = 'No context traces have been recorded.';
+        updateContextCompareAvailability();
+        return;
+      }
+      contextDiagnosticsTraces = traces;
+      traces.forEach(function(trace) {
+        var option = document.createElement('option');
+        option.value = String(trace.id);
+        var when = trace.created_at ? new Date(trace.created_at).toLocaleString() : 'Time unavailable';
+        option.textContent = [when, trace.model || 'model unknown', trace.status || 'status unknown', String(trace.id)].join(' · ');
+        contextDiagnosticsSelect.appendChild(option);
+      });
+      updateContextCompareAvailability();
+      loadContextDiagnosticDetail(contextDiagnosticsSelect.value);
+    } catch (error) {
+      contextDiagnosticsBody.textContent = 'Could not load context diagnostics.';
+      contextDiagnosticsNote.textContent = error.message || 'Trace index request failed.';
+    }
+  });
+  if (contextDiagnosticsSelect) contextDiagnosticsSelect.addEventListener('change', function() {
+    clearContextComparison();
+    updateContextCompareAvailability();
+    loadContextDiagnosticDetail(contextDiagnosticsSelect.value);
+  });
+  if (contextCompareButton) contextCompareButton.addEventListener('click', async function() {
+    var selected = selectedContextDiagnosticTrace();
+    if (contextComparisonPending || !state.access || !state.access.owner || !selected ||
+        !selected.session_id || !selected.project_id) return;
+    var selectedTraceId = selected.id;
+    var requestToken = ++contextComparisonRequestToken;
+    contextComparisonPending = true;
+    contextComparisonResult.classList.remove('hidden');
+    contextComparisonStatus.classList.remove('is-error');
+    contextComparisonStatus.textContent = 'Running two model calls…';
+    contextComparisonDirectMeta.textContent = '';
+    contextComparisonAppMeta.textContent = '';
+    contextComparisonDirectText.textContent = '';
+    contextComparisonAppText.textContent = '';
+    updateContextCompareAvailability();
+    try {
+      var response = await fetch('/api/admin/context-comparison', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          traceId: selectedTraceId,
+          sessionId: selected.session_id,
+          projectId: selected.project_id
+        })
+      });
+      if (!response.ok) {
+        var responseText = await response.text();
+        throw new Error(responseText || 'Comparison failed (' + response.status + ')');
+      }
+      var comparison = await response.json();
+      if (requestToken === contextComparisonRequestToken &&
+          !contextDiagnosticsModal.classList.contains('hidden') &&
+          contextDiagnosticsSelect.value === String(selectedTraceId) &&
+          state.access && state.access.owner) renderContextComparison(comparison);
+    } catch (error) {
+      if (requestToken === contextComparisonRequestToken &&
+          !contextDiagnosticsModal.classList.contains('hidden') &&
+          contextDiagnosticsSelect.value === String(selectedTraceId)) {
+        contextComparisonResult.classList.remove('hidden');
+        contextComparisonStatus.classList.add('is-error');
+        contextComparisonStatus.textContent = 'Comparison failed: ' + (error.message || 'request error');
+      }
+    } finally {
+      contextComparisonPending = false;
+      updateContextCompareAvailability();
+    }
+  });
+  if (contextDiagnosticsCopy) contextDiagnosticsCopy.addEventListener('click', async function() {
+    if (!contextDiagnosticsData) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(contextDiagnosticsData, null, 2));
+      contextDiagnosticsNote.textContent = 'Sanitized trace JSON copied.';
+    } catch (error) { contextDiagnosticsNote.textContent = 'Clipboard access failed.'; }
+  });
+  if (contextDiagnosticsDownload) contextDiagnosticsDownload.addEventListener('click', function() {
+    if (!contextDiagnosticsData) return;
+    var blob = new Blob([JSON.stringify(contextDiagnosticsData, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'context-trace-' + String(contextDiagnosticsData.id || 'detail').replace(/[^a-zA-Z0-9_-]/g, '') + '.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+  var closeContextDiagnosticsButton = document.getElementById('close-context-diagnostics');
+  if (closeContextDiagnosticsButton) closeContextDiagnosticsButton.addEventListener('click', closeContextDiagnostics);
+  if (contextDiagnosticsModal) contextDiagnosticsModal.addEventListener('mousedown', function(event) {
+    if (event.target === contextDiagnosticsModal) closeContextDiagnostics();
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && contextDiagnosticsModal && !contextDiagnosticsModal.classList.contains('hidden')) {
+      closeContextDiagnostics();
+    }
   });
 
   async function createChatWithRules(rules) {

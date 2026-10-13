@@ -1,0 +1,108 @@
+# URGENT: AUDIT AND REPAIR THE LLM CONTEXT AND MEMORY SYSTEM
+
+My application uses powerful external models, including Claude and Grok. These models perform substantially better in their native interfaces than they do inside my application. The application repeatedly forgets explicitly established facts, confuses people, invents dates, contradicts source documents, and confidently builds arguments on false premises.
+
+**Your assignment is to identify and eliminate every application-level mechanism responsible for this degradation. Do not merely change the system prompt or increase the advertised context-window size.**
+
+## 1. Audit the complete message pipeline
+
+Trace exactly what happens between the user's submission and the model's response, including:
+
+- Conversation-history retrieval
+- Database reads and writes
+- Message ordering and role assignment
+- Context truncation and token limits
+- Summarization and compression
+- Retrieval-augmented generation
+- System-prompt injection
+- Model API requests and responses
+- Postprocessing, filtering, and response rewriting
+
+Identify every point where the original conversation is shortened, discarded, modified, reordered, summarized, or replaced.
+
+## 2. Eliminate unauthorized interference
+
+The application must not silently:
+
+- Replace complete conversation history with an inadequate summary.
+- Drop earlier user corrections or uploaded evidence.
+- Rewrite user messages before sending them to the model.
+- Alter substantive model responses after generation.
+- Inject instructions encouraging agreement, flattery, or unjustified certainty.
+- Substitute a cheaper or less capable model without disclosure.
+- Misrepresent the number of tokens actually supplied to the model.
+
+Preserve necessary safety and provider-required controls. Remove application-specific transformations that degrade factual accuracy.
+
+## 3. Implement reliable persistent memory
+
+Create a durable, database-backed memory system containing:
+
+- Canonical identities and roles of people
+- Verified dates and chronological events
+- Established facts with source references
+- Explicit user corrections
+- Unresolved factual disputes
+- Uploaded documents and their contents
+
+Corrections must supersede erroneous working assumptions without erasing the historical record. The system must distinguish verified facts, user allegations, model inferences, and unknown information.
+
+**Example:** Once the user establishes that David Lease is the judge, the application must not subsequently identify Lease as a trustee.
+
+## 4. Preserve access to the actual conversation
+
+Store every message in full, in chronological order, without silent deletion. Supply the full conversation whenever it fits the selected model's actual context limit.
+
+When it does not fit, use intelligent retrieval from the original messages and documents, together with persistent factual memory. Never pretend that a compressed summary is equivalent to the original conversation.
+
+Uploaded documents must remain retrievable throughout the conversation.
+
+## 5. Add factual consistency checks
+
+Before producing an answer, check relevant assertions against stored facts, corrections, and source documents.
+
+Detect identity confusion, invented dates, contradictions, and unsupported claims. When evidence is insufficient, the model must acknowledge uncertainty rather than fabricate an answer.
+
+## 6. Run a direct model-versus-application comparison
+
+Take the SAME conversation, SAME model, SAME model version, and SAME model parameters.
+
+Test:
+
+**A.** Direct call to the model provider's API with the complete conversation.
+
+**B.** Call through my application.
+
+Compare the actual messages sent, token counts, retrieved context, and responses. Determine exactly where performance diverges.
+
+Log the complete outgoing API request and incoming response for debugging, with sensitive information protected. Expose these diagnostics in an admin-only interface.
+
+## 7. Build automated regression tests
+
+Use my uploaded conversation as a regression test. Verify that the application:
+
+- Remembers that David Lease is the judge.
+- Does not invent lawsuit or forensic-report dates.
+- Retains explicit corrections across lengthy conversations.
+- Correctly identifies parties and their roles.
+- Distinguishes hearing-transcript statements from speculation.
+- Recovers relevant information after unrelated topic changes.
+- Does not contradict documentary evidence without explaining the conflict.
+
+Run the same tests after context compaction, server restarts, and long conversations.
+
+## 8. Deliver a working repair, not an explanation
+
+Inspect the existing code, identify the actual causes, implement the necessary changes, and run the tests.
+
+**Do not rebuild unrelated parts of the application. Do not remove existing features. Do not declare success merely because the application compiles.**
+
+Finally, provide:
+
+1. The exact defects discovered, with file names and relevant code locations.
+2. The changes made to fix each defect.
+3. Before-and-after test results.
+4. The actual context and token counts delivered to each model.
+5. Any remaining limitations.
+
+**NONNEGOTIABLE REQUIREMENT: My application must preserve the reasoning capabilities of the underlying models rather than degrade them through defective context management, summarization, filtering, or memory handling.**

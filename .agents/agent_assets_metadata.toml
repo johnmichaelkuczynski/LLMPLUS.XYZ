@@ -129,3 +129,17 @@ mtime_ms = 1790204060896
 storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/06ce412b-5836-4333-a275-bdfb37117068/8f6432f4-a1dc-475c-b799-8225bb9df6ea"
 storage_version_token = "1790204068389624"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "MzLeMET_UKphGsnviKoVi"
+uri = "file://generated-artifacts/LLM-Plus-memory-repair-audit.txt"
+type = "text"
+title = "LLM Plus memory repair: audit and exact tested answers"
+description = "Verified defects, repairs, actual provider usage, regression results and remaining limits, with the exact inspected answers."
+logical_id = "c8e09f10-a74c-4f4f-a590-67dfbc163836"
+content_hash = "sha256:4aeb6bb4db56121c18f87f90e6c51b66ef8fd365464a8f08731f23b516084989"
+size = 9174
+mtime_ms = 1791917689182
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:2c6e621a-115a-4e70-9a0d-1b4737ac5dd7/c8e09f10-a74c-4f4f-a590-67dfbc163836/ac4bcdd6-1c30-46b5-8265-957a9bbdb768"
+storage_version_token = "1791917690246797"
+content_type = "text/plain"

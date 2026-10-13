@@ -14,9 +14,9 @@ Root causes:
 
 **The contract (keep it true):**
 - Ordinary chat must ground document questions in the real document text, budgeted and query-relevant (`selectDocExcerpts`), not only the tree. The tree is a lossy summary; exact numbers/dates/citations do not survive compression.
-- All project-context injection (tree, docs, cross-session) is gated by `isProjectSpecificQuery`. A phrasing miss = zero memory. There is now a regex fallback that force-enables context on document/recall intents — if recall silently breaks again, check that gate FIRST.
+- Do not use a keyword classifier to eliminate all project memory. Short follow-ups, pronouns and emotionally worded corrections still need persistent identity and source context.
 - Injected document text is UNTRUSTED: label it as data and tell the model to ignore any instructions embedded in it (prompt-injection).
-- Bound the DB read (LIMIT + `LEFT(raw_content, N)`) so one huge doc can't blow up latency/memory; the prompt budget alone does not cap the DB/string cost.
+- Bound DB reads through indexed source passages, not an arbitrary document prefix: source text beyond a prefix can contain the decisive evidence. The prompt budget alone does not cap DB/string cost.
 
 **Why it matters:** memory-across-chats + not-bullshitting is the app's whole value prop vs. plain ChatGPT. If either regresses, the user churns.
 

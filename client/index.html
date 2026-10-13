@@ -122,10 +122,23 @@
         <button class="topbar-btn" id="btn-download-session" data-testid="btn-download-session" title="Download this chat session">&#11015; Download chat</button>
         <button class="topbar-btn" id="btn-move-session" data-testid="btn-move-session" title="Move this session to another project">&#8618; Move session</button>
         <button class="topbar-btn topbar-btn-diagnostic" id="btn-diagnostic" data-testid="btn-diagnostic" title="Run a full system check">&#129514; Diagnostic</button>
+        <button class="topbar-btn context-diagnostics-trigger hidden" id="btn-context-diagnostics" data-testid="btn-context-diagnostics" type="button">Context diagnostics</button>
         <a class="topbar-btn" id="btn-google-login" data-testid="btn-google-login" href="/api/auth/google" title="Sign in or switch Google account">Google Login</a>
         <button class="topbar-btn billing-btn" id="btn-billing" data-testid="btn-billing" type="button">Upgrade · $100/mo</button>
         <button class="topbar-btn hidden" id="btn-signout" data-testid="btn-signout" title="Sign out">Sign out</button>
       </header>
+
+      <section class="context-health hidden" id="context-health" data-testid="context-health" aria-live="polite" aria-label="Context coverage">
+        <div class="context-health-copy">
+          <strong class="context-health-title" id="context-health-title"></strong>
+          <span class="context-health-detail" id="context-health-detail"></span>
+        </div>
+        <div class="context-health-actions">
+          <button type="button" class="context-health-evidence" id="context-health-evidence" aria-expanded="false">Evidence</button>
+          <button type="button" class="context-health-fresh hidden" id="context-health-fresh">Start fresh chat</button>
+        </div>
+        <div class="context-health-evidence-panel hidden" id="context-health-evidence-panel"></div>
+      </section>
 
       <div id="paywall-modal" class="modal hidden" data-testid="paywall-modal">
         <div class="modal-content paywall-card">
@@ -154,6 +167,43 @@
           <div class="diagnostic-body" id="diagnostic-body" data-testid="diagnostic-body">
             <p class="diagnostic-intro">This check verifies environment variables, the database, model APIs, core CRUD round-trips, a completed chat response, and whether stored document text is retrieved and used in an answer. Temporary diagnostic records are deleted automatically; your existing data is not changed.</p>
           </div>
+        </div>
+      </div>
+
+      <div id="context-diagnostics-modal" class="modal hidden" data-testid="context-diagnostics-modal" role="dialog" aria-modal="true" aria-labelledby="context-diagnostics-title">
+        <div class="modal-content context-diagnostics-modal-content">
+          <div class="modal-header">
+            <h3 id="context-diagnostics-title">Context diagnostics</h3>
+            <button class="diagnostic-close-btn" id="close-context-diagnostics" type="button" aria-label="Close context diagnostics">Close &times;</button>
+          </div>
+          <div class="context-diagnostics-controls">
+            <label for="context-diagnostics-trace">Trace</label>
+            <select id="context-diagnostics-trace" aria-label="Select context trace">
+              <option value="">Loading traces…</option>
+            </select>
+            <button type="button" id="context-diagnostics-copy" disabled>Copy JSON</button>
+            <button type="button" id="context-diagnostics-download" disabled>Download JSON</button>
+            <button type="button" id="context-compare-full-history" disabled>Compare with full history</button>
+          </div>
+          <p class="context-compare-warning">Makes two model calls.</p>
+          <p class="context-diagnostics-note" id="context-diagnostics-note" aria-live="polite">Trace data is sensitive and is held only in this page while open.</p>
+          <pre class="context-diagnostics-body" id="context-diagnostics-body" tabindex="0">Select a trace to inspect its provider request and response.</pre>
+          <section class="context-comparison hidden" id="context-comparison-result" aria-live="polite">
+            <h4>Full-history comparison</h4>
+            <p class="context-comparison-status" id="context-comparison-status">Select an ordinary trace to compare.</p>
+            <div class="context-comparison-columns">
+              <article>
+                <h5>Direct · full history</h5>
+                <p class="context-comparison-meta" id="context-comparison-direct-meta"></p>
+                <pre id="context-comparison-direct-text"></pre>
+              </article>
+              <article>
+                <h5>Application · current context</h5>
+                <p class="context-comparison-meta" id="context-comparison-app-meta"></p>
+                <pre id="context-comparison-app-text"></pre>
+              </article>
+            </div>
+          </section>
         </div>
       </div>
 

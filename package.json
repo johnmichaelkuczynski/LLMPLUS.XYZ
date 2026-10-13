@@ -11,6 +11,8 @@
     "check:response-length": "node tools/response-length-check.mjs",
     "check:plain-output": "node tools/plain-output-check.mjs",
     "check:idea-diary": "node tools/r1/idea-diary-check.mjs",
+    "check:memory": "node tools/memory-context-check.mjs",
+    "check:memory:live": "node tools/memory-live-check.mjs",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
@@ -62,6 +64,7 @@
     "express-session": "^1.19.0",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.4.2",
+    "js-tiktoken": "^1.0.21",
     "lucide-react": "^0.453.0",
     "mammoth": "^1.11.0",
     "memorystore": "^1.6.7",

@@ -1,11 +1,12 @@
 - [Tractatus value typing](tractatus-value-typing.md) — tree/JSONB node values aren't guaranteed strings; coerce before string methods, and keep chat-stream catch blocks loud (empty bubble = swallowed crash).
 - [Personal Google access](replit-auth-no-packages.md) — production data requires the exact owner's Google account; development preview opens the same existing owner workspace without a login wall.
 - [Stale deploy run command](deployment-stale-run-command.md) — Publishing UI can override .replit's run command; failed publishes may leave no build/log trace. Fix by building the file the stale command targets.
-- [Chat context-build latency](chat-context-latency.md) — per-turn chat latency must NOT scale with project size; trim transcript tails in SQL, gate cross-session behind includeProjectContext, keep raw history lean (memory tree carries continuity).
+- [Chat context-build latency](chat-context-latency.md) — bound project retrieval, but preserve current-chat originals within the token budget; do not replace them with a fixed short window.
 - [Assistant verbosity & mission drift](assistant-verbosity-mission-drift.md) — highest-priority prompt block makes the assistant obey "read and take note" (brief confirm, no lecture) and stay on mission; keep it ABOVE any rigor/analysis framing.
 - [Secret updates and stale env](secret-update-stale-env.md) — shell/server can hold a stale secret after user updates it; fingerprint via sha256 and restart workflow after the save, not before.
 - [Target-words silent truncation](target-words-silent-truncation.md) — a stray value in the "Words #" box silently capped every reply (maxTokens=256) → mid-sentence freezes; persistent length-overrides need visible active state + clear.
-- [Chat document recall](chat-document-recall.md) — ordinary chat must inject the ACTUAL project_documents text (budgeted, query-relevant), not just the lossy tree; project-context is gated by isProjectSpecificQuery (a phrasing miss drops ALL memory) with a regex fallback; treat doc text as untrusted.
+- [Chat document recall](chat-document-recall.md) — retrieve actual source passages, never only generated summaries; short follow-ups must not lose memory through keyword gating.
+- [Source fidelity and token counts](source-fidelity-token-counts.md) — original sources outrank generated memory; unsupported token counters require disclosed estimates, not byte counts presented as tokens.
 - [Normal length runaway](response-length-normal.md) — "Normal = never-ending" is fixed by 3 agreeing levers (length block + end-of-prompt FINAL REMINDER for recency + max_tokens ceiling), not by continuation logic; confirm/verify/check = brief yes/no, not an essay.
 - [UI modal stacking](ui-verification-login-gate.md) — modals opened from the artifact panel need z-index ≥1200 or the panel intercepts their clicks.
 - [Auto-commit PII sweep](auto-commit-pii-sweep.md) — completion commits sweep in pasted attached_assets transcripts; strip them or review rejects.
@@ -18,3 +19,4 @@
 - [Diary AI refusals and safety](diary-ai-refusals-safety.md) — 200 responses can be refusal-empty; durable capture needs a deterministic fallback, and safety checks must scan adversative clauses.
 - [Lockfile regeneration firewall](lockfile-regeneration-firewall.md) — npm may fail on an unavailable optional artifact after safely updating resolutions; preserve the graph and sync only root lock metadata.
 - [Stripe production mode](stripe-production-mode.md) — LLM Plus uses owner-managed live Stripe keys, not Replit’s sandbox-sync integration.
+- [Source-claim testing](source-claim-testing.md) — test assertion polarity: “completed” inside an unknown claim is not recall, and a retracted date is not a fabricated date.
