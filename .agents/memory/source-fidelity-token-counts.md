@@ -26,3 +26,9 @@ Provider aliases may resolve to a different reported version than the literal re
 **Why:** Real provider responses exposed alias/version differences during verification; a successful request does not establish the provider's maximum context capacity.
 
 **How to apply:** Expose both requested and reported models. Label conservative configured budgets as budgets, not verified physical capacities. Never interpret rate limits as permission to shorten history or change models.
+
+A recalled citation is permission to inspect its original source only within the project where the citation was offered, not permission to follow a moved chat into a different project.
+
+**Why:** A stale citation can otherwise make one project's evidence appear to come from another, even when the user owns both projects.
+
+**How to apply:** Resolve source links against current ownership and current project membership. Show an unavailable-source message after moves or deletion; do not automatically navigate or fall back to cached originals.

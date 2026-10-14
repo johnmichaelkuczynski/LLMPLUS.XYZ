@@ -14,6 +14,7 @@ import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
 import { registerVeniceVideoRoutes } from './venice-video.js';
 import { initContextMemory, ensureProjectIndex, prepareOriginalContext, CONTEXT_LIMITS, conservativeTokenEstimate, checkAnswerConsistency } from './context-memory.js';
 import { contextTrace, auditedProviderFetch, registerContextDiagnostics, decryptTrace } from './context-diagnostics.js';
+import { registerSourceInspector } from './source-inspector.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -141,6 +142,7 @@ app.use('/api', function(req, res, next) {
   next();
 });
 registerContextDiagnostics(app, pool, hasPermanentOwnerAccess);
+registerSourceInspector(app, pool);
 
 const ANONYMOUS_FREE_ACTIONS = 3;
 const AUTHENTICATED_FREE_ACTIONS = 10;

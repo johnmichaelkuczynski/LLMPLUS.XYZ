@@ -1046,7 +1046,89 @@
   }
 
   var projectSwitchToken = 0;
+  var sourceInspectorToken = 0;
+  var sourceInspectorReturnFocus = null;
+  var sourceInspectorModal = document.getElementById('source-inspector-modal');
+  var sourceInspectorInfo = document.getElementById('source-inspector-info');
+  var sourceInspectorPassage = document.getElementById('source-inspector-passage');
+  var sourceInspectorClose = document.getElementById('close-source-inspector');
+
+  function closeSourceInspector() {
+    sourceInspectorToken++;
+    sourceInspectorModal.classList.add('hidden');
+    sourceInspectorInfo.textContent = '';
+    sourceInspectorPassage.textContent = '';
+    if (sourceInspectorReturnFocus && sourceInspectorReturnFocus.isConnected) sourceInspectorReturnFocus.focus();
+    sourceInspectorReturnFocus = null;
+  }
+  sourceInspectorClose.addEventListener('click', closeSourceInspector);
+  sourceInspectorModal.addEventListener('click', function(event) {
+    if (event.target === sourceInspectorModal) closeSourceInspector();
+  });
+  // Capture Escape so closing a source does not abort an active generation.
+  document.addEventListener('keydown', function(event) {
+    if (sourceInspectorModal.classList.contains('hidden')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeSourceInspector();
+    } else if (event.key === 'Tab') {
+      if (event.shiftKey && document.activeElement === sourceInspectorClose) {
+        event.preventDefault(); sourceInspectorPassage.focus();
+      } else if (!event.shiftKey && document.activeElement === sourceInspectorPassage) {
+        event.preventDefault(); sourceInspectorClose.focus();
+      }
+    }
+  }, true);
+
+  async function openSourceInspector(reference, quote, projectId, sessionId, button) {
+    if (!isCurrentContext(sessionId, projectId)) return;
+    var token = ++sourceInspectorToken;
+    sourceInspectorReturnFocus = button;
+    sourceInspectorInfo.textContent = 'Loading original source…';
+    sourceInspectorPassage.textContent = '';
+    sourceInspectorModal.classList.remove('hidden');
+    sourceInspectorClose.focus();
+    var params = new URLSearchParams();
+    ['sessionId','ordinal','documentId','offsetChars'].forEach(function(key) {
+      if (reference[key] !== undefined) params.set(key, reference[key]);
+    });
+    if (quote) params.set('quote', String(quote).slice(0,1600));
+    try {
+      var response = await fetch('/api/projects/' + encodeURIComponent(projectId) + '/source?' + params, {
+        cache:'no-store', credentials:'include'
+      });
+      var data = await response.json();
+      if (token !== sourceInspectorToken || !isCurrentContext(sessionId, projectId)) return;
+      if (!response.ok) throw new Error(data.error || 'Could not load this source.');
+      sourceInspectorInfo.textContent = data.title + ' · ' + data.location + ' · ' + data.attribution +
+        ' · ' + data.timestampLabel + (data.timestamp ? ': ' + data.timestamp : '') +
+        ' · ' + (data.excerpt ? 'Excerpt with surrounding text' : 'Complete original text') +
+        ' · Characters ' + (data.startChars + 1) + '–' + data.endChars + ' of ' + data.totalChars;
+      sourceInspectorPassage.textContent = (data.startChars ? '[Earlier text omitted]\n\n' : '') +
+        data.passage + (data.endChars < data.totalChars ? '\n\n[Later text omitted]' : '');
+    } catch (err) {
+      if (token !== sourceInspectorToken || !isCurrentContext(sessionId, projectId)) return;
+      sourceInspectorInfo.textContent = err.message;
+      sourceInspectorPassage.textContent = '';
+    }
+  }
+
+  function appendSourceButton(parent, reference, quote, health) {
+    if (!reference || (!reference.sessionId && !reference.documentId)) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'context-health-evidence';
+    button.textContent = 'Open original source';
+    button.addEventListener('click', function() {
+      openSourceInspector(reference, quote, health.projectId, health.sessionId, button);
+    });
+    parent.appendChild(document.createTextNode(' '));
+    parent.appendChild(button);
+  }
+
   function clearContextHealth() {
+    closeSourceInspector();
     contextHealthRequestToken++;
     contextHealthSnapshot = null;
     if (els.contextHealth) els.contextHealth.classList.add('hidden');
@@ -1131,14 +1213,28 @@
       var sourceText = item.source && typeof item.source==='object' ?
         'chat '+String(item.source.sessionId||'').slice(0,8)+', message '+item.source.ordinal : item.source;
       li.textContent = [item.entity, item.role, sourceText].filter(Boolean).join(' — ');
-      if (item.quote) li.textContent += ' · User statement: '+item.quote;
+      var classification = item.classification === 'source_document' ? 'Document excerpt' :
+        item.classification === 'user_hypothesis' ? 'User hypothesis' : 'User report';
+      if (item.quote) li.textContent += ' · ' + classification + ' (excerpt; not independently verified): '+item.quote;
+      appendSourceButton(li, item.source, item.quote, health);
       evidenceList.appendChild(li);
     });
     if (identities.length) els.contextHealthEvidencePanel.appendChild(evidenceList);
     else {
       var noEvidence = document.createElement('div');
-      noEvidence.textContent = 'No identity statements were reported for this context.';
+      noEvidence.textContent = 'No identity or timeline statements were reported for this context.';
       els.contextHealthEvidencePanel.appendChild(noEvidence);
+    }
+    if (Array.isArray(health.sourceReferences) && health.sourceReferences.length) {
+      var sourceList = document.createElement('ul');
+      health.sourceReferences.forEach(function(reference) {
+        var li = document.createElement('li');
+        li.textContent = (reference.kind === 'source_document' ? 'Document excerpt' : 'User report excerpt') +
+          (reference.quote ? ': ' + reference.quote : ' used in this context');
+        appendSourceButton(li, reference, reference.quote, health);
+        sourceList.appendChild(li);
+      });
+      els.contextHealthEvidencePanel.appendChild(sourceList);
     }
     if (Array.isArray(health.traceIds) && health.traceIds.length) {
       var traceLine = document.createElement('div');

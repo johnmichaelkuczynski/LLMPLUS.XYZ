@@ -312,7 +312,9 @@ export async function retrieveEvidence(pool, projectId, sessionId, query, recent
       source:{session:r.session_id,message:r.ordinal},text:excerpt(own,terms,1600) }) + '\n';
     if (chars+entry.length > 22000) break;
     block += entry; chars += entry.length;
-    sources.push({sessionId:r.session_id,ordinal:r.ordinal,kind:'user_statement'});
+    sources.push({sessionId:r.session_id,ordinal:r.ordinal,kind:'user_statement',
+      quote:excerpt(own,terms,1600).replace(/^\[Earlier text omitted\]\n/,'').replace(/\n\[Later text omitted\]$/,'')
+        .split('\n[Source excerpt: central text omitted; original retained]\n').sort((a,b)=>b.length-a.length)[0]});
   }
   let docChars = 0;
   for (const d of docs.rows) {
@@ -320,7 +322,7 @@ export async function retrieveEvidence(pool, projectId, sessionId, query, recent
       offsetChars:d.offset_chars,text:d.content}) + '\n';
     if (docChars+entry.length > 24000) break;
     block += entry; docChars += entry.length;
-    sources.push({documentId:d.document_id,offsetChars:d.offset_chars,kind:'source_document'});
+    sources.push({documentId:d.document_id,offsetChars:d.offset_chars,kind:'source_document',quote:d.content.slice(0,1600)});
   }
   if (docChars < 20000) {
     const attached = await pool.query(`SELECT c.*,s.title FROM memory_message_chunks c
@@ -334,7 +336,7 @@ export async function retrieveEvidence(pool, projectId, sessionId, query, recent
         offsetChars:a.offset_chars,text:a.content})+'\n';
       if (docChars+entry.length>24000) break;
       block += entry; docChars += entry.length;
-      sources.push({sessionId:a.session_id,ordinal:a.ordinal,offsetChars:a.offset_chars,kind:'source_document'});
+      sources.push({sessionId:a.session_id,ordinal:a.ordinal,offsetChars:a.offset_chars,kind:'source_document',quote:a.content.slice(0,1600)});
     }
   }
   block += '[END SOURCE-ATTRIBUTED MEMORY]\n';

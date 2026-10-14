@@ -170,6 +170,17 @@
         </div>
       </div>
 
+      <div id="source-inspector-modal" class="modal hidden" style="z-index:1300" data-testid="source-inspector-modal" role="dialog" aria-modal="true" aria-labelledby="source-inspector-title">
+        <div class="modal-content context-diagnostics-modal-content">
+          <div class="modal-header">
+            <h3 id="source-inspector-title">Original source</h3>
+            <button class="diagnostic-close-btn" id="close-source-inspector" type="button" aria-label="Close original source">Close &times;</button>
+          </div>
+          <p id="source-inspector-info" aria-live="polite"></p>
+          <pre id="source-inspector-passage" style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:60vh;overflow:auto" tabindex="0"></pre>
+        </div>
+      </div>
+
       <div id="context-diagnostics-modal" class="modal hidden" data-testid="context-diagnostics-modal" role="dialog" aria-modal="true" aria-labelledby="context-diagnostics-title">
         <div class="modal-content context-diagnostics-modal-content">
           <div class="modal-header">
