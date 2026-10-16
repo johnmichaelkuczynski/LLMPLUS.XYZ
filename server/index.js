@@ -15,6 +15,7 @@ import { registerVeniceVideoRoutes } from './venice-video.js';
 import { initContextMemory, ensureProjectIndex, prepareOriginalContext, CONTEXT_LIMITS, conservativeTokenEstimate, checkAnswerConsistency } from './context-memory.js';
 import { contextTrace, auditedProviderFetch, registerContextDiagnostics, decryptTrace, providerDelay, providerSignal } from './context-diagnostics.js';
 import { createRequestLifetime, releaseGenerationLock } from './request-lifecycle.js';
+import { credentialRouter, rotatingProviderFetch } from './provider-credentials.js';
 import { registerSourceInspector } from './source-inspector.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -353,12 +354,12 @@ async function verifyGlobalDocOwnership(docId, userId) {
   return r.rows.length > 0;
 }
 
-const ANTHROPIC_API_KEY = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_BASE_URL = (process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
-const VENICE_API_KEY = process.env.VENICE_API_KEY;
+const ANTHROPIC_API_KEY = credentialRouter.primary('claude')?.key;
+const ANTHROPIC_BASE_URL = credentialRouter.primary('claude')?.base || 'https://api.anthropic.com';
+const OPENAI_API_KEY = credentialRouter.primary('chatgpt')?.key;
+const DEEPSEEK_API_KEY = credentialRouter.primary('deepseek')?.key;
+const XAI_API_KEY = credentialRouter.primary('grok')?.key;
+const VENICE_API_KEY = credentialRouter.primary('venice')?.key;
 const VENICE_MODEL = 'venice-uncensored';
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 const OPENAI_MODEL = 'gpt-4o';
@@ -675,6 +676,7 @@ async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
       }
       throw new Error(lastErr);
     } catch (fetchErr) {
+      if (fetchErr.name==='CredentialPoolError' || providerSignal()?.aborted) throw fetchErr;
       if (fetchErr.message && fetchErr.message.startsWith('OpenAI API error')) throw fetchErr;
       lastErr = fetchErr.message;
       console.log('[OpenAI] Fetch error: ' + lastErr);
@@ -730,6 +732,7 @@ async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
       }
       throw new Error(lastErr);
     } catch (fetchErr) {
+      if (fetchErr.name==='CredentialPoolError' || providerSignal()?.aborted) throw fetchErr;
       if (fetchErr.message && fetchErr.message.startsWith('DeepSeek API error')) throw fetchErr;
       lastErr = fetchErr.message;
       console.log('[DeepSeek] Fetch error: ' + lastErr);
@@ -781,6 +784,7 @@ async function callVenice(messages, systemPrompt, streaming, maxTokens) {
       }
       throw new Error(lastErr);
     } catch (fetchErr) {
+      if (fetchErr.name==='CredentialPoolError' || providerSignal()?.aborted) throw fetchErr;
       if (fetchErr.message && fetchErr.message.startsWith('Venice API error')) throw fetchErr;
       lastErr = fetchErr.message;
       console.log('[Venice] Fetch error: ' + lastErr);
@@ -836,6 +840,7 @@ async function callGrok(messages, systemPrompt, streaming, maxTokens) {
       }
       throw new Error(lastErr);
     } catch (fetchErr) {
+      if (fetchErr.name==='CredentialPoolError' || providerSignal()?.aborted) throw fetchErr;
       if (fetchErr.message && fetchErr.message.startsWith('Grok API error')) throw fetchErr;
       lastErr = fetchErr.message;
       console.log('[Grok] Fetch error: ' + lastErr);
@@ -1297,7 +1302,7 @@ var claudeCounterUnavailable = false;
 async function countClaudeInput(messages, system) {
   if (claudeCounterUnavailable) return null;
   try {
-    var response = await fetch(ANTHROPIC_BASE_URL + '/v1/messages/count_tokens', {
+    var response = await rotatingProviderFetch(ANTHROPIC_BASE_URL + '/v1/messages/count_tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({model:CLAUDE_MODEL,messages:messages,system:system}),
@@ -1319,7 +1324,7 @@ async function countClaudeInput(messages, system) {
 async function countGrokInput(messages, system) {
   if (!XAI_API_KEY) return null;
   try {
-    var response = await fetch('https://api.x.ai/v1/tokenize-text', {
+    var response = await rotatingProviderFetch('https://api.x.ai/v1/tokenize-text', {
       method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+XAI_API_KEY},
       body:JSON.stringify({model:GROK_MODEL,text:JSON.stringify([{role:'system',content:system},...messages])}),
       signal:AbortSignal.any([AbortSignal.timeout(15000),providerSignal()].filter(Boolean))

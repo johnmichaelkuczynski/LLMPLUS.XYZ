@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { abortable } from './request-lifecycle.js';
+import { credentialRouter, providerCredentialHealth } from './provider-credentials.js';
 
 export const contextTrace = new AsyncLocalStorage();
 
@@ -45,7 +46,13 @@ export function readProviderUsage(raw) {
 
 // Only the request BODY and response BODY are captured. Authorization headers,
 // cookies, provider URLs/keys and session secrets are never written to a trace.
-export async function auditedProviderFetch(pool,url,options) {
+export async function auditedProviderFetch(pool,url,options,router=credentialRouter) {
+  const signal=AbortSignal.any([options.signal,providerSignal(),AbortSignal.timeout(15*60*1000)].filter(Boolean));
+  return router.fetch(url,{...options,signal},(target,settings,credential)=>
+    auditedSingleProviderFetch(pool,target,settings,credential));
+}
+
+async function auditedSingleProviderFetch(pool,url,options,credential) {
   const trace = contextTrace.getStore();
   const signal=AbortSignal.any([AbortSignal.timeout(15*60*1000),options.signal,providerSignal()].filter(Boolean));
   options={...options,signal};
@@ -54,7 +61,8 @@ export async function auditedProviderFetch(pool,url,options) {
   const metadata = {...trace.metadata,purpose:trace.purpose || 'chat',
     requestMessageCount:request.messages?.length || 0,
     requestCharacters:JSON.stringify(request).length,
-    maxOutputTokens:request.max_tokens, selectedModel:request.model};
+    maxOutputTokens:request.max_tokens, selectedModel:request.model,
+    credentialAlias:credential?.credentialAlias || null};
   const inserted = await pool.query(`INSERT INTO context_diagnostics(user_id,session_id,project_id,model,status,metadata,encrypted_payload)
     VALUES($1,$2,$3,$4,'pending',$5,$6) RETURNING id`,
   [trace.userId,trace.sessionId,trace.projectId,request.model,JSON.stringify(metadata),encryptTrace({request,response:null})]);
@@ -102,6 +110,11 @@ export async function auditedProviderFetch(pool,url,options) {
 }
 
 export function registerContextDiagnostics(app,pool,isOwner) {
+  app.get('/api/admin/provider-health',async (req,res) => {
+    if (!isOwner(req)) return res.status(403).json({error:'Owner access required'});
+    res.set('Cache-Control','no-store');
+    res.json({providers:providerCredentialHealth(),modelSubstitution:false});
+  });
   app.get('/api/admin/context-diagnostics',async (req,res) => {
     if (!isOwner(req)) return res.status(403).json({error:'Owner access required'});
     res.set('Cache-Control','no-store');

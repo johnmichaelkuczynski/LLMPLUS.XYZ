@@ -21,3 +21,4 @@
 - [Stripe production mode](stripe-production-mode.md) — LLM Plus uses owner-managed live Stripe keys, not Replit’s sandbox-sync integration.
 - [Source-claim testing](source-claim-testing.md) — test assertion polarity: “completed” inside an unknown claim is not recall, and a retracted date is not a fabricated date.
 - [Cancellation and recovery](request-cancellation.md) — abort pending work before releasing busy locks; never guess historical model attribution.
+- [Provider credential rotation](provider-key-rotation.md) — recover with another configured key for the selected model; distinguish simulated failover from a real backup answer.
