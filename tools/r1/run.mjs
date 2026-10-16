@@ -8,6 +8,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runSourceMemoryPreflight } from './source-memory-preflight.mjs';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,11 +22,6 @@ const LONG_DOC_TARGET_WORDS = parseInt(process.env.LONG_DOC_TARGET_WORDS || '200
 const R1_MODEL = process.env.R1_MODEL || 'claude-sonnet-4-5-20250929';
 const R1_USERNAME = process.env.R1_USERNAME || 'JMK';
 const R1_PASSWORD = process.env.R1_PASSWORD || 'r1test';
-
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('FATAL: ANTHROPIC_API_KEY not set');
-  process.exit(3);
-}
 
 const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-');
 const OUTPUT_DIR = path.join(__dirname, 'runs', RUN_TIMESTAMP);
@@ -41,6 +37,23 @@ const REPORT_PATH = path.join(OUTPUT_DIR, 'report.html');
 const FAILURES_PATH = path.join(OUTPUT_DIR, 'failures.md');
 const DIAGNOSTIC_PATH = path.join(OUTPUT_DIR, 'diagnostic.json');
 const SUMMARY_PATH = path.join(OUTPUT_DIR, 'run-summary.txt');
+
+// Always run before API-key gating, browser startup, judging or generation.
+// The child runs from the repository root, not tools/r1.
+const sourceMemory = await runSourceMemoryPreflight(OUTPUT_DIR);
+console.log(`Source-memory preflight: ${sourceMemory.status} (${sourceMemory.results?.length || 0} checks)`);
+if (sourceMemory.exitCode || process.env.R1_PREFLIGHT_ONLY === 'true' || !process.env.ANTHROPIC_API_KEY) {
+  const providerBlocked = !sourceMemory.exitCode && process.env.R1_PREFLIGHT_ONLY !== 'true' && !process.env.ANTHROPIC_API_KEY;
+  const reason = providerBlocked ? 'provider_unavailable: ANTHROPIC_API_KEY not set; generation tests did not run' :
+    sourceMemory.error || 'Generation tests did not run (source-memory preflight only).';
+  fs.writeFileSync(SUMMARY_PATH, `SOURCE MEMORY: ${sourceMemory.status}\nCHECKS: ${sourceMemory.results?.length || 0}\n${reason}\n`);
+  fs.writeFileSync(FAILURES_PATH, sourceMemory.exitCode || providerBlocked ? reason+'\n' : 'No source-memory failures.\n');
+  if (providerBlocked) fs.writeFileSync(path.join(OUTPUT_DIR, 'provider-status.json'),
+    JSON.stringify({status:'provider_unavailable',error:reason},null,2));
+  console.log(reason);
+  console.log(`Evidence: ${sourceMemory.reportPath}`);
+  process.exit(sourceMemory.exitCode || (providerBlocked ? 3 : 0));
+}
 
 const VALID_TAGS = ['ASSERTS', 'REJECTS', 'ASSUMES', 'OPEN', 'RESOLVED', 'DOCUMENT', 'QUESTION'];
 const DECIMAL_KEY_RE = /^\d+(\.\d+)*$/;
@@ -1347,6 +1360,9 @@ table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:l
 h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
 </style></head><body>
 <h1>R1 Run Report — ${RUN_TIMESTAMP}</h1>
+<p>Source-memory preflight: <b>${escapeHtml(sourceMemory.status)}</b> · ${sourceMemory.results.length} checks ·
+<a href="source-memory.json">Detailed results</a> · <a href="source-memory.log">Raw check log</a>.
+Deterministic context checks; no live model answer is claimed.</p>
 <p>Interactions: <b>${interactions.length}</b> · Critical violations: <b style="color:#dc2626">${violations.length}</b> · Judge concerns: <b style="color:#d97706">${judgeConcerns.length}</b> · Sanity failures: <b>${sanityFailures.length}</b></p>
 <nav><b>Table of contents:</b> <ul>${toc}</ul></nav>
 ${sections}
@@ -1368,7 +1384,8 @@ function buildFailuresMD() {
 }
 
 function buildSummary() {
-  return `INTERACTIONS: ${interactions.length}
+  return `SOURCE MEMORY: ${sourceMemory.status} (${sourceMemory.results.length} checks)
+INTERACTIONS: ${interactions.length}
 JUDGE CONCERNS RAISED: ${judgeConcerns.length}
 CRITICAL INVARIANT VIOLATIONS: ${violations.length}
 TREE INVARIANT VIOLATIONS: ${violations.filter(v => /Invariant [AB]/.test(v.violation)).length}

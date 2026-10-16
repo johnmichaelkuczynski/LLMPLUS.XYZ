@@ -39,6 +39,40 @@ open runs/<timestamp>/report.html
 
 ## Output
 
+Every run first executes `tools/memory-context-check.mjs` from the repository
+root, before API-key validation, browser startup, or expensive generation.
+These deterministic source-memory checks need `DATABASE_URL` and
+`SESSION_SECRET`, but no model provider. They use reusable synthetic material
+in `tools/fixtures/source-memory.mjs`, never private uploads. All fixture writes
+use a dedicated database transaction that is rolled back on pass or failure
+(including connection loss). They check corrected roles, unknown versus
+assistant-invented dates, completed procedural updates, contaminated
+compression, same-project fresh-chat context, and project isolation.
+Nested index transactions use savepoints so their commits cannot commit test
+fixtures. An injected indexing failure checks that rollback leaves no partial
+index writes and that the outer fixture transaction remains intact.
+
+To run only this preflight (from either the repository root or `tools/r1`):
+
+```bash
+R1_PREFLIGHT_ONLY=true node tools/r1/run.mjs
+# From tools/r1 instead:
+R1_PREFLIGHT_ONLY=true node run.mjs
+```
+
+Harness regression checks (no database or provider required):
+
+```bash
+node --test tools/r1/source-memory-preflight.test.mjs
+```
+
+The preflight stops the run on failure. Exit 2 means an assertion regression;
+exit 3 means a setup/harness error, rate limit, or unavailable provider, never
+a passing test. Missing R1 provider credentials are reported separately after
+the deterministic checks complete. These checks do not evaluate live model
+answers; token-count callbacks are explicitly stubbed. Existing decay and
+cross-session/project checks remain unchanged.
+
 ```
 runs/<ISO-timestamp>/
   transcript.jsonl     — one JSON per interaction (verbatim everything)
@@ -50,6 +84,9 @@ runs/<ISO-timestamp>/
   tree-snapshots/      — Tractatus tree JSON before/after each chat exchange
   diagnostic.json      — full /api/diagnostic/run response (if f14 ran)
   run-summary.txt      — top-line counts (interactions, concerns, violations)
+  source-memory.json   — source-memory results, failure category, cleanup outcome
+  source-memory.log    — raw source-memory check stdout/stderr
+  provider-status.json — provider setup block, if R1 credentials are missing
 ```
 
 ## Adaptations from the original spec
