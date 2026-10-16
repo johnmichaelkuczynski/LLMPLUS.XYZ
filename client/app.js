@@ -1,4 +1,8 @@
 (function() {
+  function savedChatModel() {
+    try { var m=localStorage.getItem('llmplus_selected_model'); if(['claude','chatgpt','deepseek','grok','venice'].indexOf(m)>=0)return m; } catch(e) {}
+    return 'claude';
+  }
   var state = {
     projects: [],
     sessions: [],
@@ -11,7 +15,7 @@
     responseFormat: 'prose',
     stance: 'neutral',
     analysisMode: 'moderate',
-    model: 'claude',
+    model: savedChatModel(),
     access: null
   };
   var contextHealthRequestToken = 0;
@@ -1154,7 +1158,8 @@
     contextHealthRequestToken++;
     contextHealthSnapshot = health;
     var title;
-    if (health.status==='provider_error' || health.status==='request_error') title = 'Request failed · original message preserved';
+    if (health.status==='cancelled') title = 'Response stopped · ready for another message';
+    else if (health.status==='provider_error' || health.status==='request_error') title = 'Request failed · original message preserved';
     else if (health.status==='awaiting_provider') title = 'Context prepared · awaiting provider';
     else if (health.mode === 'full') title = 'Last reply used · full history';
     else if (health.mode === 'retrieved') title = 'Last reply used · retrieved context';
@@ -1197,7 +1202,7 @@
     els.contextHealth.classList.remove('hidden');
 
     var roleConflict=Array.isArray(health.consistencyIssues) && health.consistencyIssues.some(function(i){return i.kind==='identity_conflict';});
-    var shouldFresh = health.status!=='provider_error' && health.status!=='request_error' &&
+    var shouldFresh = health.status!=='cancelled' && health.status!=='provider_error' && health.status!=='request_error' &&
       (!!health.warning || Number(health.omittedMessages) > 0 || roleConflict);
     els.contextHealthFresh.classList.toggle('hidden', !shouldFresh);
     els.contextHealthFresh.disabled = !!state.streaming || contextFreshStarting;
@@ -1471,17 +1476,19 @@
     }
     els.welcome.style.display = 'none';
     for (var i = 0; i < transcript.length; i++) {
-      addMessage(transcript[i].role, transcript[i].content);
+      if(transcript[i].role==='assistant' && !String(transcript[i].content || '').trim()) continue;
+      addMessage(transcript[i].role, transcript[i].content, transcript[i].model);
     }
     scrollBottom();
   }
 
-  function addMessage(role, content) {
+  function addMessage(role, content, model) {
     els.welcome.style.display = 'none';
     var div = document.createElement('div');
     div.className = 'message ' + role;
-    var avatar = role === 'user' ? 'U' : 'C';
-    var label = role === 'user' ? 'You' : 'Claude';
+    var names={claude:'Claude',chatgpt:'ChatGPT',deepseek:'DeepSeek',grok:'Grok',venice:'Venice'};
+    var label = role === 'user' ? 'You' : (names[model] || 'Assistant');
+    var avatar = role === 'user' ? 'U' : label.charAt(0);
     var words = content.split(/\s+/).length;
     var lines = content.split('\n').length;
     var isLarge = role === 'user' && words > 200;
@@ -1712,6 +1719,7 @@
       var c = textEl.querySelector('.cursor-blink');
       if (c) c.remove();
       textEl.innerHTML = fmt(fullText);
+      if(!fullText.trim()) { var emptyReply=textEl.closest('.message'); if(emptyReply)emptyReply.remove(); }
       if (isDocumentArtifact(fullText)) {
         var artTitle = extractArtifactTitle(fullText);
         var viewBtn = document.createElement('button');
@@ -1839,7 +1847,7 @@
           if (fullText) {
             textEl.innerHTML = fmt(fullText) + '\n<em style="color:#9ca3af">[Stopped by user]</em>';
           } else {
-            textEl.innerHTML = '<em style="color:#9ca3af">[Stopped]</em>';
+            var stoppedReply=textEl.closest('.message');if(stoppedReply)stoppedReply.remove();
           }
           state.streaming = false;
           state.abortController = null;
@@ -2025,13 +2033,25 @@
     }
   }
 
+  function stopChatResponse() {
+    var active=state.activeChatRequest;
+    if(active && !state.cancelPending) {
+      state.cancelPending=fetch('/api/sessions/'+encodeURIComponent(active.sessionId)+'/cancel',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId:active.projectId}),
+        signal:AbortSignal.timeout(7000)
+      }).then(function(r){if(!r.ok)throw new Error('Unable to confirm cancellation');return r.json();})
+        .catch(function(e){notify(e.message,'error');})
+        .finally(function(){state.cancelPending=null;});
+    }
+    if(state.abortController)state.abortController.abort();
+  }
+
   async function sendMessage() {
     if (state.streaming) {
-      if (state.abortController) {
-        state.abortController.abort();
-      }
+      stopChatResponse();
       return;
     }
+    if(state.cancelPending) await state.cancelPending;
     var text = els.chatInput.value.trim();
     var hasAttachments = state.pendingAttachments.length > 0 && state.pendingAttachments.some(function(a) { return !a.uploading; });
     if (!text && !hasAttachments) return;
@@ -2078,6 +2098,8 @@
     var needsAutoTitle = isFirstMessage && state.currentSession.title === 'New Chat';
     var sendingSession = state.currentSession;
     var sendingProject = state.currentProject;
+    var sendingModel = state.model;
+    state.activeChatRequest={sessionId:sendingSession.id,projectId:sendingProject.id};
     var optimisticTitle = '';
     if (needsAutoTitle) {
       var titleSource = text || (readyAttachments.length > 0 ? readyAttachments[0].docName : 'New Chat');
@@ -2110,7 +2132,7 @@
           responseFormat: state.responseFormat,
           stance: state.stance,
           analysisMode: state.analysisMode,
-          model: state.model,
+          model: sendingModel,
           targetWords: getTargetWords(),
           respond: !isIdeaDiary(sendingProject) || diaryRespond(sendingProject)
         }),
@@ -2145,13 +2167,14 @@
       streamSSE(res, textEl, function(fullText) {
         if (sendingSession && fullText) {
           sendingSession.transcript = sendingSession.transcript || [];
-          sendingSession.transcript.push({ role: 'assistant', content: fullText });
+          sendingSession.transcript.push({ role: 'assistant', content: fullText, model:sendingModel });
         }
         state.streaming = false;
         state.abortController = null;
         els.btnSend.innerHTML = '&#9654;';
         els.btnSend.classList.remove('stop-mode');
         els.btnSend.disabled = false;
+        state.activeChatRequest=null;
         refreshBillingStatus();
         refreshContextHealth(sendingSession, sendingProject);
 
@@ -2175,7 +2198,7 @@
         var ti = textEl && textEl.querySelector('.thinking-indicator');
         if (ti) ti.remove();
         if (textEl && textEl.textContent.trim() === '') {
-          textEl.innerHTML = '<em style="color:#9ca3af">[Stopped]</em>';
+          var emptyStopped=textEl.closest('.message');if(emptyStopped)emptyStopped.remove();
         } else if (textEl) {
           textEl.innerHTML = fmt(textEl.textContent) + '\n<em style="color:#9ca3af">[Stopped by user]</em>';
         }
@@ -3814,7 +3837,7 @@
   });
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && state.streaming && state.abortController) {
-      state.abortController.abort();
+      stopChatResponse();
     }
   });
   els.chatInput.addEventListener('paste', function(e) {
@@ -3894,10 +3917,14 @@
       document.querySelectorAll('.rm-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       state.model = btn.getAttribute('data-model');
+      try{localStorage.setItem('llmplus_selected_model',state.model);}catch(e){}
       var modelNames = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok', venice: 'Venice' };
       els.chatInput.placeholder = 'Message ' + (modelNames[state.model] || 'Claude') + '...';
     });
   });
+
+  document.querySelectorAll('.rm-btn').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-model')===state.model);});
+  els.chatInput.placeholder='Message '+({claude:'Claude',chatgpt:'ChatGPT',deepseek:'DeepSeek',grok:'Grok',venice:'Venice'}[state.model])+'...';
 
   els.btnNewProject.addEventListener('click', function() {
     els.projectModal.classList.add('active');

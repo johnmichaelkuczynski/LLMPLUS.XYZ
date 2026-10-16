@@ -13,7 +13,8 @@ import { pool } from './db.js';
 import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
 import { registerVeniceVideoRoutes } from './venice-video.js';
 import { initContextMemory, ensureProjectIndex, prepareOriginalContext, CONTEXT_LIMITS, conservativeTokenEstimate, checkAnswerConsistency } from './context-memory.js';
-import { contextTrace, auditedProviderFetch, registerContextDiagnostics, decryptTrace } from './context-diagnostics.js';
+import { contextTrace, auditedProviderFetch, registerContextDiagnostics, decryptTrace, providerDelay, providerSignal } from './context-diagnostics.js';
+import { createRequestLifetime, releaseGenerationLock } from './request-lifecycle.js';
 import { registerSourceInspector } from './source-inspector.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -604,7 +605,7 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
       if (responseText) return responseText;
       if (attempt < maxRetries - 1) {
         console.log('[callClaude] Empty text response, retry ' + (attempt + 1) + '/' + maxRetries);
-        await new Promise(function(r) { setTimeout(r, Math.pow(2, attempt) * 1000); });
+        await providerDelay(Math.pow(2, attempt) * 1000);
         continue;
       }
       throw new Error('Claude returned no text content after ' + maxRetries + ' attempts');
@@ -614,7 +615,7 @@ async function callClaude(messages, systemPrompt, streaming, maxTokens) {
       var waitSec = Math.pow(2, attempt + 1) + Math.random() * 2;
       console.log('[callClaude] Transient API error (status ' + response.status + '), retry ' + (attempt + 1) + '/' + maxRetries + ' in ' + waitSec.toFixed(1) + 's');
       if (attempt < maxRetries - 1) {
-        await new Promise(function(r) { setTimeout(r, waitSec * 1000); });
+        await providerDelay(waitSec * 1000);
         continue;
       }
     }
@@ -648,7 +649,7 @@ async function callOpenAI(messages, systemPrompt, streaming, maxTokens) {
     if (attempt > 0) {
       var delay = Math.pow(2, attempt) * 1000;
       console.log('[OpenAI] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
-      await new Promise(function(r) { setTimeout(r, delay); });
+      await providerDelay(delay);
     }
     try {
       var response = await auditedProviderFetch(pool, 'https://api.openai.com/v1/chat/completions', {
@@ -703,7 +704,7 @@ async function callDeepSeek(messages, systemPrompt, streaming, maxTokens) {
     if (attempt > 0) {
       var delay = Math.pow(2, attempt) * 1000;
       console.log('[DeepSeek] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
-      await new Promise(function(r) { setTimeout(r, delay); });
+      await providerDelay(delay);
     }
     try {
       var response = await auditedProviderFetch(pool, 'https://api.deepseek.com/chat/completions', {
@@ -756,7 +757,7 @@ async function callVenice(messages, systemPrompt, streaming, maxTokens) {
     if (attempt > 0) {
       var delay = Math.pow(2, attempt) * 1000;
       console.log('[Venice] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
-      await new Promise(function(r) { setTimeout(r, delay); });
+      await providerDelay(delay);
     }
     try {
       var response = await auditedProviderFetch(pool, 'https://api.venice.ai/api/v1/chat/completions', {
@@ -809,7 +810,7 @@ async function callGrok(messages, systemPrompt, streaming, maxTokens) {
     if (attempt > 0) {
       var delay = Math.pow(2, attempt) * 1000;
       console.log('[Grok] Retry attempt ' + (attempt + 1) + ' after ' + delay + 'ms');
-      await new Promise(function(r) { setTimeout(r, delay); });
+      await providerDelay(delay);
     }
     try {
       var response = await auditedProviderFetch(pool, 'https://api.x.ai/v1/chat/completions', {
@@ -1300,7 +1301,7 @@ async function countClaudeInput(messages, system) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({model:CLAUDE_MODEL,messages:messages,system:system}),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.any([AbortSignal.timeout(15000),providerSignal()].filter(Boolean))
     });
     if (!response.ok) {
       if ([404,405,501].includes(response.status)) claudeCounterUnavailable = true;
@@ -1321,7 +1322,7 @@ async function countGrokInput(messages, system) {
     var response = await fetch('https://api.x.ai/v1/tokenize-text', {
       method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+XAI_API_KEY},
       body:JSON.stringify({model:GROK_MODEL,text:JSON.stringify([{role:'system',content:system},...messages])}),
-      signal:AbortSignal.timeout(15000)
+      signal:AbortSignal.any([AbortSignal.timeout(15000),providerSignal()].filter(Boolean))
     });
     if (!response.ok) return null;
     var result = await response.json();
@@ -2391,6 +2392,18 @@ function queueIdeaDiaryMemoryUpdate(projectId, userMessage, assistantResponse, u
   return current;
 }
 
+const activeChatRequests = new Map();
+app.post('/api/sessions/:id/cancel',async function(req,res) {
+  if(!await verifySessionInProject(req.params.id,req.body.projectId,req.userId))
+    return res.status(403).json({error:'Forbidden'});
+  const current=activeChatRequests.get(req.params.id);
+  if(current) {
+    current.stop();
+    await Promise.race([current.done,new Promise(resolve=>setTimeout(resolve,3000))]);
+  }
+  res.json({cancelled:!!current,released:!activeChatRequests.has(req.params.id)});
+});
+
 app.post('/api/chat', async function(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -2399,14 +2412,18 @@ app.post('/api/chat', async function(req, res) {
   res.flushHeaders();
 
   var clientClosed = false;
+  const lifetime=createRequestLifetime(req,res);
+  const requestTrace=contextTrace.getStore();
+  if(requestTrace) requestTrace.abortSignal=lifetime.signal;
+  lifetime.signal.addEventListener('abort',()=>{clientClosed=true;},{once:true});
   function markClosed() {
     if (!res.writableEnded && !clientClosed) {
       clientClosed = true;
+      lifetime.stop();
       console.log('[Chat] Client disconnected — killing generation');
     }
   }
   res.on('close', markClosed);
-  req.on('close', markClosed);
   req.on('aborted', markClosed);
 
   var generationLock = null;
@@ -2435,6 +2452,9 @@ app.post('/api/chat', async function(req, res) {
       return res.end();
     }
     generationLock = await pool.connect();
+    const previousRequest=activeChatRequests.get(sessionId);
+    if(previousRequest?.signal.aborted) await Promise.race([previousRequest.done,new Promise(resolve=>setTimeout(resolve,3000))]);
+    lifetime.signal.throwIfAborted();
     var lockResult = await generationLock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[sessionId]);
     if (!lockResult.rows[0].locked) {
       generationLock.release();
@@ -2442,6 +2462,7 @@ app.post('/api/chat', async function(req, res) {
       res.write('data: '+JSON.stringify({type:'error',error:'This chat already has a response in progress. Wait for it to finish before sending another message.'})+'\n\n');
       return res.end();
     }
+    activeChatRequests.set(sessionId,lifetime);
 
     // Single round-trip for all project-level fields (was 3 separate queries).
     var projectResult = await pool.query(
@@ -2904,9 +2925,9 @@ app.post('/api/chat', async function(req, res) {
     }
     var savedText = fullText;
     var newEntries = [
-      { role: 'assistant', content: savedText, incomplete:wasKilled, timestamp:new Date().toISOString() }
+      { role: 'assistant', content: savedText, model:modelChoice, incomplete:wasKilled, timestamp:new Date().toISOString() }
     ];
-    await pool.query(
+    if(savedText) await pool.query(
       "UPDATE sessions SET transcript = COALESCE(transcript, '[]'::jsonb) || $1::jsonb WHERE id = $2",
       [JSON.stringify(newEntries), sessionId]);
     assistantSubmissionSaved = true;
@@ -2946,20 +2967,21 @@ app.post('/api/chat', async function(req, res) {
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (err) {
-    console.error('Chat error:', err);
+    if(lifetime.signal.aborted) console.log('[Chat] Cancelled or timed out; releasing session');
+    else console.error('Chat error:', err);
     if (userSubmissionSaved && !assistantSubmissionSaved) {
       var failedPartial = (fullText || '') + (err.partialResponse || '');
       if (failedPartial) {
         try {
           await pool.query("UPDATE sessions SET transcript=COALESCE(transcript,'[]'::jsonb)||$1::jsonb WHERE id=$2",
-            [JSON.stringify([{role:'assistant',content:failedPartial,incomplete:true,timestamp:new Date().toISOString()}]),sessionId]);
+            [JSON.stringify([{role:'assistant',content:failedPartial,model:modelChoice,incomplete:true,timestamp:new Date().toISOString()}]),sessionId]);
           await ensureProjectIndex(pool,projectId);
         } catch (saveError) { console.error('[Context] Could not persist partial provider response:',saveError.message); }
       }
     }
     if (reliableContext) {
-      reliableContext.health.status='request_error';
-      reliableContext.health.warning='The request did not finish successfully. Your original message is preserved; a successfully completed reply is not being reported.';
+      reliableContext.health.status=lifetime.signal.aborted?'cancelled':'request_error';
+      reliableContext.health.warning=lifetime.signal.aborted?'Response stopped. Your message and any partial answer are preserved. You can send another message.':'The request did not finish successfully. Your original message is preserved; a successfully completed reply is not being reported.';
       try { await pool.query('UPDATE sessions SET context_health=$1 WHERE id=$2',[JSON.stringify(reliableContext.health),sessionId]); } catch {}
       if (!res.writableEnded) res.write('data: '+JSON.stringify({type:'context_health',...reliableContext.health})+'\n\n');
     }
@@ -2970,10 +2992,9 @@ app.post('/api/chat', async function(req, res) {
       } catch (e) {}
     }
   } finally {
-    if (generationLock) {
-      try { await generationLock.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[req.body.sessionId]); }
-      finally { generationLock.release(); }
-    }
+    if (generationLock) await releaseGenerationLock(generationLock,req.body.sessionId);
+    if(activeChatRequests.get(req.body.sessionId)===lifetime) activeChatRequests.delete(req.body.sessionId);
+    lifetime.dispose();
   }
 });
 

@@ -402,9 +402,11 @@ export async function prepareOriginalContext({pool,projectId,sessionId,message,s
   await ensureProjectIndex(pool,projectId);
   const stats = (await pool.query(`SELECT count(*)::int AS count,
     COALESCE(sum(octet_length(content)+32),0)::bigint AS bytes, COALESCE(max(ordinal),0)::int AS max_ordinal
-    FROM memory_messages WHERE session_id=$1 AND ordinal<=COALESCE($2,2147483647)`,[sessionId,historyMaxOrdinal ?? null])).rows[0];
+    FROM memory_messages WHERE session_id=$1 AND ordinal<=COALESCE($2,2147483647)
+      AND NOT(role='assistant' AND content !~ '[^[:space:]]')`,[sessionId,historyMaxOrdinal ?? null])).rows[0];
   const recent = (await pool.query(`SELECT ordinal,role,content,is_correction FROM memory_messages
-    WHERE session_id=$1 AND octet_length(content)<=$2 AND ordinal<=COALESCE($3,2147483647) ORDER BY ordinal DESC LIMIT 32`,
+    WHERE session_id=$1 AND octet_length(content)<=$2 AND ordinal<=COALESCE($3,2147483647)
+      AND NOT(role='assistant' AND content !~ '[^[:space:]]') ORDER BY ordinal DESC LIMIT 32`,
   [sessionId,CONTEXT_LIMITS[model]*5,historyMaxOrdinal ?? null])).rows.reverse();
   const evidence = await retrieveEvidence(pool,projectId,sessionId,message,recent);
   system += evidence.block + consistencyReminder(evidence);
@@ -419,7 +421,8 @@ export async function prepareOriginalContext({pool,projectId,sessionId,message,s
   // retrieved through indexed original messages rather than transferred whole.
   if (Number(stats.bytes) <= window*5) {
     full = (await pool.query(`SELECT ordinal,role,content,is_correction FROM memory_messages
-      WHERE session_id=$1 AND ordinal<=COALESCE($2,2147483647) ORDER BY ordinal`,[sessionId,historyMaxOrdinal ?? null])).rows;
+      WHERE session_id=$1 AND ordinal<=COALESCE($2,2147483647)
+        AND NOT(role='assistant' AND content !~ '[^[:space:]]') ORDER BY ordinal`,[sessionId,historyMaxOrdinal ?? null])).rows;
     if (countTokens) {
       count = await countTokens([...full.map(r=>({role:r.role,content:r.content})),current],system);
       if (count !== null) countMethod = tokenCountMethod;

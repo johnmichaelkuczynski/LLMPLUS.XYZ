@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { abortable } from './request-lifecycle.js';
 
 export const contextTrace = new AsyncLocalStorage();
+
+export function providerSignal() { return contextTrace.getStore()?.abortSignal; }
+export function providerDelay(ms) { return delay(ms,undefined,{signal:providerSignal()}); }
 
 function key() {
   if (!process.env.SESSION_SECRET) throw new Error('Secure context diagnostics require SESSION_SECRET');
@@ -42,7 +47,9 @@ export function readProviderUsage(raw) {
 // cookies, provider URLs/keys and session secrets are never written to a trace.
 export async function auditedProviderFetch(pool,url,options) {
   const trace = contextTrace.getStore();
-  if (!trace) return fetch(url,options);
+  const signal=AbortSignal.any([AbortSignal.timeout(15*60*1000),options.signal,providerSignal()].filter(Boolean));
+  options={...options,signal};
+  if (!trace) return abortable(()=>fetch(url,options),signal);
   const request = JSON.parse(options.body);
   const metadata = {...trace.metadata,purpose:trace.purpose || 'chat',
     requestMessageCount:request.messages?.length || 0,
@@ -66,15 +73,15 @@ export async function auditedProviderFetch(pool,url,options) {
         encryptTrace({request,response:raw}),id]);
   }
   let response;
-  try { response = await fetch(url,options); }
-  catch (err) { await finish('network_error',err.message); throw err; }
+  try { response = await abortable(()=>fetch(url,options),signal); }
+  catch (err) { await finish(signal.aborted?'aborted':'network_error',err.message); throw err; }
   if (!response.body) { await finish('empty'); return response; }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const body = new ReadableStream({
     async pull(controller) {
       try {
-        const next = await reader.read();
+        const next = await abortable(()=>reader.read(),AbortSignal.any([signal,AbortSignal.timeout(90000)]));
         if (next.done) {
           raw += decoder.decode();
           await finish(response.ok?'complete':'provider_error');
@@ -84,7 +91,8 @@ export async function auditedProviderFetch(pool,url,options) {
           controller.enqueue(next.value);
         }
       } catch (err) {
-        try { await finish('stream_error',err.message); } catch {}
+        reader.cancel(err).catch(()=>{});
+        try { await finish(signal.aborted?'aborted':'stream_error',err.message); } catch {}
         controller.error(err);
       }
     },
