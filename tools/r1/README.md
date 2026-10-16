@@ -1,9 +1,37 @@
 # R1 — Synthetic User Agent for LLMPlus
 
 R1 is a Playwright-driven synthetic user that beta-tests the LLMPlus app end-to-end
-and produces raw, reviewable evidence of every interaction. It does NOT produce
-pass/fail summaries — every screenshot, every request body, every model response is
-captured verbatim so a human can review the run in under 30 minutes.
+and produces raw, reviewable evidence of every interaction. Browser interactions
+retain their screenshots, request bodies and model responses for human review;
+deterministic fixture checks also have explicit pass/fail results.
+
+Every run also executes `tools/provider-rotation-check.mjs` automatically, before
+browser setup and regardless of `SKIP_FUNCTIONS`. These deterministic checks use
+injected credentials, responses, a clock and a database recorder in a separate
+process with network access blocked and no inherited secrets. They do not contact
+providers, modify chats or establish that a live backup key works.
+
+Coverage includes rejected/rate-limited primaries, same-model backup success,
+cooldowns, cancellation, no model substitution, and encrypted secret-free traces.
+A fixture regression, timeout, subprocess failure or incomplete result is a
+critical violation (exit 2; exit 3 takes precedence for harness setup failures).
+Results and captured assertion errors appear in the console, `report.html`,
+`failures.md`, `run-summary.txt`, and `credential-rotation.json`.
+
+To run just this integration and generate the same reports without a browser,
+app requests, or a reviewer API key:
+
+```bash
+node tools/r1/run.mjs --credential-rotation-only
+```
+
+This focused mode is labeled as such and is not a complete browser beta run.
+
+Integration regression tests (including injected failures and timeouts) run with:
+
+```bash
+node --test tools/r1/provider-rotation-suite.test.mjs
+```
 
 ## Quick start
 
@@ -39,8 +67,10 @@ open runs/<timestamp>/report.html
 
 ## Output
 
-Every run first executes `tools/memory-context-check.mjs` from the repository
-root, before API-key validation, browser startup, or expensive generation.
+Every regular run executes both credential rotation and
+`tools/memory-context-check.mjs` before API-key validation, browser startup, or
+expensive generation. Credential rotation runs first so a source-memory setup
+failure cannot hide its result. Source-memory checks run from the repository root.
 These deterministic source-memory checks need `DATABASE_URL` and
 `SESSION_SECRET`, but no model provider. They use reusable synthetic material
 in `tools/fixtures/source-memory.mjs`, never private uploads. All fixture writes
@@ -52,7 +82,8 @@ Nested index transactions use savepoints so their commits cannot commit test
 fixtures. An injected indexing failure checks that rollback leaves no partial
 index writes and that the outer fixture transaction remains intact.
 
-To run only this preflight (from either the repository root or `tools/r1`):
+To run both deterministic preflights without browser generation (from either
+the repository root or `tools/r1`):
 
 ```bash
 R1_PREFLIGHT_ONLY=true node tools/r1/run.mjs
@@ -83,6 +114,7 @@ runs/<ISO-timestamp>/
   screenshots/         — numbered PNGs (3 per interactive step)
   tree-snapshots/      — Tractatus tree JSON before/after each chat exchange
   diagnostic.json      — full /api/diagnostic/run response (if f14 ran)
+  credential-rotation.json — isolated fixture results, check names and assertion evidence
   run-summary.txt      — top-line counts (interactions, concerns, violations)
   source-memory.json   — source-memory results, failure category, cleanup outcome
   source-memory.log    — raw source-memory check stdout/stderr

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSourceMemoryPreflight } from './source-memory-preflight.mjs';
+import { runProviderRotationSuite } from './provider-rotation-suite.mjs';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,8 @@ const LONG_DOC_TARGET_WORDS = parseInt(process.env.LONG_DOC_TARGET_WORDS || '200
 const R1_MODEL = process.env.R1_MODEL || 'claude-sonnet-4-5-20250929';
 const R1_USERNAME = process.env.R1_USERNAME || 'JMK';
 const R1_PASSWORD = process.env.R1_PASSWORD || 'r1test';
+
+const ROTATION_ONLY = process.argv.includes('--credential-rotation-only');
 
 const RUN_TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-');
 const OUTPUT_DIR = path.join(__dirname, 'runs', RUN_TIMESTAMP);
@@ -37,28 +40,12 @@ const REPORT_PATH = path.join(OUTPUT_DIR, 'report.html');
 const FAILURES_PATH = path.join(OUTPUT_DIR, 'failures.md');
 const DIAGNOSTIC_PATH = path.join(OUTPUT_DIR, 'diagnostic.json');
 const SUMMARY_PATH = path.join(OUTPUT_DIR, 'run-summary.txt');
-
-// Always run before API-key gating, browser startup, judging or generation.
-// The child runs from the repository root, not tools/r1.
-const sourceMemory = await runSourceMemoryPreflight(OUTPUT_DIR);
-console.log(`Source-memory preflight: ${sourceMemory.status} (${sourceMemory.results?.length || 0} checks)`);
-if (sourceMemory.exitCode || process.env.R1_PREFLIGHT_ONLY === 'true' || !process.env.ANTHROPIC_API_KEY) {
-  const providerBlocked = !sourceMemory.exitCode && process.env.R1_PREFLIGHT_ONLY !== 'true' && !process.env.ANTHROPIC_API_KEY;
-  const reason = providerBlocked ? 'provider_unavailable: ANTHROPIC_API_KEY not set; generation tests did not run' :
-    sourceMemory.error || 'Generation tests did not run (source-memory preflight only).';
-  fs.writeFileSync(SUMMARY_PATH, `SOURCE MEMORY: ${sourceMemory.status}\nCHECKS: ${sourceMemory.results?.length || 0}\n${reason}\n`);
-  fs.writeFileSync(FAILURES_PATH, sourceMemory.exitCode || providerBlocked ? reason+'\n' : 'No source-memory failures.\n');
-  if (providerBlocked) fs.writeFileSync(path.join(OUTPUT_DIR, 'provider-status.json'),
-    JSON.stringify({status:'provider_unavailable',error:reason},null,2));
-  console.log(reason);
-  console.log(`Evidence: ${sourceMemory.reportPath}`);
-  process.exit(sourceMemory.exitCode || (providerBlocked ? 3 : 0));
-}
+const ROTATION_PATH = path.join(OUTPUT_DIR, 'credential-rotation.json');
 
 const VALID_TAGS = ['ASSERTS', 'REJECTS', 'ASSUMES', 'OPEN', 'RESOLVED', 'DOCUMENT', 'QUESTION'];
 const DECIMAL_KEY_RE = /^\d+(\.\d+)*$/;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
 // ─── Global state ───────────────────────────────────────────────────────────
 const state = {
@@ -86,6 +73,8 @@ const judgeConcerns = [];
 const violations = [];      // critical
 const sanityFailures = [];
 const networkCalls = [];    // mirror; full log written to file
+let credentialRotation = null;
+let sourceMemory = { status: 'not_run', results: [] };
 
 let stepCounter = 0;
 let screenshotCounter = 0;
@@ -1360,17 +1349,26 @@ table,th,td{border:1px solid #ddd;padding:4px}th{background:#f3f4f6;text-align:l
 h1{margin:0}h2{margin-top:30px;border-bottom:2px solid #2563eb;padding-bottom:6px}
 </style></head><body>
 <h1>R1 Run Report — ${RUN_TIMESTAMP}</h1>
-<p>Source-memory preflight: <b>${escapeHtml(sourceMemory.status)}</b> · ${sourceMemory.results.length} checks ·
-<a href="source-memory.json">Detailed results</a> · <a href="source-memory.log">Raw check log</a>.
+<p>Source-memory preflight: <b>${escapeHtml(sourceMemory.status)}</b> · ${sourceMemory.results?.length || 0} checks ·
+${sourceMemory.reportPath ? '<a href="source-memory.json">Detailed results</a> · <a href="source-memory.log">Raw check log</a>.' : 'Not run in credential-rotation-only mode.'}
 Deterministic context checks; no live model answer is claimed.</p>
 <p>Interactions: <b>${interactions.length}</b> · Critical violations: <b style="color:#dc2626">${violations.length}</b> · Judge concerns: <b style="color:#d97706">${judgeConcerns.length}</b> · Sanity failures: <b>${sanityFailures.length}</b></p>
-<nav><b>Table of contents:</b> <ul>${toc}</ul></nav>
+<nav><b>Table of contents:</b> <ul><li><a href="#credential-rotation">Credential rotation</a></li>${toc}</ul></nav>
+<section id="credential-rotation"><h2>Credential rotation — ${escapeHtml(credentialRotation?.status || 'NOT RUN')}</h2>
+<p>${escapeHtml(credentialRotation?.evidence)}</p>
+<p>Checks passed: ${credentialRotation?.checks.length || 0} · Duration: ${credentialRotation?.durationMs || 0}ms</p>
+${credentialRotation?.error ? `<p style="color:#dc2626"><b>${escapeHtml(credentialRotation.error)}</b></p>` : ''}
+<pre style="white-space:pre-wrap">${escapeHtml((credentialRotation?.stdout || '') + (credentialRotation?.stderr || ''))}</pre></section>
 ${sections}
 </body></html>`;
 }
 
 function buildFailuresMD() {
   let md = `# R1 Failures — ${RUN_TIMESTAMP}\n\n`;
+  md += `## Source-memory preflight — ${sourceMemory.status}\n\n${sourceMemory.results?.length || 0} checks. ${sourceMemory.error || ''}\n\n`;
+  md += `## Credential rotation — ${credentialRotation?.status || 'NOT RUN'}\n\n`;
+  md += `${credentialRotation?.checks.length || 0} checks passed. ${credentialRotation?.evidence || ''}\n\n`;
+  if (credentialRotation?.error) md += `${credentialRotation.error}\n\n\`\`\`\n${credentialRotation.stdout}${credentialRotation.stderr}\n\`\`\`\n\n`;
   md += `## CRITICAL INVARIANT VIOLATIONS (${violations.length})\n\n`;
   if (!violations.length) md += '_None._\n\n';
   for (const v of violations) md += `- **${v.interaction}** — ${v.violation}\n`;
@@ -1384,8 +1382,10 @@ function buildFailuresMD() {
 }
 
 function buildSummary() {
-  return `SOURCE MEMORY: ${sourceMemory.status} (${sourceMemory.results.length} checks)
+  return `SOURCE MEMORY: ${sourceMemory.status} (${sourceMemory.results?.length || 0} checks)
 INTERACTIONS: ${interactions.length}
+CREDENTIAL ROTATION: ${credentialRotation?.status || 'NOT RUN'} (${credentialRotation?.checks.length || 0} checks passed)
+RUN SCOPE: ${ROTATION_ONLY ? 'credential rotation only; browser checks not run' : process.env.R1_PREFLIGHT_ONLY === 'true' ? 'deterministic preflights only; browser checks not run' : 'regular beta suite'}
 JUDGE CONCERNS RAISED: ${judgeConcerns.length}
 CRITICAL INVARIANT VIOLATIONS: ${violations.length}
 TREE INVARIANT VIOLATIONS: ${violations.filter(v => /Invariant [AB]/.test(v.violation)).length}
@@ -1396,33 +1396,79 @@ HARNESS SANITY FAILURES: ${sanityFailures.length}
 // ─── Main ───────────────────────────────────────────────────────────────────
 (async () => {
   console.log(`\nR1 is running.`);
-  console.log(`Live view:    http://localhost:${LIVE_VIEW_PORT}`);
+  if (!ROTATION_ONLY) console.log(`Live view:    http://localhost:${LIVE_VIEW_PORT}`);
   console.log(`Output dir:   ${OUTPUT_DIR}`);
-  console.log(`Watch the live view; do not trust summary output alone.\n`);
+  console.log(ROTATION_ONLY ? 'Credential rotation only — browser checks will not run.\n' : 'Watch the live view; do not trust summary output alone.\n');
 
-  startLiveView();
-  const browser = await chromium.launch({ headless: HEADLESS });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const page = await context.newPage();
-  attachNetworkCapture(page);
-
+  let browser, context;
   let projectId = null;
   try {
-    await login(page);
-    if (!SKIP_FUNCTIONS.has('1')) await f1_loadHomeChat(page, context);
-    if (!SKIP_FUNCTIONS.has('2')) await f2_projectsList(page, context);
-    if (!SKIP_FUNCTIONS.has('3')) projectId = await f3_createProject(page, context);
-    if (projectId && !SKIP_FUNCTIONS.has('4')) await f4_projectChat(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('5')) await f5_memoryHierarchy(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('6')) await f6_crossSessionPersistence(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('7')) await f7_compression(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('8')) await f8_longDoc(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('9')) await f9_sessions(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('10')) await f10_renameProject(page, context, projectId);
-    if (projectId && !SKIP_FUNCTIONS.has('11')) await f11_treeViz(page, context, projectId);
-    if (!SKIP_FUNCTIONS.has('13')) await f13_voice(page, context);
-    if (!SKIP_FUNCTIONS.has('14')) await f14_diagnostic(page, context);
-    if (projectId && !SKIP_FUNCTIONS.has('12')) await f12_deleteProject(page, context, projectId);
+    state.status = 'credential rotation fixtures';
+    credentialRotation = await runProviderRotationSuite();
+    fs.writeFileSync(ROTATION_PATH, JSON.stringify(credentialRotation, null, 2));
+    log(`[credential rotation] ${credentialRotation.status}: ${credentialRotation.checks.length} checks passed`);
+    log(credentialRotation.stdout);
+    if (credentialRotation.stderr) log(credentialRotation.stderr);
+    if (credentialRotation.error) {
+      violations.push({ interaction: 'credential rotation', violation: credentialRotation.error });
+    }
+    state.completed.push({
+      functionNumber: 'fixtures',
+      stepDescription: `${credentialRotation.name}: ${credentialRotation.status} (${credentialRotation.checks.length} checks passed)`,
+      violation: credentialRotation.error,
+    });
+    let runBrowser = false;
+    if (!ROTATION_ONLY) {
+      // Both preflights precede provider gating, browser startup and generation.
+      // Rotation runs first so a source-memory setup failure cannot hide it.
+      sourceMemory = await runSourceMemoryPreflight(OUTPUT_DIR);
+      log(`Source-memory preflight: ${sourceMemory.status} (${sourceMemory.results?.length || 0} checks)`);
+      if (sourceMemory.exitCode) {
+        const reason = sourceMemory.error || `Source-memory preflight: ${sourceMemory.status}`;
+        if (sourceMemory.exitCode === 2) violations.push({ interaction: 'source-memory preflight', violation: reason });
+        else sanityFailures.push({ interaction: 'source-memory preflight', reason });
+      }
+      const preflightOnly = process.env.R1_PREFLIGHT_ONLY === 'true';
+      const providerBlocked = !sourceMemory.exitCode && !preflightOnly && !anthropic;
+      if (providerBlocked) {
+        const reason = 'provider_unavailable: ANTHROPIC_API_KEY not set; generation tests did not run';
+        fs.writeFileSync(path.join(OUTPUT_DIR, 'provider-status.json'),
+          JSON.stringify({ status: 'provider_unavailable', error: reason }, null, 2));
+        sanityFailures.push({ interaction: 'provider setup', reason });
+        log(reason);
+      } else if (preflightOnly || sourceMemory.exitCode) {
+        log(sourceMemory.error || 'Generation tests did not run (source-memory preflight only).');
+      }
+      log(`Evidence: ${sourceMemory.reportPath}`);
+      runBrowser = !sourceMemory.exitCode && !preflightOnly && !providerBlocked;
+    }
+    // Persist fixture evidence even if browser setup subsequently fails.
+    fs.writeFileSync(REPORT_PATH, buildReportHTML());
+    fs.writeFileSync(FAILURES_PATH, buildFailuresMD());
+    fs.writeFileSync(SUMMARY_PATH, buildSummary());
+    if (runBrowser) {
+      if (!anthropic) throw new Error('ANTHROPIC_API_KEY not set; browser beta checks cannot run');
+      startLiveView();
+      browser = await chromium.launch({ headless: HEADLESS });
+      context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      const page = await context.newPage();
+      attachNetworkCapture(page);
+      await login(page);
+      if (!SKIP_FUNCTIONS.has('1')) await f1_loadHomeChat(page, context);
+      if (!SKIP_FUNCTIONS.has('2')) await f2_projectsList(page, context);
+      if (!SKIP_FUNCTIONS.has('3')) projectId = await f3_createProject(page, context);
+      if (projectId && !SKIP_FUNCTIONS.has('4')) await f4_projectChat(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('5')) await f5_memoryHierarchy(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('6')) await f6_crossSessionPersistence(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('7')) await f7_compression(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('8')) await f8_longDoc(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('9')) await f9_sessions(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('10')) await f10_renameProject(page, context, projectId);
+      if (projectId && !SKIP_FUNCTIONS.has('11')) await f11_treeViz(page, context, projectId);
+      if (!SKIP_FUNCTIONS.has('13')) await f13_voice(page, context);
+      if (!SKIP_FUNCTIONS.has('14')) await f14_diagnostic(page, context);
+      if (projectId && !SKIP_FUNCTIONS.has('12')) await f12_deleteProject(page, context, projectId);
+    }
   } catch (err) {
     log('[fatal] R1 harness crashed:', err.message, err.stack);
     sanityFailures.push({ interaction: 'harness', reason: 'Uncaught exception: ' + err.message });
@@ -1443,10 +1489,10 @@ HARNESS SANITY FAILURES: ${sanityFailures.length}
   log(`\n${buildSummary()}`);
 
   // Hold live view for 60s
-  await sleep(60_000);
+  if (!ROTATION_ONLY && context) await sleep(60_000);
 
-  await context.close();
-  await browser.close();
+  await context?.close();
+  await browser?.close();
   consoleLog.end(); transcriptStream.end(); networkLogStream.end();
 
   let exit = 0;
