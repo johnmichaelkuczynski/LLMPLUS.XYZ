@@ -187,6 +187,15 @@
             <h3 id="context-diagnostics-title">Context diagnostics</h3>
             <button class="diagnostic-close-btn" id="close-context-diagnostics" type="button" aria-label="Close context diagnostics">Close &times;</button>
           </div>
+          <section class="provider-health" aria-labelledby="provider-health-title">
+            <div class="provider-health-heading">
+              <h4 id="provider-health-title">AI credential health</h4>
+              <button type="button" id="provider-health-refresh">Refresh status</button>
+            </div>
+            <p class="provider-health-note">Recorded use in this server process only. Available means not cooling down, not verified. Refresh reads status only; it makes no AI calls.</p>
+            <p id="provider-health-status" class="provider-health-note" role="status"></p>
+            <div id="provider-health-body"></div>
+          </section>
           <div class="context-diagnostics-controls">
             <label for="context-diagnostics-trace">Trace</label>
             <select id="context-diagnostics-trace" aria-label="Select context trace">

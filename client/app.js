@@ -4026,6 +4026,108 @@
   var contextDiagnosticsNote = document.getElementById('context-diagnostics-note');
   var contextDiagnosticsCopy = document.getElementById('context-diagnostics-copy');
   var contextDiagnosticsDownload = document.getElementById('context-diagnostics-download');
+  var providerHealthBody = document.getElementById('provider-health-body');
+  var providerHealthStatus = document.getElementById('provider-health-status');
+  var providerHealthRefresh = document.getElementById('provider-health-refresh');
+  var providerHealthRequestToken = 0;
+  var providerHealthController = null;
+  function resetProviderHealth() {
+    providerHealthRequestToken++;
+    if (providerHealthController) providerHealthController.abort();
+    providerHealthController = null;
+    providerHealthBody.replaceChildren();
+    providerHealthStatus.textContent = '';
+    providerHealthRefresh.disabled = false;
+  }
+  function renderProviderHealth(providers) {
+    providerHealthBody.replaceChildren();
+    if (!providers.length) {
+      providerHealthStatus.textContent = 'No provider status was returned.';
+      return;
+    }
+    var statuses = {
+      not_yet_tested: 'Not yet tested',
+      last_attempt_succeeded: 'Successfully used (HTTP success)',
+      cooling_down: 'Cooling down',
+      ready_to_retry: 'Ready to retry · not yet recovered'
+    };
+    providers.forEach(function(provider) {
+      var details = document.createElement('details');
+      var summary = document.createElement('summary');
+      var count = provider.configuredCredentials;
+      var backups = Math.max(0, count - 1);
+      summary.textContent = provider.label + ' · ' + count + ' configured · ' +
+        provider.availableCredentials + ' available · ' +
+        (backups ? backups + ' backup' + (backups === 1 ? '' : 's') + ' configured' : 'No backup configured');
+      details.appendChild(summary);
+      if (!count) {
+        var empty = document.createElement('p');
+        empty.textContent = 'No credentials configured.';
+        details.appendChild(empty);
+      } else {
+        var wrap = document.createElement('div');
+        wrap.className = 'provider-health-table-wrap';
+        var table = document.createElement('table');
+        table.setAttribute('aria-label', provider.label + ' credential status');
+        var heading = table.createTHead().insertRow();
+        ['Safe alias', 'Recorded use', 'Last HTTP outcome', 'Cooldown remaining at refresh'].forEach(function(label) {
+          var th = document.createElement('th');
+          th.scope = 'col';
+          th.textContent = label;
+          heading.appendChild(th);
+        });
+        var body = table.createTBody();
+        provider.credentials.forEach(function(credential) {
+          var row = body.insertRow();
+          [credential.alias, statuses[credential.status] || 'Status unavailable',
+            credential.lastHttpStatus === null ? 'No recorded outcome' : 'HTTP ' + credential.lastHttpStatus,
+            credential.retryAfterSeconds > 0 ? credential.retryAfterSeconds + ' seconds' : 'None'
+          ].forEach(function(value) { row.insertCell().textContent = value; });
+        });
+        wrap.appendChild(table);
+        details.appendChild(wrap);
+      }
+      providerHealthBody.appendChild(details);
+    });
+  }
+  async function loadProviderHealth() {
+    if (!state.access || !state.access.owner || contextDiagnosticsModal.classList.contains('hidden')) return;
+    resetProviderHealth();
+    var token = providerHealthRequestToken;
+    var controller = new AbortController();
+    providerHealthController = controller;
+    providerHealthRefresh.disabled = true;
+    providerHealthStatus.textContent = 'Loading recorded credential status…';
+    function isCurrent() {
+      return token === providerHealthRequestToken && state.access && state.access.owner &&
+        !contextDiagnosticsModal.classList.contains('hidden');
+    }
+    try {
+      var response = await fetch('/api/admin/provider-health', {
+        cache: 'no-store', credentials: 'include', signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Status request failed (HTTP ' + response.status + ').');
+      var health = await response.json();
+      if (!isCurrent()) return;
+      if (!Array.isArray(health.providers) || health.providers.some(function(provider) {
+        return !provider || !Array.isArray(provider.credentials) ||
+          !Number.isInteger(provider.configuredCredentials) || !Number.isInteger(provider.availableCredentials);
+      })) throw new Error('Invalid credential status response.');
+      providerHealthStatus.textContent = 'Snapshot: ' + new Date().toLocaleString() + '. Expand a provider to inspect its aliases.';
+      renderProviderHealth(health.providers);
+    } catch (error) {
+      if (!isCurrent()) return;
+      providerHealthBody.replaceChildren();
+      providerHealthStatus.textContent = 'Could not load AI credential health. ' +
+        (error.message || 'Request failed.') + ' Use Refresh status to retry.';
+    } finally {
+      if (isCurrent()) {
+        providerHealthController = null;
+        providerHealthRefresh.disabled = false;
+      }
+    }
+  }
+  if (providerHealthRefresh) providerHealthRefresh.addEventListener('click', loadProviderHealth);
   var contextCompareButton = document.getElementById('context-compare-full-history');
   var contextComparisonResult = document.getElementById('context-comparison-result');
   var contextComparisonStatus = document.getElementById('context-comparison-status');
@@ -4089,6 +4191,7 @@
     return clean;
   }
   function closeContextDiagnostics() {
+    resetProviderHealth();
     contextDiagnosticsRequestToken++;
     contextDiagnosticsTraces = [];
     clearContextComparison();
@@ -4135,6 +4238,7 @@
     updateContextCompareAvailability();
     contextDiagnosticsModal.classList.remove('hidden');
     contextDiagnosticsModal.classList.add('active');
+    loadProviderHealth();
     contextDiagnosticsData = null;
     contextDiagnosticsSelect.innerHTML = '';
     var loading = document.createElement('option');

@@ -1278,7 +1278,20 @@ html, body {
 }
 .context-health-evidence-panel ul { padding-left: 18px; }
 .context-diagnostics-trigger { border-color: #6e8b8d; color: #31585a; }
-#context-diagnostics-modal:not(.hidden) { position: fixed; inset: 0; z-index: 2600; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(28, 43, 47, .42); }
+.provider-health { flex: 0 0 auto; margin: 12px 16px; padding: 12px; border: 1px solid #cbdadd; border-radius: 6px; background: #f4f8f8; }
+.provider-health-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.provider-health h4 { margin: 0; color: #294b54; font-size: 13px; }
+.provider-health button { padding: 5px 10px; border: 1px solid #cad6da; border-radius: 5px; background: #fff; color: #324d57; font: inherit; font-size: 12px; cursor: pointer; }
+.provider-health button:disabled { opacity: .55; cursor: not-allowed; }
+.provider-health-note { margin: 6px 0; color: #60777f; font-size: 12px; }
+.provider-health details { margin-top: 8px; font-size: 12px; color: #324d57; }
+.provider-health summary { cursor: pointer; overflow-wrap: anywhere; }
+.provider-health-table-wrap { overflow-x: auto; }
+.provider-health table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; text-align: left; }
+.provider-health th, .provider-health td { padding: 6px; border-bottom: 1px solid #dce5e8; vertical-align: top; }
+.provider-health td:first-child { overflow-wrap: anywhere; }
+#context-diagnostics-modal:not(.hidden) { position: fixed; inset: 0; z-index: 2600; display: flex; align-items: center; justify-content: center; padding: 16px; max-width: none; max-height: none; border-radius: 0; background: rgba(28, 43, 47, .42); }
+#context-diagnostics-modal > .modal-content { background: #fff; border-radius: 12px; }
 .context-diagnostics-modal-content { width: min(980px, 94vw); max-width: none; max-height: 88vh; display: flex; flex-direction: column; overflow-y: auto; }
 .context-diagnostics-modal-content .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid #d9e2e5; }
 .context-diagnostics-modal-content .modal-header h3 { margin: 0; color: #29424d; }
