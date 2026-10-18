@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { saveContextHealth } from './chat-lease.js';
 import { getEncoding } from 'js-tiktoken';
 
 const budgetTokenizer = getEncoding('o200k_base');
@@ -150,8 +151,12 @@ export async function initContextMemory(db) {
 
 // Index originals once, then only appended messages. No full JSON transcript
 // transfers on subsequent turns. Locking prevents a concurrent append being lost.
-export async function ensureProjectIndex(pool, projectId) {
+export async function ensureProjectIndex(pool, projectId, {signal}={}) {
   const db = await pool.connect();
+  let destroyed=false;
+  const cancel=()=>{if(!destroyed){destroyed=true;db.release(true);}};
+  if(signal?.aborted) {cancel();signal.throwIfAborted();}
+  signal?.addEventListener('abort',cancel,{once:true});
   try {
     await db.query('BEGIN');
     await db.query("SELECT pg_advisory_xact_lock(hashtextextended('context-index:'||$1::text,0))",[projectId]);
@@ -201,9 +206,12 @@ export async function ensureProjectIndex(pool, projectId) {
     }
     await db.query('COMMIT');
   } catch (err) {
-    await db.query('ROLLBACK');
+    if(!destroyed) await db.query('ROLLBACK');
     throw err;
-  } finally { db.release(); }
+  } finally {
+    signal?.removeEventListener('abort',cancel);
+    if(!destroyed) db.release();
+  }
 }
 
 function excerpt(text, terms, limit) {
@@ -398,8 +406,8 @@ export function checkAnswerConsistency(text, evidence, messages) {
   return issues;
 }
 
-export async function prepareOriginalContext({pool,projectId,sessionId,message,system,model,maxOutputTokens,countTokens,historyMaxOrdinal,tokenCountMethod='provider_count_tokens',allowUncountedFullAttempt=false,forceRetrieval=false}) {
-  await ensureProjectIndex(pool,projectId);
+export async function prepareOriginalContext({pool,projectId,sessionId,message,system,model,maxOutputTokens,countTokens,historyMaxOrdinal,tokenCountMethod='provider_count_tokens',allowUncountedFullAttempt=false,forceRetrieval=false,signal,generationToken}) {
+  await ensureProjectIndex(pool,projectId,{signal});
   const stats = (await pool.query(`SELECT count(*)::int AS count,
     COALESCE(sum(octet_length(content)+32),0)::bigint AS bytes, COALESCE(max(ordinal),0)::int AS max_ordinal
     FROM memory_messages WHERE session_id=$1 AND ordinal<=COALESCE($2,2147483647)
@@ -467,7 +475,7 @@ export async function prepareOriginalContext({pool,projectId,sessionId,message,s
     conflicts:evidence.conflicts,traceIds:[],
     warning:mode === 'retrieved' ?
       'This reply uses selected original messages and source excerpts, not the complete transcript. Start a fresh chat in this project if the conversation has become confused. Stored originals and user corrections remain available; a fresh chat is not a guarantee of accuracy.' : null};
-  await pool.query('UPDATE sessions SET context_health=$1 WHERE id=$2',[JSON.stringify(health),sessionId]);
+  await saveContextHealth(pool,health,sessionId,generationToken);
   const summary = { ...health };
   delete summary.identityStatements;
   delete summary.timelineStatements;

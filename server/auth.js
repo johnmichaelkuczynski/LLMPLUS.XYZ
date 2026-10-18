@@ -2,7 +2,7 @@ import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import { Passport } from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { pool } from './db.js';
+import { pool, authPool } from './db.js';
 
 const SESSION_COOKIE = 'llmplus.sid.v2';
 const CALLBACK_PATH = '/auth/google/callback';
@@ -33,7 +33,7 @@ async function ensureUserWorkspace(userId) {
 }
 
 async function getUserById(id) {
-  const result = await pool.query(
+  const result = await authPool.query(
     `SELECT id, username, email, display_name, google_id
        FROM users
       WHERE id = $1`,
@@ -173,7 +173,7 @@ function isDevelopmentPreviewRequest(req) {
 }
 
 async function getPersonalOwner() {
-  const result = await pool.query(
+  const result = await authPool.query(
     `SELECT id, username, email, display_name, google_id
        FROM users
       WHERE LOWER(email) = LOWER($1)
@@ -202,13 +202,14 @@ export function setupGoogleAuth(app) {
   app.use(session({
     name: SESSION_COOKIE,
     store: new PgSession({
-      pool,
+      pool: authPool,
       tableName: 'google_sessions_v2',
       createTableIfMissing: false,
       errorLog: (...args) => console.error('Google session store error:', ...args)
     }),
     secret: sessionSecret,
     resave: false,
+    rolling: true,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
@@ -228,6 +229,7 @@ export function setupGoogleAuth(app) {
       const user = await getUserById(id);
       done(null, user || false);
     } catch (error) {
+      error.status = 503;
       done(error);
     }
   });

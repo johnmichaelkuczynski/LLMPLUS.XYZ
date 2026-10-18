@@ -20,6 +20,7 @@
   };
   var contextHealthRequestToken = 0;
   var contextHealthSnapshot = null;
+  var remoteResponseTimer = null;
   var contextFreshStarting = false;
   var contextDiagnosticsData = null;
   var contextDiagnosticsRequestToken = 0;
@@ -1132,6 +1133,7 @@
   }
 
   function clearContextHealth() {
+    updateRemoteResponse(null);
     closeSourceInspector();
     contextHealthRequestToken++;
     contextHealthSnapshot = null;
@@ -1262,9 +1264,34 @@
       if (requestToken !== contextHealthRequestToken || !isCurrentContext(sessionId, projectId)) return;
       if (health && String(health.sessionId) === String(sessionId) && String(health.projectId) === String(projectId)) {
         renderContextHealth(health);
+        updateRemoteResponse(health.activeResponse,session,project);
       }
     } catch (e) {
       if (requestToken === contextHealthRequestToken && isCurrentContext(sessionId, projectId)) clearContextHealth();
+    }
+  }
+
+  function updateRemoteResponse(response,session,project) {
+    clearTimeout(remoteResponseTimer);
+    remoteResponseTimer=null;
+    state.remoteGeneration=null;
+    if(state.streaming)return;
+    if(response && response.active && session && project) {
+      state.remoteGeneration={sessionId:session.id,projectId:project.id};
+      els.btnSend.innerHTML='&#9724;';
+      els.btnSend.classList.add('stop-mode');
+      els.btnSend.disabled=false;
+      els.btnSend.title=response.stopping?'Stopping earlier response…':'Stop earlier response';
+      els.btnSend.setAttribute('aria-label','Stop earlier response');
+      remoteResponseTimer=setTimeout(function(){
+        if(isCurrentContext(session.id,project.id))refreshContextHealth(session,project);
+      },1500);
+    } else {
+      els.btnSend.innerHTML='&#9654;';
+      els.btnSend.classList.remove('stop-mode');
+      els.btnSend.disabled=false;
+      els.btnSend.title='Send message';
+      els.btnSend.setAttribute('aria-label','Send message');
     }
   }
 
@@ -2034,14 +2061,25 @@
   }
 
   function stopChatResponse() {
-    var active=state.activeChatRequest;
+    var active=state.activeChatRequest || state.remoteGeneration;
     if(active && !state.cancelPending) {
       state.cancelPending=fetch('/api/sessions/'+encodeURIComponent(active.sessionId)+'/cancel',{
         method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projectId:active.projectId}),
         signal:AbortSignal.timeout(7000)
       }).then(function(r){if(!r.ok)throw new Error('Unable to confirm cancellation');return r.json();})
+        .then(function(result){
+          if(!result.released)throw new Error('The earlier response is still stopping. Stop remains available.');
+          if(isCurrentContext(active.sessionId,active.projectId) && !state.streaming) {
+            contextHealthRequestToken++;
+            updateRemoteResponse(null);
+          }
+          return result;
+        })
         .catch(function(e){notify(e.message,'error');})
-        .finally(function(){state.cancelPending=null;});
+        .finally(function(){
+          state.cancelPending=null;
+          if(isCurrentContext(active.sessionId,active.projectId))refreshContextHealth(state.currentSession,state.currentProject);
+        });
     }
     if(state.abortController)state.abortController.abort();
   }
@@ -2052,6 +2090,10 @@
       return;
     }
     if(state.cancelPending) await state.cancelPending;
+    if(state.remoteGeneration) {
+      stopChatResponse();
+      return;
+    }
     var text = els.chatInput.value.trim();
     var hasAttachments = state.pendingAttachments.length > 0 && state.pendingAttachments.some(function(a) { return !a.uploading; });
     if (!text && !hasAttachments) return;
@@ -6234,25 +6276,35 @@
     navigator.clipboard.writeText(t).then(function() { notify('Copied B', 'success'); });
   });
 
+  var appInitialized = false;
+  var authRetryTimer = null;
   async function bootstrapAuth() {
     var app = document.getElementById('app');
     var signIn = document.getElementById('btn-google-login');
+    var sidebarSignIn = document.querySelector('.sidebar-access-btn[href="/api/auth/google"]');
+    function labelSignIn(text, title) {
+      [signIn, sidebarSignIn].forEach(function(link) {
+        if (link) { link.textContent = text; link.title = title; }
+      });
+    }
     var signOut = document.getElementById('btn-signout');
     var errorCode = new URLSearchParams(window.location.search).get('authError');
     var checkoutState = new URLSearchParams(window.location.search).get('checkout');
 
     try {
       var response = await fetch('/api/auth/me', { cache: 'no-store' });
-      var data = response.ok ? await response.json() : { authenticated: false, user: null };
+      if (!response.ok) throw new Error('Sign-in status is temporarily unavailable. Your session has not been discarded.');
+      var data = await response.json();
       if (data.authenticated && data.user) {
         window.__authUser = data.user;
-        if (signIn) signIn.textContent = 'Google Login';
+        labelSignIn(data.developmentPreview ? 'Owner preview' : 'Signed in',
+          data.developmentPreview ? 'Owner workspace preview; Google sign-in is optional here' : 'Signed in · click to switch Google account');
         if (signOut) signOut.classList.toggle('hidden', Boolean(data.developmentPreview));
         var chip = document.getElementById('user-chip');
         if (chip) chip.textContent = data.user.email || data.user.username || '';
       }
       app.classList.remove('hidden');
-      initializeApp();
+      if (!appInitialized) { appInitialized = true; initializeApp(); }
       await refreshBillingStatus();
       if (checkoutState === 'success') {
         if (state.access && state.access.paid) {
@@ -6266,7 +6318,9 @@
       if (errorCode || checkoutState) window.history.replaceState({}, document.title, window.location.pathname);
     } catch (error) {
       app.classList.remove('hidden');
-      initializeApp();
+      labelSignIn('Rechecking sign-in…','The server could not verify sign-in. Retrying without discarding your session.');
+      clearTimeout(authRetryTimer);
+      authRetryTimer = setTimeout(bootstrapAuth, 3000);
     }
   }
 

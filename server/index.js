@@ -14,7 +14,8 @@ import { setupGoogleAuth, requireAccessIdentity } from './auth.js';
 import { registerVeniceVideoRoutes } from './venice-video.js';
 import { initContextMemory, ensureProjectIndex, prepareOriginalContext, CONTEXT_LIMITS, conservativeTokenEstimate, checkAnswerConsistency } from './context-memory.js';
 import { contextTrace, auditedProviderFetch, registerContextDiagnostics, decryptTrace, providerDelay, providerSignal } from './context-diagnostics.js';
-import { createRequestLifetime, releaseGenerationLock } from './request-lifecycle.js';
+import { createRequestLifetime } from './request-lifecycle.js';
+import { acquireChatLease, requestChatCancellation, saveContextHealth, waitForChatRelease } from './chat-lease.js';
 import { credentialRouter, rotatingProviderFetch } from './provider-credentials.js';
 import { registerSourceInspector } from './source-inspector.js';
 
@@ -1413,9 +1414,18 @@ app.get('/api/sessions/:id/context-health', async function(req, res) {
     var row = (await pool.query(`SELECT project_id,context_health,
       CASE WHEN jsonb_typeof(transcript)='array' THEN jsonb_array_length(transcript) ELSE 0 END AS count
       FROM sessions WHERE id=$1`,[req.params.id])).rows[0];
-    res.json(row.context_health || {sessionId:req.params.id,projectId:row.project_id,totalMessages:row.count,
+    var health=Object.assign({totalMessages:row.count,
       mode:'not_yet_measured',inputTokens:null,countMethod:'not_yet_measured',identityStatements:[],traceIds:[],
-      warning:null,historyMessagesIncluded:null,omittedMessages:null});
+      warning:null,historyMessagesIncluded:null,omittedMessages:null},row.context_health || {});
+    var lease=health._generation;
+    delete health._generation;
+    health.sessionId=req.params.id;
+    health.projectId=row.project_id;
+    health.activeResponse={
+      active:!!lease && Number(lease.expiresAt)>Date.now(),
+      stopping:!!lease && lease.cancelRequested===true
+    };
+    res.json(health);
   } catch (err) { res.status(500).json({error:err.message}); }
 });
 
@@ -2402,11 +2412,14 @@ app.post('/api/sessions/:id/cancel',async function(req,res) {
   if(!await verifySessionInProject(req.params.id,req.body.projectId,req.userId))
     return res.status(403).json({error:'Forbidden'});
   const current=activeChatRequests.get(req.params.id);
+  // Stop local work before waiting for any database row it might be indexing.
+  if(current) current.stop();
+  const remoteCancelled=await requestChatCancellation(pool,req.params.id);
   if(current) {
-    current.stop();
     await Promise.race([current.done,new Promise(resolve=>setTimeout(resolve,3000))]);
   }
-  res.json({cancelled:!!current,released:!activeChatRequests.has(req.params.id)});
+  const released=await waitForChatRelease(pool,req.params.id);
+  res.json({cancelled:!!current || remoteCancelled,released});
 });
 
 app.post('/api/chat', async function(req, res) {
@@ -2418,6 +2431,10 @@ app.post('/api/chat', async function(req, res) {
 
   var clientClosed = false;
   const lifetime=createRequestLifetime(req,res);
+  const keepAlive=setInterval(()=>{
+    try {if(!res.writableEnded)res.write(': keep-alive\n\n');} catch {lifetime.stop();}
+  },5000);
+  keepAlive.unref?.();
   const requestTrace=contextTrace.getStore();
   if(requestTrace) requestTrace.abortSignal=lifetime.signal;
   lifetime.signal.addEventListener('abort',()=>{clientClosed=true;},{once:true});
@@ -2456,15 +2473,12 @@ app.post('/api/chat', async function(req, res) {
       res.write('data: ' + JSON.stringify({ type: 'error', error: 'Forbidden' }) + '\n\n');
       return res.end();
     }
-    generationLock = await pool.connect();
     const previousRequest=activeChatRequests.get(sessionId);
     if(previousRequest?.signal.aborted) await Promise.race([previousRequest.done,new Promise(resolve=>setTimeout(resolve,3000))]);
     lifetime.signal.throwIfAborted();
-    var lockResult = await generationLock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[sessionId]);
-    if (!lockResult.rows[0].locked) {
-      generationLock.release();
-      generationLock = null;
-      res.write('data: '+JSON.stringify({type:'error',error:'This chat already has a response in progress. Wait for it to finish before sending another message.'})+'\n\n');
+    generationLock = await acquireChatLease(pool,sessionId,lifetime);
+    if (!generationLock) {
+      res.write('data: '+JSON.stringify({type:'error',code:'generation_busy',error:'This chat has an active response. Use Stop to cancel it, or wait for it to finish.'})+'\n\n');
       return res.end();
     }
     activeChatRequests.set(sessionId,lifetime);
@@ -2512,8 +2526,11 @@ app.post('/api/chat', async function(req, res) {
     // Save the original submission before calling a provider. Even a failed or
     // interrupted generation must not erase the user's correction/evidence.
     var historyMaxOrdinal = grRes.rows[0].history_count;
-    await pool.query("UPDATE sessions SET transcript = COALESCE(transcript,'[]'::jsonb) || $1::jsonb WHERE id=$2",
-      [JSON.stringify([{role:'user',content:message,timestamp:new Date().toISOString()}]),sessionId]);
+    await generationLock.assertOwned();
+    const accepted=await pool.query(`UPDATE sessions SET transcript = COALESCE(transcript,'[]'::jsonb) || $1::jsonb
+      WHERE id=$2 AND context_health#>>'{_generation,token}'=$3 RETURNING id`,
+      [JSON.stringify([{role:'user',content:message,timestamp:new Date().toISOString()}]),sessionId,generationLock.token]);
+    if(!accepted.rows.length) throw new Error('This request was superseded before its message was saved');
     userSubmissionSaved = true;
 
     var userOwnWords = attachmentRequest.hasAttachment ? attachmentRequest.rawUserInstruction : (message || '');
@@ -2652,7 +2669,7 @@ app.post('/api/chat', async function(req, res) {
       message:userContent,system:systemPrompt,model:modelChoice,maxOutputTokens:lengthMaxTokens,
       countTokens:modelChoice === 'claude' ? countClaudeInput : modelChoice==='grok'?countGrokInput:null,
       tokenCountMethod:modelChoice==='grok'?'provider_tokenizer_with_overhead_margin':'provider_count_tokens',
-      historyMaxOrdinal:historyMaxOrdinal,allowUncountedFullAttempt:true});
+      historyMaxOrdinal:historyMaxOrdinal,allowUncountedFullAttempt:true,signal:lifetime.signal,generationToken:generationLock.token});
     msgs = reliableContext.messages;
     systemPrompt = reliableContext.system;
     var trace = contextTrace.getStore();
@@ -2809,7 +2826,7 @@ app.post('/api/chat', async function(req, res) {
         system:contextBaseSystem,model:modelChoice,maxOutputTokens:lengthMaxTokens,
         countTokens:modelChoice==='claude'?countClaudeInput:modelChoice==='grok'?countGrokInput:null,
         tokenCountMethod:modelChoice==='grok'?'provider_tokenizer_with_overhead_margin':'provider_count_tokens',
-        historyMaxOrdinal,forceRetrieval:true});
+        historyMaxOrdinal,forceRetrieval:true,signal:lifetime.signal,generationToken:generationLock.token});
       msgs=reliableContext.messages;systemPrompt=reliableContext.system;
       reliableContext.health.warning='The provider rejected the full history as too large. '+reliableContext.health.warning;
       if(trace) trace.metadata=reliableContext.metadata;
@@ -2932,11 +2949,15 @@ app.post('/api/chat', async function(req, res) {
     var newEntries = [
       { role: 'assistant', content: savedText, model:modelChoice, incomplete:wasKilled, timestamp:new Date().toISOString() }
     ];
-    if(savedText) await pool.query(
-      "UPDATE sessions SET transcript = COALESCE(transcript, '[]'::jsonb) || $1::jsonb WHERE id = $2",
-      [JSON.stringify(newEntries), sessionId]);
+    await generationLock.assertOwned();
+    if(savedText) {
+      const persisted=await pool.query(
+      `UPDATE sessions SET transcript = COALESCE(transcript, '[]'::jsonb) || $1::jsonb
+        WHERE id = $2 AND context_health#>>'{_generation,token}'=$3 RETURNING id`,
+      [JSON.stringify(newEntries), sessionId,generationLock.token]);
+      if(!persisted.rows.length) throw new Error('This request no longer owns the chat; its answer was not saved over a newer request');
+    }
     assistantSubmissionSaved = true;
-    await ensureProjectIndex(pool,projectId);
     if (trace) {
       reliableContext.health.status = wasKilled ? 'partial' : 'complete';
       reliableContext.health.providerAcceptancePending=false;
@@ -2958,7 +2979,7 @@ app.post('/api/chat', async function(req, res) {
           reliableContext.health.countMethod = 'provider_response_usage';
         }
       }
-      await pool.query('UPDATE sessions SET context_health=$1 WHERE id=$2',[JSON.stringify(reliableContext.health),sessionId]);
+      await saveContextHealth(pool,reliableContext.health,sessionId,generationLock.token);
       res.write('data: ' + JSON.stringify({type:'context_trace',sessionId:sessionId,projectId:projectId,traceIds:trace.traceIds}) + '\n\n');
     }
 
@@ -2968,6 +2989,8 @@ app.post('/api/chat', async function(req, res) {
       return;
     }
 
+    await generationLock.release();
+    generationLock=null;
     res.write('data: ' + JSON.stringify({ type: 'tractatus_trigger', projectId: projectId, userMessage: message, assistantResponse: fullText.substring(0, 8000) }) + '\n\n');
     res.write('data: [DONE]\n\n');
     res.end();
@@ -2978,16 +3001,16 @@ app.post('/api/chat', async function(req, res) {
       var failedPartial = (fullText || '') + (err.partialResponse || '');
       if (failedPartial) {
         try {
-          await pool.query("UPDATE sessions SET transcript=COALESCE(transcript,'[]'::jsonb)||$1::jsonb WHERE id=$2",
-            [JSON.stringify([{role:'assistant',content:failedPartial,model:modelChoice,incomplete:true,timestamp:new Date().toISOString()}]),sessionId]);
-          await ensureProjectIndex(pool,projectId);
+          await pool.query(`UPDATE sessions SET transcript=COALESCE(transcript,'[]'::jsonb)||$1::jsonb
+            WHERE id=$2 AND context_health#>>'{_generation,token}'=$3`,
+            [JSON.stringify([{role:'assistant',content:failedPartial,model:modelChoice,incomplete:true,timestamp:new Date().toISOString()}]),sessionId,generationLock?.token]);
         } catch (saveError) { console.error('[Context] Could not persist partial provider response:',saveError.message); }
       }
     }
     if (reliableContext) {
       reliableContext.health.status=lifetime.signal.aborted?'cancelled':'request_error';
       reliableContext.health.warning=lifetime.signal.aborted?'Response stopped. Your message and any partial answer are preserved. You can send another message.':'The request did not finish successfully. Your original message is preserved; a successfully completed reply is not being reported.';
-      try { await pool.query('UPDATE sessions SET context_health=$1 WHERE id=$2',[JSON.stringify(reliableContext.health),sessionId]); } catch {}
+      try { await saveContextHealth(pool,reliableContext.health,sessionId,generationLock?.token); } catch {}
       if (!res.writableEnded) res.write('data: '+JSON.stringify({type:'context_health',...reliableContext.health})+'\n\n');
     }
     if (!res.writableEnded) {
@@ -2997,7 +3020,12 @@ app.post('/api/chat', async function(req, res) {
       } catch (e) {}
     }
   } finally {
-    if (generationLock) await releaseGenerationLock(generationLock,req.body.sessionId);
+    clearInterval(keepAlive);
+    if (generationLock) {
+      try {await generationLock.release();} catch(error) {
+        console.error('[Chat] Lease cleanup failed; automatic expiry will recover the chat:',error.code || error.name);
+      }
+    }
     if(activeChatRequests.get(req.body.sessionId)===lifetime) activeChatRequests.delete(req.body.sessionId);
     lifetime.dispose();
   }

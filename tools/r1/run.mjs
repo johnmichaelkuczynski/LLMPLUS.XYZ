@@ -764,6 +764,16 @@ async function recordStep(page, opts, fn) {
 // ─── Functions 1–14 ─────────────────────────────────────────────────────────
 async function f1_loadHomeChat(page, context) {
   state.status = 'f1';
+  // Never send a generated test question into the user's default/personal chat.
+  const fixture=await apiFetch(context,'/api/projects',{
+    method:'POST',body:{name:'R1 isolated home '+RUN_TIMESTAMP}
+  });
+  if(fixture.status!==200 && fixture.status!==201) throw new Error('Cannot create an isolated R1 project; refusing to use a personal chat');
+  const fixtureId=fixture.body.id;
+  if(!fixtureId) throw new Error('Isolated R1 project ID missing; refusing to continue');
+  await page.evaluate(id=>localStorage.setItem('llmplus_last_project',id),fixtureId);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('[data-testid="project-'+fixtureId+'"].active',{timeout:30000});
   // We are already on the app after login; do NOT re-goto.
   // Wait for the sidebar to populate (an active project sidebar-item + active session sidebar-item).
   await page.waitForSelector('[data-testid^="project-"]', { timeout: 30000 }).catch(()=>{});
@@ -778,6 +788,7 @@ async function f1_loadHomeChat(page, context) {
   });
   let mainProjectId = ctx.pid;
   let sessionId = ctx.sid;
+  if(mainProjectId!==fixtureId) throw new Error('R1 project isolation failed; refusing to send a message');
   if (!mainProjectId) {
     const { body: projects } = await apiFetch(context, '/api/projects');
     if (!projects || !projects.length) { log('[f1] no projects'); return; }
@@ -790,7 +801,10 @@ async function f1_loadHomeChat(page, context) {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-testid^="session-"]', { timeout: 15000 }).catch(()=>{});
   }
-  log(`[f1] using project ${mainProjectId} session ${sessionId}`);
+  const fixtureSessions=await apiFetch(context,`/api/projects/${fixtureId}/sessions`);
+  if(!Array.isArray(fixtureSessions.body) || !fixtureSessions.body.some(s=>s.id===sessionId))
+    throw new Error('R1 session does not belong to its isolated project; refusing to send');
+  log(`[f1] using isolated project ${mainProjectId} session ${sessionId}`);
   const mainProject = { id: mainProjectId };
   await sendChatViaUI(page, context, mainProject.id, sessionId, {
     functionNumber: 1,
