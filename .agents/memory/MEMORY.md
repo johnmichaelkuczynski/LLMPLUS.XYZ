@@ -7,7 +7,7 @@
 - [Target-words silent truncation](target-words-silent-truncation.md) — a stray value in the "Words #" box silently capped every reply (maxTokens=256) → mid-sentence freezes; persistent length-overrides need visible active state + clear.
 - [Chat document recall](chat-document-recall.md) — retrieve actual source passages, never only generated summaries; short follow-ups must not lose memory through keyword gating.
 - [Source fidelity and token counts](source-fidelity-token-counts.md) — original sources outrank generated memory; unsupported token counters require disclosed estimates, not byte counts presented as tokens.
-- [Normal length runaway](response-length-normal.md) — "Normal = never-ending" is fixed by 3 agreeing levers (length block + end-of-prompt FINAL REMINDER for recency + max_tokens ceiling), not by continuation logic; confirm/verify/check = brief yes/no, not an essay.
+- [Brief but complete answers](response-length-normal.md) — keep Normal short, but finish interrupted thoughts once; token caps and provider end_turn do not prove an answer is complete.
 - [UI modal stacking](ui-verification-login-gate.md) — modals opened from the artifact panel need z-index ≥1200 or the panel intercepts their clicks.
 - [Auto-commit PII sweep](auto-commit-pii-sweep.md) — completion commits sweep in pasted attached_assets transcripts; strip them or review rejects.
 - [Decay-warning behavioral testing](decay-behavior-testing.md) — prompt-effect checks need A/B (degraded vs healthy) with per-trial projects (chat cross-injects sessions) and zero decay language allowed in controls.

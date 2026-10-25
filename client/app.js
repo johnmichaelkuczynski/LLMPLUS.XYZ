@@ -1160,7 +1160,8 @@
     contextHealthRequestToken++;
     contextHealthSnapshot = health;
     var title;
-    if (health.status==='cancelled') title = 'Response stopped · ready for another message';
+    if (health.status==='incomplete') title = 'Answer incomplete · partial text preserved';
+    else if (health.status==='cancelled') title = 'Response stopped · ready for another message';
     else if (health.status==='provider_error' || health.status==='request_error') title = 'Request failed · original message preserved';
     else if (health.status==='awaiting_provider') title = 'Context prepared · awaiting provider';
     else if (health.mode === 'full') title = 'Last reply used · full history';

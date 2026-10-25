@@ -1,24 +1,16 @@
 ---
-name: "Normal" length runaway — prompt recency + token ceiling, not continuation
-description: Why "Normal" produced never-ending essays for simple questions, and the levers that actually control it.
+name: Brief but complete answers
+description: Keep Normal mode short without accepting a provider's cut-off sentence as a finished answer.
 ---
 
-# "Normal" length = never-ending: the real levers
+Control Normal length with aligned numeric prompt guidance, an end-of-prompt reminder, and a bounded output budget. Do not restore unrestricted continuations to solve truncation.
 
-Symptom: user asks a yes/no ("tell me if this document is correct") in NORMAL mode and gets a giant section-by-section / clause-by-clause essay. User rage: "NORMAL SEEMS TO MEAN NEVER ENDING."
+**Why:** Prompt-only instructions previously produced excessively long answers under heavy project context. Conversely, accepting a hard budget as a finished response stranded sentences. A recorded production response also ended with “would be” despite the provider reporting end_turn, so that signal alone is insufficient.
 
-It was NOT the auto-continuation logic (that already correctly refuses to continue on max_tokens without an explicit word target / long-form request). The runaway came from a SINGLE call. Three compounding causes:
+**How to apply:** Keep the existing concise style instructions. Allow one short completion-only attempt for a token-cap stop, a stream without a terminal event, or clearly dangling prose. Finish the current thought, not additional sections. Preserve explicit exact-output requests and intentional structured output.
 
-1. **Persona lead-in rewarded verbosity.** The system prompt opened by telling the model to give "expert-level, intellectually rigorous responses" — the model reads that as "be elaborate." Fix: frame rigor as QUALITY of reasoning, not LENGTH, and tell it to match length to the request.
-2. **No end-of-prompt reminder for Normal.** Concise mode had a strong FINAL REMINDER appended AFTER buildSystemPrompt returns (recency wins); Normal's length instruction was buried mid-prompt and got drowned by persona + heavy project/legal context. Fix: give Normal its own end-of-prompt FINAL REMINDER, mirroring concise.
-3. **Token ceiling too high.** Normal max_tokens was 4096 (~3000 words) so runaway was physically possible. Lowered to 2048 as a hard safety net (Normal does NOT auto-continue on max_tokens, so the ceiling is real).
+Never report unfinished output as a successful complete answer.
 
-**Durable rules:**
-- Length control lives in THREE places that must agree: (a) the length block inside buildSystemPrompt, (b) an end-of-prompt FINAL REMINDER (recency; concise & normal both have one), (c) the max_tokens ceiling per mode. Changing only one is why earlier length fixes didn't stick.
-- Recency matters: the last length instruction in the prompt wins. Length/target/ground-rules notes are deliberately appended AFTER buildSystemPrompt for this reason.
-- "Confirm / verify / check / is this correct?" is a request for a brief yes/no, NOT a license to analyze. This is now a HIGHEST-PRIORITY rule alongside the "read and take note" procedural rule.
-- Tradeoff accepted: a 2048 cap can truncate a genuinely-long Normal answer mid-sentence (Normal won't continue). Acceptable because if the model writes 1500+ words for a simple question it's already failing; shorter is what the user wants. Detailed/Exhaustive exist for real length.
+**Why:** The previous implementation defaulted streams to end_turn and refused to finish ordinary token-limited responses. This made both genuine interruptions and falsely finished sentences look successful.
 
-**Round 2 (user: "STILL WAY TOO LONG"):** prompt-only nudges weren't enough. What finally bit: a NUMERIC hard cap ("never exceed ~300 words") stated in BOTH the length block and the end-of-prompt FINAL REMINDER, plus dropping Normal's max_tokens 2048→1200 (~900 words physical ceiling). Vague "match length to question" language gets ignored under heavy context; give the model a number. Compare route needs the same reminder (it builds its own prompts).
-
-**Round 3 (Concise still exceeded sentence limits):** even aligned prompts and token ceilings can obey a word cap while violating a sentence cap under strong project context. For Super Concise and Concise, buffer the short generation and enforce the sentence count at the output boundary before saving or displaying it; apply the same rule to compare lanes. **Why:** sentence count is a user-visible contract, not a best-effort style request. **How to apply:** any new generation route that accepts these modes must use the shared short-response enforcement before emission.
+**How to apply:** Default unclosed streams to interrupted, parse the final streaming frame even without a newline, preserve partial text, and persist a visible incomplete status if the bounded completion cannot finish. Do not discard original source context to make a continuation fit.

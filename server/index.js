@@ -1,4 +1,5 @@
 import express from 'express';
+import { needsResponseCompletion, joinCompletion, completionMessages } from './response-completion.js';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
@@ -2690,15 +2691,14 @@ app.post('/api/chat', async function(req, res) {
         var decoder = new TextDecoder();
         var buffer = '';
         var segmentText = '';
-        var stopReason = 'end_turn';
+        var stopReason = 'stream_interrupted';
         while (true) {
           if (clientClosed) {
             try { await reader.cancel(); } catch (e) {}
             return { segmentText: segmentText, stopReason: 'aborted' };
           }
           var chunk = await reader.read();
-          if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
+          buffer += chunk.done ? decoder.decode()+'\n' : decoder.decode(chunk.value, { stream: true });
           var oLines = buffer.split('\n');
           buffer = oLines.pop();
           for (var j = 0; j < oLines.length; j++) {
@@ -2719,11 +2719,14 @@ app.post('/api/chat', async function(req, res) {
                     stopReason = 'max_tokens';
                   } else if (parsed.choices[0].finish_reason === 'stop') {
                     stopReason = 'end_turn';
+                  } else if(parsed.choices[0].finish_reason) {
+                    stopReason = parsed.choices[0].finish_reason;
                   }
                 }
               } catch (e) { if (!(e instanceof SyntaxError)) throw e; }
             }
           }
+          if(chunk.done)break;
         }
         return { segmentText: segmentText, stopReason: stopReason };
       } catch (err) {
@@ -2759,7 +2762,7 @@ app.post('/api/chat', async function(req, res) {
         var decoder = new TextDecoder();
         var buffer = '';
         var segmentText = '';
-        var stopReason = 'end_turn';
+        var stopReason = 'stream_interrupted';
 
         while (true) {
           if (clientClosed) {
@@ -2767,8 +2770,7 @@ app.post('/api/chat', async function(req, res) {
             return { segmentText: segmentText, stopReason: 'aborted' };
           }
           var chunk = await reader.read();
-          if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
+          buffer += chunk.done ? decoder.decode()+'\n' : decoder.decode(chunk.value, { stream: true });
           var lines = buffer.split('\n');
           buffer = lines.pop();
           for (var j = 0; j < lines.length; j++) {
@@ -2791,6 +2793,7 @@ app.post('/api/chat', async function(req, res) {
               } catch (e) { if (!(e instanceof SyntaxError)) throw e; }
             }
           }
+          if(chunk.done)break;
         }
         return { segmentText: segmentText, stopReason: stopReason };
       } catch (err) {
@@ -2863,9 +2866,8 @@ app.post('/api/chat', async function(req, res) {
           needsMore = true;
           console.log('[Chat] continuing: explicit long-form request');
         } else {
-          // No explicit length target and not an explicit long-form request:
-          // do NOT auto-continue. The model chose this length; forcing more
-          // is exactly the runaway-length behavior users hate.
+          // Do not expand ordinary answers. A separate bounded completion
+          // pass below can finish a cut-off thought without writing an essay.
           console.log('[Chat] stopping: max_tokens but no explicit length target (adaptive)');
         }
       } else if (lastResult.stopReason === 'end_turn' && requestedWords > 0 && currentWords < requestedWords * 0.8) {
@@ -2938,7 +2940,46 @@ app.post('/api/chat', async function(req, res) {
       console.log('[Chat complete] Total words: ' + finalWords + ' / requested: ' + requestedWords + ' | continuations: ' + continuationCount);
     }
 
+    // At most ONE short repair: Normal remains short, but no longer silently
+    // accepts max_tokens, an unclosed stream, or a clearly dangling end_turn.
+    if(!clientClosed && needsResponseCompletion(lastResult.stopReason,fullText,responseFormat,userOwnWords)) {
+      const finishMessages=completionMessages(msgs,fullText);
+      const previousBudget=lengthMaxTokens;
+      lengthMaxTokens=512;
+      if(conservativeTokenEstimate(finishMessages,systemPrompt)+lengthMaxTokens+2048<=CONTEXT_LIMITS[modelChoice]) {
+        if(trace) {
+          trace.purpose='continuation';
+          trace.metadata={...reliableContext.metadata,purpose:'continuation',boundedCompletion:true};
+        }
+        res.write('data: '+JSON.stringify({type:'status',message:'Finishing the interrupted answer…'})+'\n\n');
+        bufferShortResponse=true;
+        try {
+          lastResult=await streamOneCall(finishMessages);
+          fullText=joinCompletion(fullText,lastResult.segmentText);
+          res.write('data: '+JSON.stringify({type:'replace_text',text:fullText})+'\n\n');
+        } catch(finishError) {
+          if(finishError.partialResponse) {
+            fullText=joinCompletion(fullText,finishError.partialResponse);
+            finishError.partialResponse='';
+            if(!clientClosed && !res.destroyed && !res.writableEnded)
+              res.write('data: '+JSON.stringify({type:'replace_text',text:fullText})+'\n\n');
+          }
+          throw finishError;
+        } finally {
+          bufferShortResponse=false;
+          lengthMaxTokens=previousBudget;
+        }
+      } else {
+        lengthMaxTokens=previousBudget;
+      }
+    }
     var wasKilled = clientClosed || lastResult.stopReason === 'aborted';
+    var outputIncomplete = !wasKilled && (lastResult.stopReason!=='end_turn' ||
+      needsResponseCompletion(lastResult.stopReason,fullText,responseFormat,userOwnWords));
+    if(outputIncomplete) {
+      reliableContext.health.warning='This answer is incomplete: the provider stopped before finishing it. The partial answer is preserved; you can ask it to continue.';
+      res.write('data: '+JSON.stringify({type:'error',code:'answer_incomplete',error:reliableContext.health.warning})+'\n\n');
+    }
     var consistencyIssues = checkAnswerConsistency(fullText,reliableContext.evidence,msgs);
     reliableContext.health.consistencyIssues = consistencyIssues;
     if (consistencyIssues.length && !wasKilled) {
@@ -2947,7 +2988,7 @@ app.post('/api/chat', async function(req, res) {
     }
     var savedText = fullText;
     var newEntries = [
-      { role: 'assistant', content: savedText, model:modelChoice, incomplete:wasKilled, timestamp:new Date().toISOString() }
+      { role: 'assistant', content: savedText, model:modelChoice, incomplete:wasKilled || outputIncomplete, timestamp:new Date().toISOString() }
     ];
     await generationLock.assertOwned();
     if(savedText) {
@@ -2959,7 +3000,7 @@ app.post('/api/chat', async function(req, res) {
     }
     assistantSubmissionSaved = true;
     if (trace) {
-      reliableContext.health.status = wasKilled ? 'partial' : 'complete';
+      reliableContext.health.status = wasKilled ? 'partial' : outputIncomplete ? 'incomplete' : 'complete';
       reliableContext.health.providerAcceptancePending=false;
       reliableContext.health.traceIds = trace.traceIds;
       var primaryUsage = trace.results && trace.results.find(r=>r.status==='complete');
