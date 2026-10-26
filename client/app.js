@@ -932,7 +932,7 @@
 
   async function api(url, opts) {
     var r = await fetch(url, opts || {});
-    if (await handleGateResponse(r.clone())) throw new Error('Free access limit reached');
+    if (await handleGateResponse(r)) throw new Error('Free access limit reached');
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   }
@@ -1732,15 +1732,15 @@
     var artifactOpened = false;
     var artifactCheckInterval = null;
     var lastArtifactLen = 0;
-    var shownLen = 0;
-    var streamDone = false;
     var finalized = false;
-    var rafId = null;
+    var authoritativeAnswer = false;
+    var answerIncomplete = false;
+    var streamError = false;
+    var invalidFrame = false;
 
-    function finalizeRender() {
+    function finalizeRender(completion) {
       if (finalized) return;
       finalized = true;
-      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
       if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
       var ti2 = textEl.querySelector('.thinking-indicator');
       if (ti2) ti2.remove();
@@ -1757,36 +1757,20 @@
         viewBtn.addEventListener('click', function() { showArtifact(fullText, artTitle); });
         textEl.appendChild(viewBtn);
       }
-      if (onDone) onDone(fullText);
+      if(completion && completion.incomplete && fullText.trim()) {
+        var warning=document.createElement('small');
+        warning.className='msg-meta';
+        warning.textContent='Answer interrupted or incomplete · partial text preserved';
+        textEl.appendChild(warning);
+      }
+      if (onDone) onDone(fullText,completion || {incomplete:false});
     }
 
-    // Smooth typewriter renderer: drains received text at a steady pace
-    // so output flows naturally instead of appearing in network-sized blocks.
-    function renderLoop() {
-      rafId = null;
-      if (finalized) return;
-      if (shownLen < fullText.length) {
-        var ti = textEl.querySelector('.thinking-indicator');
-        if (ti) ti.remove();
-        var remaining = fullText.length - shownLen;
-        var step = Math.max(2, Math.ceil(remaining * 0.18));
-        if (step > 180) step = 180;
-        shownLen += step;
-        if (shownLen > fullText.length) shownLen = fullText.length;
-        textEl.innerHTML = fmt(fullText.slice(0, shownLen)) + '<span class="cursor-blink"></span>';
-        scrollBottom();
-      }
-      if (shownLen < fullText.length || !streamDone) {
-        rafId = requestAnimationFrame(renderLoop);
-      } else {
-        finalizeRender();
-      }
-    }
-
+    // Never let paused animation callbacks strand received text or keep Send busy.
     function ensureLoop() {
-      if (rafId == null && !finalized) {
-        rafId = requestAnimationFrame(renderLoop);
-      }
+      if (finalized) return;
+      textEl.innerHTML=fmt(fullText)+'<span class="cursor-blink"></span>';
+      scrollBottom();
     }
 
     function updateLiveArtifact() {
@@ -1819,18 +1803,19 @@
 
     function pump() {
       reader.read().then(function(result) {
-        if (result.done) {
-          streamDone = true;
-          ensureLoop();
-          return;
-        }
-        buffer += decoder.decode(result.value, { stream: true });
+        if(finalized)return;
+        buffer += result.done ? decoder.decode()+'\n' : decoder.decode(result.value, { stream: true });
         var lines = buffer.split('\n');
         buffer = lines.pop();
         for (var i = 0; i < lines.length; i++) {
-          if (lines[i].startsWith('data: ')) {
-            var data = lines[i].slice(6).trim();
-            if (data === '[DONE]') continue;
+          if (lines[i].startsWith('data:')) {
+            var data = lines[i].slice(5).trim();
+            if(!data)continue;
+            if (data === '[DONE]') {
+              finalizeRender({incomplete:answerIncomplete || invalidFrame || streamError});
+              reader.cancel().catch(function(){});
+              return;
+            }
             try {
               var parsed = JSON.parse(data);
               if (parsed.type === 'status') {
@@ -1841,7 +1826,14 @@
               } else if (parsed.type === 'replace_text') {
                 fullText = parsed.text || '';
                 ensureLoop();
+              } else if(parsed.type === 'answer_complete') {
+                fullText=String(parsed.text || '');
+                authoritativeAnswer=true;
+                answerIncomplete=parsed.incomplete===true;
+                invalidFrame=false;
+                ensureLoop();
               } else if (parsed.type === 'error') {
+                streamError=true;
                 notify('Error: ' + parsed.error, 'error');
               } else if (parsed.type === 'tractatus_trigger') {
                 startTractatusUpdate(parsed.projectId, parsed.userMessage, parsed.assistantResponse);
@@ -1859,15 +1851,21 @@
                   renderContextHealth(traceHealth);
                 }
               }
-            } catch (e) {}
+            } catch (e) { invalidFrame=true; }
           }
+        }
+        if(result.done) {
+          var incomplete=answerIncomplete || invalidFrame || streamError || !authoritativeAnswer;
+          if(incomplete && !streamError)notify('The connection ended before completion was confirmed. Any received text is preserved.','error');
+          finalizeRender({incomplete:incomplete});
+          return;
         }
         pump();
       }).catch(function(err) {
+        if(finalized)return;
         if (artifactCheckInterval) { clearInterval(artifactCheckInterval); artifactCheckInterval = null; }
         var c = textEl.querySelector('.cursor-blink');
         if (c) c.remove();
-        if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
         finalized = true;
         var ti2 = textEl.querySelector('.thinking-indicator');
         if (ti2) ti2.remove();
@@ -1882,8 +1880,11 @@
           els.btnSend.innerHTML = '&#9654;';
           els.btnSend.classList.remove('stop-mode');
           els.btnSend.disabled = false;
+        } else {
+          textEl.innerHTML=fmt(fullText);
+          notify('The answer was interrupted. Any received text is preserved.','error');
         }
-        if (onDone) onDone(fullText);
+        if (onDone) onDone(fullText,{incomplete:true});
       });
     }
     pump();
@@ -2181,7 +2182,7 @@
         }),
         signal: state.abortController.signal
       });
-      if (await handleGateResponse(res.clone())) {
+      if (await handleGateResponse(res)) {
         if (textEl) textEl.textContent = 'Free access limit reached.';
         state.streaming = false;
         state.abortController = null;
@@ -2207,10 +2208,11 @@
         }
         return;
       }
-      streamSSE(res, textEl, function(fullText) {
+      streamSSE(res, textEl, function(fullText,completion) {
         if (sendingSession && fullText) {
           sendingSession.transcript = sendingSession.transcript || [];
-          sendingSession.transcript.push({ role: 'assistant', content: fullText, model:sendingModel });
+          sendingSession.transcript.push({ role: 'assistant', content: fullText, model:sendingModel,
+            incomplete:!!(completion && completion.incomplete) });
         }
         state.streaming = false;
         state.abortController = null;

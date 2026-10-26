@@ -72,6 +72,14 @@ try {
   results.push('Cancellation enforces project ownership; legacy empty records remain archived but are excluded from rendering and model requests; no new empty records or browser JavaScript errors');
   await fs.writeFile('generated-artifacts/request-recovery-live-check.json',JSON.stringify({results},null,2));
   console.log(results.join('\n'));
+} catch(error) {
+  const pages=browser?browser.contexts().flatMap(context=>context.pages()):[];
+  const current=pages.at(-1);
+  if(current)console.error('Isolated recovery diagnostic:',JSON.stringify({
+    lastAnswer:await current.locator('.message.assistant .msg-text').last().innerText().catch(()=>'unavailable'),
+    sendClass:await current.locator('#btn-send').getAttribute('class').catch(()=>'unavailable')
+  }));
+  throw error;
 } finally {
   if(browser)await browser.close();
   if(project)await pool.query('DELETE FROM projects WHERE id=$1',[project]);
