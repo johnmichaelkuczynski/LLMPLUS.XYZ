@@ -6120,6 +6120,7 @@
   };
   var MODEL_LABELS = { claude: 'Claude', chatgpt: 'ChatGPT', deepseek: 'DeepSeek', grok: 'Grok', venice: 'Venice' };
   var compareAbort = null;
+  var compareRunId = 0;
 
   function openComparePicker() {
     if (!state.currentSession || !state.currentProject) {
@@ -6163,7 +6164,11 @@
     var bHdr = document.getElementById('compare-col-b-header');
     var statusEl = document.getElementById('compare-status');
     var titleEl = document.getElementById('compare-overlay-title');
-    var modelLabel = MODEL_LABELS[state.model] || 'Claude';
+    if (compareAbort) compareAbort.abort();
+    var runId = ++compareRunId;
+    var controller = new AbortController();
+    compareAbort = controller;
+    var modelLabel = MODEL_LABELS[state.model] || 'Selected model';
     aHdr.textContent = STANCE_LABELS[stanceA] + '  ·  ' + modelLabel;
     bHdr.textContent = STANCE_LABELS[stanceB] + '  ·  ' + modelLabel;
     titleEl.textContent = STANCE_LABELS[stanceA] + ' vs ' + STANCE_LABELS[stanceB];
@@ -6173,7 +6178,24 @@
     document.getElementById('compare-overlay').classList.remove('hidden');
 
     var textA = '', textB = '';
-    var doneA = false, doneB = false;
+    var laneStates = { A: 'streaming', B: 'streaming' };
+    var laneModels = { A: modelLabel, B: modelLabel };
+    var laneStances = { A: STANCE_LABELS[stanceA], B: STANCE_LABELS[stanceB] };
+
+    function updateStatus() {
+      var finished = function(s) { return s === 'completed' || s === 'incomplete' || s === 'cancelled'; };
+      if (laneStates.A === 'completed' && laneStates.B === 'completed')
+        statusEl.textContent = 'Done. ' + textA.trim().split(/\s+/).filter(Boolean).length +
+          ' words (A) · ' + textB.trim().split(/\s+/).filter(Boolean).length + ' words (B).';
+      else statusEl.textContent = 'A: ' + laneStates.A + ' · B: ' + laneStates.B +
+        (finished(laneStates.A) && finished(laneStates.B) ? '. Partial answers are preserved.' : '…');
+    }
+
+    function setLaneHeader(lane) {
+      var header = lane === 'A' ? aHdr : bHdr;
+      header.textContent = laneStances[lane] + '  ·  ' + laneModels[lane] +
+        (laneStates[lane] === 'completed' ? '' : '  ·  ' + laneStates[lane]);
+    }
 
     function appendLane(lane, t) {
       var body = lane === 'A' ? aBody : bBody;
@@ -6183,16 +6205,48 @@
       body.scrollTop = body.scrollHeight;
     }
 
-    function endLane(lane) {
-      if (lane === 'A') doneA = true; else doneB = true;
+    function endLane(lane, status, message) {
+      laneStates[lane] = ['completed', 'cancelled'].indexOf(status) >= 0 ? status : 'incomplete';
       var body = lane === 'A' ? aBody : bBody;
       var cursor = body.querySelector('.compare-cursor');
       if (cursor) cursor.remove();
-      if (doneA && doneB) statusEl.textContent = 'Done. ' + textA.split(/\s+/).length + ' words (A) · ' + textB.split(/\s+/).length + ' words (B).';
-      else statusEl.textContent = 'Lane ' + lane + ' done. Waiting for the other...';
+      if (laneStates[lane] !== 'completed' && !body.querySelector('.compare-incomplete')) {
+        var notice = document.createElement('p');
+        notice.className = 'compare-incomplete';
+        notice.setAttribute('role', 'status');
+        notice.textContent = message || (status === 'cancelled' ? 'Stopped. Partial answer preserved.' :
+          'Incomplete answer. The stream ended before completion was confirmed; partial text is preserved.');
+        body.appendChild(notice);
+      }
+      setLaneHeader(lane);
+      updateStatus();
     }
 
-    compareAbort = new AbortController();
+    function handleLine(line) {
+      if (runId !== compareRunId || !line.startsWith('data:')) return;
+      var data = line.slice(5).trim();
+      if (!data || data === '[DONE]') return;
+      var ev;
+      try { ev = JSON.parse(data); } catch (e) { return; }
+      if (ev.lane === 'A' || ev.lane === 'B') {
+        if (ev.model) laneModels[ev.lane] = MODEL_LABELS[ev.model] || ev.model;
+        if (ev.type === 'text') appendLane(ev.lane, ev.text || '');
+        else if (ev.type === 'replace_text') {
+          if (ev.lane === 'A') textA = ''; else textB = '';
+          appendLane(ev.lane, ev.text || '');
+        } else if (ev.type === 'lane_end') endLane(ev.lane, ev.status, ev.message);
+        else if (ev.type === 'lane_status') {
+          laneStates[ev.lane] = ev.status;
+          updateStatus();
+        }
+        setLaneHeader(ev.lane);
+      } else if (ev.type === 'error') {
+        ['A', 'B'].forEach(function(lane) {
+          if (laneStates[lane] !== 'completed') endLane(lane, 'incomplete', 'Incomplete answer: ' + ev.error);
+        });
+      }
+    }
+
     try {
       var res = await fetch('/api/chat/compare', {
         method: 'POST',
@@ -6209,44 +6263,39 @@
           model: state.model,
           targetWords: getTargetWords()
         }),
-        signal: compareAbort.signal
+        signal: controller.signal
       });
       if (!res.ok || !res.body) {
-        statusEl.textContent = 'Error: HTTP ' + res.status;
-        return;
+        throw new Error('HTTP ' + res.status);
       }
       var reader = res.body.getReader();
       var decoder = new TextDecoder();
       var buffer = '';
       while (true) {
         var chunk = await reader.read();
-        if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true });
+        if (runId !== compareRunId) { await reader.cancel(); return; }
+        buffer += chunk.done ? decoder.decode() + '\n' : decoder.decode(chunk.value, { stream: true });
         var lines = buffer.split('\n');
         buffer = lines.pop();
         for (var i = 0; i < lines.length; i++) {
-          var line = lines[i];
-          if (!line.startsWith('data: ')) continue;
-          var data = line.slice(6).trim();
-          if (!data || data === '[DONE]') continue;
-          try {
-            var ev = JSON.parse(data);
-            if (ev.type === 'text' && (ev.lane === 'A' || ev.lane === 'B')) {
-              appendLane(ev.lane, ev.text || '');
-            } else if (ev.type === 'lane_end' && (ev.lane === 'A' || ev.lane === 'B')) {
-              endLane(ev.lane);
-            } else if (ev.type === 'error') {
-              statusEl.textContent = 'Error: ' + ev.error;
-            }
-          } catch (e) {}
+          handleLine(lines[i]);
         }
+        if (chunk.done) break;
       }
     } catch (err) {
-      if (err.name !== 'AbortError') statusEl.textContent = 'Error: ' + err.message;
+      if (runId === compareRunId) ['A', 'B'].forEach(function(lane) {
+        if (laneStates[lane] === 'streaming' || laneStates[lane] === 'finishing')
+          endLane(lane, controller.signal.aborted ? 'cancelled' : 'incomplete',
+            controller.signal.aborted ? '' : 'Incomplete answer: ' + err.message);
+      });
     } finally {
-      compareAbort = null;
-      var ca = aBody.querySelector('.compare-cursor'); if (ca) ca.remove();
-      var cb = bBody.querySelector('.compare-cursor'); if (cb) cb.remove();
+      if (runId === compareRunId) {
+        compareAbort = null;
+        ['A', 'B'].forEach(function(lane) {
+          if (laneStates[lane] === 'streaming' || laneStates[lane] === 'finishing')
+            endLane(lane, controller.signal.aborted ? 'cancelled' : 'incomplete');
+        });
+      }
     }
   }
 
@@ -6258,6 +6307,12 @@
   if (btnCmpClosePick) btnCmpClosePick.addEventListener('click', closeComparePicker);
   var btnCmpCloseOv = document.getElementById('close-compare-overlay');
   if (btnCmpCloseOv) btnCmpCloseOv.addEventListener('click', closeCompareOverlay);
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && compareAbort) {
+      compareAbort.abort();
+      event.preventDefault();
+    }
+  });
   var btnCmpGo = document.getElementById('btn-compare-go');
   if (btnCmpGo) btnCmpGo.addEventListener('click', function() {
     var a = document.getElementById('compare-stance-a').value;

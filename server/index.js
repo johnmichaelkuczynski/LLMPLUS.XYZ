@@ -1,5 +1,6 @@
 import express from 'express';
 import {directChatPrompt,directOutputBudget} from './direct-chat-prompt.js';
+import { runComparisonLane } from './comparison-lane.js';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
@@ -3045,8 +3046,13 @@ app.post('/api/chat/compare', async function(req, res) {
   function send(obj) { res.write('data: ' + JSON.stringify(obj) + '\n\n'); }
   send({ type: 'status', status: 'thinking' });
 
-  var clientClosed = false;
-  req.on('close', function() { clientClosed = true; });
+  const lifetime = createRequestLifetime(req, res);
+  const requestTrace = contextTrace.getStore();
+  if (requestTrace) requestTrace.abortSignal = lifetime.signal;
+  const keepAlive = setInterval(() => {
+    if (!res.destroyed && !res.writableEnded) res.write(': keep-alive\n\n');
+  }, 5000);
+  keepAlive.unref?.();
 
   try {
     var sessionId = req.body.sessionId;
@@ -3128,10 +3134,12 @@ app.post('/api/chat/compare', async function(req, res) {
     }
     var reliableA = await prepareOriginalContext({pool,projectId,sessionId,message:userContent,
       system:systemA,model:modelChoice,maxOutputTokens:lengthMaxTokens,
+      signal:lifetime.signal,
       countTokens:modelChoice==='claude'?countClaudeInput:modelChoice==='grok'?countGrokInput:null,
       tokenCountMethod:modelChoice==='grok'?'provider_tokenizer_with_overhead_margin':'provider_count_tokens'});
     var reliableB = await prepareOriginalContext({pool,projectId,sessionId,message:userContent,
       system:systemB,model:modelChoice,maxOutputTokens:lengthMaxTokens,
+      signal:lifetime.signal,
       countTokens:modelChoice==='claude'?countClaudeInput:modelChoice==='grok'?countGrokInput:null,
       tokenCountMethod:modelChoice==='grok'?'provider_tokenizer_with_overhead_margin':'provider_count_tokens'});
     // Both lanes use the same original history. The slightly longer system may
@@ -3148,76 +3156,41 @@ app.post('/api/chat/compare', async function(req, res) {
     var writeLock = Promise.resolve();
     function safeSend(obj) {
       writeLock = writeLock.then(function() {
-        try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch (e) {}
+        if (!lifetime.signal.aborted && !res.destroyed && !res.writableEnded)
+          res.write('data: ' + JSON.stringify(obj) + '\n\n');
       });
       return writeLock;
     }
 
     async function runLane(lane, systemPrompt) {
-      try {
-        safeSend({ type: 'lane_start', lane: lane });
-        var bufferLane = false;
-        var laneText = '';
-        var apiRes;
-        var isOAI = false;
-        if (modelChoice === 'chatgpt')      { apiRes = await callOpenAI(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
-        else if (modelChoice === 'deepseek'){ apiRes = await callDeepSeek(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
-        else if (modelChoice === 'grok')    { apiRes = await callGrok(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
-        else if (modelChoice === 'venice')  { apiRes = await callVenice(msgs, systemPrompt, true, lengthMaxTokens); isOAI = true; }
-        else                                { apiRes = await callClaude(msgs, systemPrompt, true, lengthMaxTokens); }
-
-        if (!apiRes.ok) {
-          var errBody = await apiRes.text();
-          console.error('[Compare lane ' + lane + '] HTTP ' + apiRes.status + ': ' + errBody.substring(0, 300));
-          safeSend({ type: 'text', lane: lane, text: '\n\n[Error: API returned ' + apiRes.status + ']\n\n' });
-          safeSend({ type: 'lane_end', lane: lane });
-          return;
-        }
-        var reader = apiRes.body.getReader();
-        var decoder = new TextDecoder();
-        var buffer = '';
-        while (true) {
-          if (clientClosed) { try { reader.cancel(); } catch (e) {} break; }
-          var chunk = await reader.read();
-          if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
-          var lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (var j = 0; j < lines.length; j++) {
-            var line = lines[j];
-            if (!line.startsWith('data: ')) continue;
-            var data = line.slice(6).trim();
-            if (!data || data === '[DONE]') continue;
-            try {
-              var parsed = JSON.parse(data);
-              if (isOAI) {
-                if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
-                    laneText += parsed.choices[0].delta.content;
-                    if (!bufferLane) safeSend({ type: 'text', lane: lane, text: parsed.choices[0].delta.content });
-                }
-              } else {
-                if (parsed.type === 'content_block_delta' && parsed.delta && parsed.delta.type === 'text_delta') {
-                    laneText += parsed.delta.text;
-                    if (!bufferLane) safeSend({ type: 'text', lane: lane, text: parsed.delta.text });
-                }
-              }
-            } catch (e) {}
-          }
-        }
-        if (bufferLane) safeSend({ type: 'text', lane: lane, text: laneText });
-        var laneIssues = checkAnswerConsistency(laneText,reliableA.evidence,msgs);
-        if (laneIssues.length) safeSend({type:'consistency_warning',sessionId,projectId,lane,issues:laneIssues,
+      // Fork trace metadata too: concurrent lanes must not overwrite attribution.
+      const laneTrace = compareTrace ? { ...compareTrace, metadata: {
+        ...(lane === 'A' ? reliableA.metadata : reliableB.metadata), lane
+      } } : null;
+      const execute = async () => {
+        const result = await runComparisonLane({
+          lane, model:modelChoice, messages:msgs, system:systemPrompt, maxTokens:lengthMaxTokens,
+          format:responseFormat, request:userOwnWords, signal:lifetime.signal, send:safeSend,
+          openAI:modelChoice !== 'claude',
+          call:{claude:callClaude,chatgpt:callOpenAI,deepseek:callDeepSeek,grok:callGrok,venice:callVenice}[modelChoice],
+          canFit:(messages,system,budget) =>
+            conservativeTokenEstimate(messages,system)+budget+2048 <= CONTEXT_LIMITS[modelChoice],
+          onEnding:() => { if (laneTrace) {
+            laneTrace.purpose='continuation';
+            laneTrace.metadata={...laneTrace.metadata,purpose:'continuation',boundedCompletion:true};
+          } }
+        });
+        var laneIssues = checkAnswerConsistency(result.text,
+          lane === 'A' ? reliableA.evidence : reliableB.evidence,msgs);
+        if (!lifetime.signal.aborted && laneIssues.length) safeSend({type:'consistency_warning',sessionId,projectId,lane,issues:laneIssues,
           message:'A possible factual inconsistency was detected in this comparison lane. Inspect the source evidence.'});
-        safeSend({ type: 'lane_end', lane: lane });
-      } catch (err) {
-        console.error('[Compare lane ' + lane + '] Exception:', err.message);
-        safeSend({ type: 'text', lane: lane, text: '\n\n[Error: ' + err.message + ']\n\n' });
-        safeSend({ type: 'lane_end', lane: lane });
-      }
+      };
+      return laneTrace ? contextTrace.run(laneTrace,execute) : execute();
     }
 
     await Promise.all([runLane('A', systemA), runLane('B', systemB)]);
     await writeLock;
+    lifetime.signal.throwIfAborted();
     if (compareTrace) send({type:'context_trace',sessionId,projectId,traceIds:compareTrace.traceIds});
     res.write('data: [DONE]\n\n');
     res.end();
@@ -3225,6 +3198,9 @@ app.post('/api/chat/compare', async function(req, res) {
     console.error('Compare error:', err);
     try { send({ type: 'error', error: err.message }); } catch (e) {}
     res.end();
+  } finally {
+    clearInterval(keepAlive);
+    lifetime.dispose();
   }
 });
 

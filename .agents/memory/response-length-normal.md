@@ -26,3 +26,15 @@ Never clone successful streaming responses just to inspect their HTTP status.
 **Why:** An unused cloned body leaves another branch of the stream alive. Canceling the displayed branch alone then does not cancel the underlying source; this was reproduced with a held-open browser stream.
 
 **How to apply:** Inspect the original response status. Read a gating-error body only when the response actually represents that error, and do not create an unread clone on the success path.
+
+The comparison panels retain a separately scoped bounded ending repair. Do not restore that repair to ordinary chat.
+
+**Why:** The comparison task explicitly requires one short ending attempt for an interrupted lane; ordinary chat now preserves direct provider output without an automatic ending.
+
+**How to apply:** Keep comparison completion helpers scoped to the comparison lane implementation, while preserving ordinary-chat direct-output behavior.
+
+Exact-output requests must not be expanded by a comparison ending attempt, even when a provider hits its cap; flag that lane incomplete instead.
+
+**Why:** Finishing an intentional quotation or exact payload changes the requested output. A complete-looking sentence is less important than preserving the explicit output contract.
+
+**How to apply:** Separate permission to repair from the decision to label output incomplete. Neither a lane-end event nor transport closure alone proves successful completion.
